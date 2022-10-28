@@ -19,20 +19,25 @@ sizeof = ctypes.sizeof
 reference = ctypes.byref
 addressof = ctypes.addressof
 
+
+
 def init_process_regions(pid, process):
 	sysinfo = SYSTEM_INFO()
 	Kernel32.GetSystemInfo(reference(sysinfo))
 	mbi = MEMORY_BASIC_INFORMATION()
-	
-	memory_regions = []
-	current_address = sysinfo.lpMinimumApplicationAddress
-	end_address = sysinfo.lpMaximumApplicationAddress
 
-	while current_address < end_address:
+	current_address = sysinfo.lpMinimumApplicationAddress
+	end_application_address = sysinfo.lpMaximumApplicationAddress
+
+	memory_regions = []
+	memory_size = 0
+
+	while current_address < end_application_address:
 		Kernel32.VirtualQueryEx(process, CPointer(current_address), reference(mbi), sizeof(mbi))
 		
 		if mbi.Protect == MEMORY_PROTECTION.PAGE_READWRITE and mbi.State == MEMORY_STATE.MEM_COMMIT:
 			memory_regions.append(Region(current_address, mbi.RegionSize))
+			memory_size += mbi.RegionSize
 		
 		current_address += mbi.RegionSize
-	return memory_regions
+	return memory_regions, memory_size
