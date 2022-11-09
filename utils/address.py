@@ -23,7 +23,7 @@ class Address(int):
 		return hex(self)
 
 	def __repr__(self):
-		return f'{hex(self)}'
+		return hex(self)
 
 
 class Region:

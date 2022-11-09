@@ -1,29 +1,61 @@
-from threading import Thread
-from time import sleep
+from utils.message import Message, empty
+from pymem import Pymem
+from multiprocessing import Process, Queue, Event
+from sys import exit
 
-class MemoryView(Thread):
-	def __init__(self, process):
-		Thread.__init__(self, daemon=True)
+class MemoryView(Process):
+	def __init__(self, process_name: str, in_queue: Queue, out_queue: Queue):
+		Process.__init__(self)
 		self.frozen_addresses = []
 		self.selected_addresses = []
-		self.process_reader = process
-		self.changes = []
-		self.loop = True
+		self.in_queue = in_queue
+		self.out_queue = out_queue
+		self.process_name = process_name
 
 	def run(self):
-		while self.loop:
-			for change in self.changes:
-				address = self.selected_addresses[change[0]]
-				address.value = change[1]
-				self.process_reader.write_bytes(address,address.value, len(address))
+		process_reader = Pymem(process_name=self.process_name)
+		proc_message:Message = empty
+		
+		while True:
+			if not self.in_queue.empty():
+				proc_message = self.in_queue.get_nowait()
+				print(proc_message.message_type, proc_message.message)
 
-			for address in self.selected_addresses:
-				if address not in self.frozen_addresses:
-					address.value = self.process_reader.read_bytes(address, len(address))
-			for address in self.frozen_addresses:
-				self.process_reader.write_bytes(address,address.value, len(address))
-			if len(self.selected_addresses) == 0:
-				sleep(0.000000001)
+			action = proc_message.message_type
+
+			if action == 'EXIT':
+				exit(proc_message.message[0])
+			if action == 'RESET':
+				self.reset_process(proc_message.message[0])
+				process_reader = Pymem(process_name=self.process_name)
+			if action == 'ADD_ADDRESS':
+				success = self.selectAddress(proc_message.message[0])
+				self.out_queue.put(Message(message_type='ADDRESS_ADDED', message=[success]))
+			if action == 'DELETE_ADDRESS':
+				self.deleteAddress(proc_message.message[0])
+			if action == 'EDIT_ADDRESS':
+				self.setValue(proc_message.message[0],proc_message.message[1])
+			if action == 'FREEZE_ADDRESS':
+				self.freezeAddress(proc_message.message[0])
+			if action == 'UNFREEZE_ADDRESS':
+				self.unfreezeAddress(proc_message.message[0])
+			if action == 'UPDATE_VALUES':
+				self.out_queue.put(Message(message_type='UPDATE_RESULT', message=self.collect_values()))
+
+			try:
+				for address in self.selected_addresses:
+					if address not in self.frozen_addresses:
+						address.value = process_reader.read_bytes(address, len(address))
+				for address in self.frozen_addresses:
+					process_reader.write_bytes(address, address.value, len(address))
+			except Exception as e:
+				print(e)
+				pass
+			proc_message = empty
+
+	def collect_values(self):
+		return [address.value for address in self.selected_addresses]
+
 
 	def freezeAddress(self, index):
 		self.frozen_addresses.append(self.selected_addresses[index])
@@ -35,18 +67,18 @@ class MemoryView(Thread):
 		return True
 	
 	def setValue(self, index, value):
-		self.changes.append((index, value))
+		self.selected_addresses[index].value = value
 
-	def unfreezeAddress(self, index):
+	def unfreezeAddress(self, index: int):
 		self.frozen_addresses.remove(self.selected_addresses[index])
 
-	def deleteAddress(self, index):
-		self.selected_addresses.remove(self.selected_addresses[index])
+	def deleteAddress(self, index: int):
+		address = self.selected_addresses[index]
+		if address in self.frozen_addresses:
+			self.frozen_addresses.remove(address)
+		self.selected_addresses.remove(address)
 
-	def reset_process(self, process):
+	def reset_process(self, process_name: str):
 		self.frozen_addresses = []
 		self.selected_addresses = []
-		self.process_reader = process
-
-	def stop_loop(self):
-		self.loop = False
+		self.process_name = process_name
