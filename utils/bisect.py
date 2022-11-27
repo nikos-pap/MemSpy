@@ -1,6 +1,7 @@
 """Bisection algorithms."""
 from sys import version_info
 
+
 def insort_right(a, x, lo=0, hi=None, *, key=None):
 	"""Insert item x in list a, and keep it sorted assuming a is sorted.
 
@@ -14,6 +15,7 @@ def insort_right(a, x, lo=0, hi=None, *, key=None):
 	else:
 		lo = bisect_right(a, key(x), lo, hi, key=key)
 	a.insert(lo, x)
+	return lo
 
 
 def bisect_right(a, x, lo=0, hi=None, *, key=None):
@@ -64,6 +66,8 @@ def insort_left(a, x, lo=0, hi=None, *, key=None):
 	else:
 		lo = bisect_left(a, key(x), lo, hi, key=key)
 	a.insert(lo, x)
+	return lo
+
 
 def bisect_left(a, x, lo=0, hi=None, *, key=None):
 	"""Return the index where to insert item x in list a, assuming a is sorted.
@@ -98,10 +102,11 @@ def bisect_left(a, x, lo=0, hi=None, *, key=None):
 				hi = mid
 	return lo
 
+
 if version_info[0] >= 3 and version_info[1] >= 10:
-# Overwrite above definitions with a fast C implementation
+	# Overwrite above definitions with a fast C implementation
 	try:
-		from _bisect import *
+		from _bisect import bisect_left, bisect_right
 	except ImportError:
 		pass
 
