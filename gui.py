@@ -361,8 +361,8 @@ class App(tk.Tk):
 
 	def fill_address_table(self):
 		address_list = self.backend.get_address_list(Type[self.typeVar.get()])
-		for address in address_list:
-			self.tree.insert(values=address['values'], tags=[self.typeVar.get()])
+		self.tree.load_addresses(address_list, self.typeVar.get())
+		self.tree.show_page()
 
 	def on_closing(self):
 		self.backend.stop_loop()

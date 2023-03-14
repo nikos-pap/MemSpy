@@ -5,9 +5,7 @@ from pymem.ressources.structure import MEMORY_PROTECTION, MEMORY_STATE, SYSTEM_I
 
 sysinfo = SYSTEM_INFO()
 kernel32.GetSystemInfo(byref(sysinfo))
-start_application_address = sysinfo.lpMinimumApplicationAddress
-end_application_address = sysinfo.lpMaximumApplicationAddress
-memory_size_limit = end_application_address - start_application_address
+memory_size_limit = sysinfo.lpMaximumApplicationAddress - sysinfo.lpMinimumApplicationAddress
 mbi = MEMORY_BASIC_INFORMATION()
 allowed_protections = [
 	MEMORY_PROTECTION.PAGE_EXECUTE_READ,
@@ -18,12 +16,12 @@ allowed_protections = [
 
 
 def init_process_regions(process):
-	current_address = start_application_address
+	current_address = sysinfo.lpMinimumApplicationAddress
 
 	memory_regions = []
 	memory_size = 0
 
-	while current_address < end_application_address:
+	while current_address < sysinfo.lpMaximumApplicationAddress:
 		kernel32.VirtualQueryEx(process, cpointer(current_address), byref(mbi), sizeof(mbi))
 		
 		if mbi.Protect in allowed_protections and mbi.State == MEMORY_STATE.MEM_COMMIT:
@@ -34,9 +32,9 @@ def init_process_regions(process):
 
 
 def process_regions(process):
-	current_address = start_application_address
+	current_address = sysinfo.lpMinimumApplicationAddress
 
-	while current_address < end_application_address:
+	while current_address < sysinfo.lpMaximumApplicationAddress:
 		kernel32.VirtualQueryEx(process, cpointer(current_address), byref(mbi), sizeof(mbi))
 		
 		if mbi.Protect in allowed_protections and mbi.State == MEMORY_STATE.MEM_COMMIT:

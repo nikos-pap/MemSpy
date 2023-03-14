@@ -16,6 +16,7 @@ class Backend:
 		self.proc_queue_in = Queue(maxsize=15)
 		self.proc_queue_out = Queue(maxsize=15)
 		self.memory_view = None
+		self.page_size = 200
 
 	def init_process_reader(self, name: str):
 		if self.process_reader is not None:
@@ -62,7 +63,7 @@ class Backend:
 		result = []
 		for address in self.address_list:
 			value = convert_from_bytes(address.value, value_type)
-			result.append({'values': (hex(address), value)})
+			result.append((hex(address), value))
 		return result
 
 	def filter_address_list(self, condition: Callable[[bytes, bytes], bool], input_val: bytes = None):
