@@ -109,7 +109,7 @@ class AddressList(tk.Frame):
 		if not text:
 			return
 
-		self.filtered_list = list(filter(lambda a: text in a.address, self.filtered_list))
+		self.filtered_list = list(filter(lambda a: text in a.address, self.address_list))
 		self.show_page()
 
 

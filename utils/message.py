@@ -9,7 +9,7 @@ message_types: List[str] = ['EXIT', 'ADD_ADDRESS', 'DELETE_ADDRESS', 'EDIT_ADDRE
 @dataclass
 class Message:
     message_type: str = 'EMPTY'
-    message: List[int | str | bytes] = field(default_factory=list)
+    message: List = field(default_factory=list)
 
 
 terminate: Callable[[int], Message] = lambda e: Message('EXIT', [e])
