@@ -1,0 +1,5 @@
+Pillow
+pywin32
+Pymem
+regex
+psutil
