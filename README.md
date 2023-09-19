@@ -20,6 +20,13 @@ To execute the app you must run ```python gui.py```. After that, a window will p
 
 ![GUI](imgs/GUI.png)
 
+## Future Goals
+In this section, we provide some future goals about this project.
+* Users can use all the opperations (not only "Equals") at the "New Scan".
+* Implementation of Pointer Scanner
+* Redesign
+* Order of processes by PID
+
 ## Contact
 Georgoulas Dimosthenis - dimosgeo99@gmail.com
 
