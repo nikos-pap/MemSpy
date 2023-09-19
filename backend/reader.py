@@ -21,6 +21,7 @@ class ProcessMemoryReader:
 	def value_scan_re(self, value: bytes, progress_bar):
 		memory_size = memory_size_limit
 		address_list = []
+		value = re.escape(value, special_only=True)
 		
 		for region in process_regions(self.proc):
 			try:
