@@ -345,7 +345,7 @@ class App(tk.Tk):
 		old_values[-1] = self.editVariable.get()
 		value_type = Type['Int32']
 		for tag in tags:
-			if tag in Type:
+			if tag in Type.__members__:
 				value_type = Type[tag]
 		self.backend.set_value(index, convert_to_bytes(self.editVariable.get(), value_type))
 		self.selectedTree.item(item, values=old_values, tags=tags)
