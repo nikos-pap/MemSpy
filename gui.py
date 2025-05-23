@@ -1,3 +1,5 @@
+from PyQt6.QtCore import QObject, pyqtSignal
+
 from utils.types import convert_to_bytes, convert_from_bytes, Type
 from guiwidgets.address_list import AddressList
 from PIL import ImageTk
