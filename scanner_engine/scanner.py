@@ -13,7 +13,8 @@ class MemoryScanner(Process):
         self.queueIn: Queue = scanner_queue
         self.queueOut: Queue = results_queue
         self.queueMain: Queue = out_queue
-        self.scanner: Optional[ProcessInspector] = None
+        # self.scanner: Optional[ProcessInspector] = None
+        self.scanner = newMemoryScanner()
 
     def run(self):
         while True:
@@ -26,7 +27,7 @@ class MemoryScanner(Process):
             match message.message_type:
                 case MessageType.SET_PROCESS:
                     pid = message.message[0]
-                    self.scanner = newMemoryScanner(pid)
+                    self.scanner.change_process(pid)
                     print(f'(MemoryScanner) Process id set to {pid}')
                 case MessageType.START_SCAN:
                     value = message.message[0]

@@ -1,12 +1,13 @@
 import ctypes
 import os
+import time
 from ctypes import wintypes
 
 import numpy as np
 from numba import cuda
 
 from scanner_engine.memory_scanner import AbstractMemoryScanner
-from scanner_engine.utils.parallel import filter_and_extract_values_gpu, filter_and_extract_values_cpu
+import scanner_engine.utils.parallel as parallel_utils
 from utils.types import Condition
 
 PROCESS_ALL_ACCESS = 0x1F0FFF
@@ -49,6 +50,7 @@ class Region:
 
         if use_gpu:
             # GPU path
+            s = time.time()
             d_data = cuda.to_device(self.data)
             d_ranges = cuda.to_device(ranges)
 
@@ -58,22 +60,28 @@ class Region:
 
             threads_per_block = 256
             blocks = (length + threads_per_block - 1) // threads_per_block
-
-            filter_and_extract_values_gpu[blocks, threads_per_block](
+            parallel_utils.filter_and_extract_values_gpu[blocks, threads_per_block](
                 d_data, self.base_address, d_ranges, d_addrs, d_values, d_counts, values_type_size, length, condition, step_enable
             )
 
             count = d_counts.copy_to_host()[0]
             addrs = d_addrs.copy_to_host()[:count]
             values = d_values.copy_to_host()[:count]
+            print(time.time() - s)
         else:
-            addrs, values = filter_and_extract_values_cpu(self.data, self.base_address, ranges, values_type, values_type_size, length, condition, step_enable)
+            addrs, values = parallel_utils.filter_and_extract_values_cpu(self.data, self.base_address, ranges, values_type, values_type_size, length, condition, step_enable)
         self.pointers = np.column_stack((addrs, values))
         self.data = []
 
 class MemoryScanner(AbstractMemoryScanner):
-    def __init__(self, pid: int):
-        super().__init__(pid)
+    def __init__(self):
+        # super().__init__(pid)
+        self.warm_up_parallel()
+
+    def warm_up_parallel(self):
+        if cuda.is_available():
+            parallel_utils.warm_up_gpu()
+        parallel_utils.warm_up_cpu()
 
     def read_memory(self):
         if not self.handle:
@@ -118,7 +126,7 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, False, Condition.EQUAL, False)
+            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, True, Condition.EQUAL, False)
             if region.pointers.shape[0]>0:
                 for address, value in region.pointers:
                     yield int(address), (current_size * 100) // total_size

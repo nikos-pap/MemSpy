@@ -7,6 +7,24 @@ from utils.types import Condition
 
 warnings.simplefilter("ignore", category=NumbaWarning)
 
+
+@njit
+def cpu_func():
+    pass
+
+# Simple GPU kernel
+@cuda.jit
+def gpu_kernel():
+    pass
+
+# CPU warm-up
+def warm_up_cpu():
+    cpu_func()
+
+# GPU warm-up
+def warm_up_gpu():
+    gpu_kernel[1, 1]()  # Launch with 1 block of 1 thread
+
 @njit(parallel=True)
 def filter_and_extract_values_cpu(data, base_address, ranges, values_type, values_type_size, length, search_condition, step_enable):
     temp_addrs = np.zeros(length, dtype=np.uint64)
