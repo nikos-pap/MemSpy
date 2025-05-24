@@ -120,8 +120,12 @@ class MemoryScannerUI(QMainWindow):
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
 
         dock_container.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.search_table_dock)
-        dock_container.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.saved_table_dock)
+        dock_container.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self.saved_table_dock)
         dock_container.tabifyDockWidget(self.saved_table_dock, self.search_table_dock)
+        dock_container.setDockOptions(
+            QMainWindow.DockOption.AllowNestedDocks |
+            QMainWindow.DockOption.AllowTabbedDocks
+        )
         # Table
         self.search_address_table = PaginatedTable(0, 4)
         # self.search_address_table.setHorizontalHeaderLabels(["Freeze", "Address", "Value", "Previous Value"])
