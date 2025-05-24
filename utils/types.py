@@ -21,6 +21,7 @@ class Condition(Enum):
     EQUAL = auto()
     GREATER_THAN = auto()
     LESS_THAN = auto()
+    BETWEEN = auto()
     CHANGED = auto()
     NOT_EQUAL = auto()
 
