@@ -146,12 +146,12 @@ class MemoryScanner(AbstractMemoryScanner):
                         id += 1
             address += memory_info.RegionSize
 
-    def scan_value(self, value: bytes) -> tuple[int, int]:
+    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
         total_size = self.get_working_memory_size()
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, True, Condition.EQUAL, True)
+            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, use_gpu, condition, step_enable)
             # region.data2values2(np.array([[value, 0, 0]], dtype=np.uint32), 4)
             if region.pointers.shape[0]>0:
                 for address, value in region.pointers:
