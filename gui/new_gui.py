@@ -8,9 +8,11 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
 from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
+
+from backend import Backend
 from guiwidgets import DynamicComboBox
 from guiwidgets.paged_table import PaginatedTable
-from model.model import Model
+from models.model import Model
 from utils import Type, TYPE_RANGES, convert_to_bytes
 from utils.types import Condition
 
@@ -44,8 +46,8 @@ class MemoryScannerUI(QMainWindow):
         super().__init__()
         self.setWindowTitle("Memory Scanner")
 
-        self.model = Model()
-        self.backend = self.model.backend
+        # self.models = Model()
+        self.backend = Backend()
         horizontal_spacing = 10
         width = 1000
         height = 700
@@ -121,13 +123,14 @@ class MemoryScannerUI(QMainWindow):
         dock_container.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self.saved_table_dock)
         dock_container.tabifyDockWidget(self.saved_table_dock, self.search_table_dock)
         # Table
-        self.search_address_table = PaginatedTable(self.model.filter_addresses, self.model.setAddressValue, self.model.change_freeze_address_status, self.backend.listener.dataReady, 0, 4)
+        self.search_address_table = PaginatedTable(0, 4)
         # self.search_address_table.setHorizontalHeaderLabels(["Freeze", "Address", "Value", "Previous Value"])
         header = self.search_address_table.horizontalHeader()
         # header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        # header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
         self.search_table_dock.setWidget(self.search_address_table)
 
         self.saved_table = QTableWidget(0, 3)
@@ -156,9 +159,15 @@ class MemoryScannerUI(QMainWindow):
 
         self.update_process_list_command()
         self.initialise()
-        # self.model.dataChanged.connect(self.search_address_table.setValue)
+        self.backend.listener.dataReady.connect(self.search_address_table.handleUpdate)
+        self.backend.listener.progressSignal.connect(self.progress_bar.setValue)
+        self.backend.listener.totalValuesSignal.connect(self.finished_scan)
+        self.backend.listener.pageRangeSignal.connect(self.search_address_table.setPageRanges)
+        self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
+        self.search_address_table.previousPageSignal.connect(self.backend.get_previous_page)
+        # self.models.dataChanged.connect(self.search_address_table.setValue)
         # self.thread = None
-        self.pool = QThreadPool.globalInstance()
+        # self.pool = QThreadPool.globalInstance()
         # self.timer = QTimer(self)
         # self.timer.timeout.connect(self.update_process_list_command)
         # self.timer.start(4000)
@@ -220,7 +229,7 @@ class MemoryScannerUI(QMainWindow):
 
         self.process_box.clear()
         self.process_box.insertItem(0, "-- Select Process --", None)
-        names, images, pids = self.model.getRunningProcesses()
+        names, images, pids = self.backend.getRunningProcesses()
 
         for name, image, pid in zip(names, images, pids):
             label = format_item(name, pid)
@@ -252,9 +261,9 @@ class MemoryScannerUI(QMainWindow):
             return
         condition = Condition.EQUAL
         self.disable_scan_navigation()
-        self.model.scan(value, condition)
+        self.backend.scan(value, condition)
         # Connect signals
-        # task = ScannerThread(self.model, value)
+        # task = ScannerThread(self.models, value)
         # task.signals.finished.connect(self.finished_scan)
         # task.signals.progress.connect(self.progress_bar.setValue)
         # task.signals.error.connect(self.on_scan_error)
@@ -263,11 +272,10 @@ class MemoryScannerUI(QMainWindow):
     def on_scan_error(self, e):
         print(e)
 
-    def finished_scan(self):
-        print('finished')
-        print(self.model.scan_time)
+    def finished_scan(self, total: int):
         self.enable_scan_navigation()
-        self.fill_address_table()
+        self.search_address_table.setTotal(total)
+        self.search_address_table.show_message()
 
     def disable_scan_navigation(self):
         self.typeCombo.setDisabled(True)
@@ -290,7 +298,7 @@ class MemoryScannerUI(QMainWindow):
         self.isAttached = True
         self.setWindowTitle(f'Mem Scanner - {proc_id}')
         start = time.time()
-        self.model.initProcessReader(proc_id)
+        self.backend.init_process_reader(proc_id)
         print(f'It takes {time.time() - start}')
         self.setWindowIcon(QIcon())
         if icon:
@@ -355,5 +363,5 @@ class MemoryScannerUI(QMainWindow):
             self.valid_input = False
 
     def closeEvent(self, event):
-        self.model.terminate()
+        self.backend.stop_loop()
         event.accept()

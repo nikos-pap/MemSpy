@@ -21,7 +21,7 @@ class ProcessMemoryReader:
 		# address_list = []
 		value = re.escape(value, special_only=True)
 		# progress = 0
-		address_list = self.pymem_handler.search_bytes(value, progress_command)
+		address_list = self.pymem_handler.scan_value(value, progress_command)
 		# for region in process_regions(self.proc):
 		# 	progress += region.size
 		# 	print(region.size)

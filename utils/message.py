@@ -13,12 +13,18 @@ class MessageType(Enum):
     RESET = auto()
     EMPTY = auto()
     ADD_ADDRESS = auto()
-    DELETE_ADDRESS = auto()
-    FREEZE_ADDRESS = auto()
-    UNFREEZE_ADDRESS = auto()
-    EDIT_ADDRESS = auto()
+    GET_NEXT_PAGE = auto()
+    GET_PREV_PAGE = auto()
+    SET_PAGE_RANGE = auto()
+    # DELETE_ADDRESS = auto()
+    # FREEZE_ADDRESS = auto()
+    # UNFREEZE_ADDRESS = auto()
+    # EDIT_ADDRESS = auto()
     VALUE_CHANGED = auto()
+    # scanner messages
     START_SCAN = auto()
+    SET_TOTAL_VALUES = auto()
+    SET_PROGRESS = auto()
 
 
 @dataclass

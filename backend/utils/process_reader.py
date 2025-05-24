@@ -1,7 +1,9 @@
 import ctypes
 from ctypes import wintypes
 from collections import namedtuple
-from typing import Optional, Callable, Any
+from typing import Callable, Any
+
+from scanner_engine.memory_scanner import AbstractMemoryScanner
 
 # ——— Constants ———
 PROCESS_QUERY_INFORMATION = 0x0400
@@ -29,22 +31,6 @@ SE_PRIVILEGE_ENABLED = 0x00000002
 
 
 # ——— Structures ———
-class ProcessMemoryCountersEx(ctypes.Structure):
-    _fields_ = [
-        ('cb', wintypes.DWORD),
-        ('PageFaultCount', wintypes.DWORD),
-        ('PeakWorkingSetSize', ctypes.c_size_t),
-        ('WorkingSetSize', ctypes.c_size_t),
-        ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
-        ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
-        ('PagefileUsage', ctypes.c_size_t),
-        ('PeakPagefileUsage', ctypes.c_size_t),
-        ('PrivateUsage', ctypes.c_size_t),
-    ]
-
-
 class MemoryBasicInformation(ctypes.Structure):
     _fields_ = [
         ('BaseAddress', ctypes.c_void_p),
@@ -65,18 +51,8 @@ MemoryRegion = namedtuple('MemoryRegion', [
 
 # ——— Load libraries ———
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
-psapi = ctypes.WinDLL('Psapi', use_last_error=True)
-advapi32 = ctypes.WinDLL('Advapi32', use_last_error=True)
 
 # ——— WinAPI prototypes ———
-OpenProcess = kernel32.OpenProcess
-OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-OpenProcess.restype = wintypes.HANDLE
-
-CloseHandle = kernel32.CloseHandle
-CloseHandle.argtypes = (wintypes.HANDLE,)
-CloseHandle.restype = wintypes.BOOL
-
 VirtualQueryEx = kernel32.VirtualQueryEx
 VirtualQueryEx.argtypes = (
     wintypes.HANDLE,   # hProcess
@@ -94,104 +70,11 @@ ReadProcessMemory.argtypes = (
 )
 ReadProcessMemory.restype = wintypes.BOOL
 
-psapi.GetProcessMemoryInfo.argtypes = (
-    wintypes.HANDLE, ctypes.POINTER(ProcessMemoryCountersEx), wintypes.DWORD
-)
-psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
-
-advapi32.OpenProcessToken.argtypes = (wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE))
-advapi32.OpenProcessToken.restype = wintypes.BOOL
-advapi32.LookupPrivilegeValueW.argtypes = (wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_ulonglong))
-advapi32.LookupPrivilegeValueW.restype = wintypes.BOOL
-advapi32.AdjustTokenPrivileges.argtypes = (
-    wintypes.HANDLE, wintypes.BOOL, ctypes.c_void_p,
-    wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p
-)
-advapi32.AdjustTokenPrivileges.restype = wintypes.BOOL
-
-
-# ——— Helper: enable SeDebugPrivilege ———
-def enable_debug_privilege():
-    hToken = wintypes.HANDLE()
-    if not advapi32.OpenProcessToken(
-            kernel32.GetCurrentProcess(),
-            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
-            ctypes.byref(hToken)
-    ):
-        raise ctypes.WinError(ctypes.get_last_error())
-
-    luid = ctypes.c_ulonglong()
-    if not advapi32.LookupPrivilegeValueW(None, 'SeDebugPrivilege', ctypes.byref(luid)):
-        CloseHandle(hToken)
-        raise ctypes.WinError(ctypes.get_last_error())
-
-    class LUIDAttributes(ctypes.Structure):
-        _fields_ = [('Luid', ctypes.c_ulonglong), ('Attributes', wintypes.DWORD)]
-
-    class TokenPrivileges(ctypes.Structure):
-        _fields_ = [('PrivilegeCount', wintypes.DWORD), ('Privileges', LUIDAttributes * 1)]
-
-    tp = TokenPrivileges()
-    tp.PrivilegeCount = 1
-    tp.Privileges[0] = LUIDAttributes(luid.value, SE_PRIVILEGE_ENABLED)
-
-    if not advapi32.AdjustTokenPrivileges(hToken, False, ctypes.byref(tp), ctypes.sizeof(tp), None, None):
-        CloseHandle(hToken)
-        raise ctypes.WinError(ctypes.get_last_error())
-
-    CloseHandle(hToken)
-
-
-# --- Scan each region in chunks for a byte-pattern --- #
-def scan_region(proc, base, size, pattern, chunk_size=1 << 20):
-    buffer = ctypes.create_string_buffer(chunk_size)
-    read = ctypes.c_size_t(0)
-    results = []
-    offset = 0
-
-    while offset < size:
-        to_read = min(chunk_size, size - offset)
-        success = ReadProcessMemory(proc,
-                                    ctypes.c_void_p(base + offset),
-                                    buffer,
-                                    to_read,
-                                    ctypes.byref(read))
-        if not success:
-            break
-
-        data = buffer.raw[:read.value]
-        idx = data.find(pattern)
-        while idx != -1:
-            results.append(base + offset + idx)
-            idx = data.find(pattern, idx + 1)
-
-        offset += to_read
-
-    return results, size
-
 
 # ——— ProcessInspector Class ———
-class ProcessInspector:
+class ProcessInspector(AbstractMemoryScanner):
     def __init__(self, pid: int, enable_debug: bool = False):
-        if enable_debug:
-            enable_debug_privilege()
-        self.pid = pid
-        flags = (
-                PROCESS_QUERY_INFORMATION
-                | PROCESS_VM_READ
-                | PROCESS_VM_WRITE
-                | PROCESS_VM_OPERATION
-        )
-        self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
-        if not self.handle:
-            raise ctypes.WinError(ctypes.get_last_error())
-
-    def get_working_set_size(self) -> int:
-        cnt = ProcessMemoryCountersEx()
-        cnt.cb = ctypes.sizeof(cnt)
-        if not psapi.GetProcessMemoryInfo(self.handle, ctypes.byref(cnt), cnt.cb):
-            raise ctypes.WinError(ctypes.get_last_error())
-        return cnt.WorkingSetSize
+        super().__init__(pid, enable_debug)
 
     def get_memory_regions(self):
         regions = []
@@ -222,13 +105,13 @@ class ProcessInspector:
 
         # return regions
 
-    def search_bytes(self, pattern: bytes, progress_command: Callable[[Any], None] = lambda a: None):
+    def scan_value(self, pattern: bytes) -> tuple[int, int]:
         """
         Search for a byte sequence 'pattern' in all committed, readable regions.
         Returns a list of (address, data) tuples for each match.
         """
         results = []
-        totalSize = self.get_working_set_size()
+        totalSize = self.get_working_memory_size()
         currentSize = 0
         for region in self.get_memory_regions():
             if region.State != MEM_COMMIT:
@@ -252,13 +135,12 @@ class ProcessInspector:
             while idx != -1:
                 match_addr = addr + idx
                 match_data = data[idx:idx + len(pattern)]
-                yield match_addr
+                yield match_addr, int(currentSize / totalSize * 100)
                 idx = data.find(pattern, idx + 4)
             currentSize += region.RegionSize
-            progress_command(int((currentSize / totalSize) * 100))
-        return results
+        # return results
 
-    def search_bytes_fast(self, pattern: bytes, progress_command: Optional[Callable[[Any], None]]):
+    def search_bytes_fast(self, pattern: bytes, progress_command: Callable[[Any], None] = lambda a: None):
         """
         For each committed, readable region:
           1) Read it all in one ReadProcessMemory call
@@ -412,18 +294,3 @@ class ProcessInspector:
             )
 
         return written.value == size
-
-    def close(self):
-        if self.handle:
-            CloseHandle(self.handle)
-            self.handle = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        self.close()
-
-    def __del__(self):
-        if getattr(self, 'handle', None):
-            CloseHandle(self.handle)

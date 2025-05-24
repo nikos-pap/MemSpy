@@ -72,8 +72,8 @@ class Region:
         self.data = []
 
 class MemoryScanner(AbstractMemoryScanner):
-    def __init__(self, pid: int, enable_debug: bool):
-        super().__init__(pid, enable_debug)
+    def __init__(self, pid: int):
+        super().__init__(pid)
 
     def read_memory(self):
         if not self.handle:
@@ -121,7 +121,7 @@ class MemoryScanner(AbstractMemoryScanner):
             region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, False, Condition.EQUAL, False)
             if region.pointers.shape[0]>0:
                 for address, value in region.pointers:
-                    yield address, (current_size * 100) // total_size
+                    yield int(address), (current_size * 100) // total_size
 
             current_size += region.size
 

@@ -14,23 +14,34 @@ import os
 
 class QueueWorker(QObject):
     """Lives in a QThread, pulls ints from the multiprocessing.Queue and emits them."""
-    dataReady = pyqtSignal(str, bytes)
+    dataReady = pyqtSignal('qulonglong', bytes)
     finished = pyqtSignal()
     sendValues = pyqtSignal(int, bytes)
+    progressSignal = pyqtSignal(int)
+    totalValuesSignal = pyqtSignal(int)
+    pageRangeSignal = pyqtSignal(int)
 
     def __init__(self, queue: Queue):
         super().__init__()
         self.queue = queue
 
     def run(self):
+        c = 0
         while True:
             msg = self.queue.get()       # block until data arrives
-            if msg.message_type == MessageType.EXIT:
-                break                       # sentinel to stop
-            if msg.message_type == MessageType.VALUE_CHANGED:
-                self.dataReady.emit(msg.message[0], msg.message[1])
-            else:
-                print(f'Got Message: {msg}')
+            match msg.message_type:
+                case MessageType.EXIT:
+                    break                       # sentinel to stop
+                case MessageType.VALUE_CHANGED:
+                    self.dataReady.emit(msg.message[0], msg.message[1])
+                case MessageType.SET_PROGRESS:
+                    self.progressSignal.emit(msg.message[0])
+                case MessageType.SET_PAGE_RANGE:
+                    self.pageRangeSignal.emit(msg.message[0])
+                case MessageType.SET_TOTAL_VALUES:
+                    self.totalValuesSignal.emit(msg.message[0])
+                case _:
+                    print(f'Got Message: {msg}')
         self.finished.emit()
 
 
@@ -38,6 +49,7 @@ class Backend(QObject):
 
     update = pyqtSignal(str, bytes)
     newAddress = pyqtSignal(int, RowEntry)
+
 
     def __init__(self):
         super().__init__()
@@ -60,7 +72,7 @@ class Backend(QObject):
         self.memory_view: Optional[MemoryView] = MemoryView(self.proc_queue_in, self.proc_queue_out, name='Test')
         self.memory_view.start()
 
-        self.scanner_process: Optional[MemoryScanner] = MemoryScanner(self.scanner_queue_in, self.proc_queue_in)
+        self.scanner_process: Optional[MemoryScanner] = MemoryScanner(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out)
         self.scanner_process.start()
 
     def init_process_reader(self, proc_id: int):
@@ -102,6 +114,12 @@ class Backend(QObject):
         progress_bar(100)
         return {hex(address): RowEntry(False, value, value, Type.UInt32) for address in address_list}
         # return dict()
+
+    def get_next_page(self) -> None:
+        self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE))
+
+    def get_previous_page(self) -> None:
+        self.proc_queue_in.put(Message(MessageType.GET_PREV_PAGE))
     # def value_scan(self, value: bytes, progress_bar) -> Dict[str, RowEntry]:
     #     address_list = self.process_reader.search_bytes(value, progress_bar)
     #     progress_bar(100)
@@ -151,17 +169,16 @@ class Backend(QObject):
 
     def stop_loop(self):
         if self.memory_view:
-            self.memory_view.terminate()
+            self.proc_queue_in.put(Message(MessageType.EXIT, [0]))
         if self.scanner_process:
-            self.scanner_process.terminate()
+            self.scanner_queue_in.put(Message(MessageType.EXIT, [0]))
 
-        if self.memory_view:
-            self.memory_view.join()
         if self.scanner_process:
             self.scanner_process.join()
+        if self.memory_view:
+            self.memory_view.join()
 
-    @property
-    def running_processes(self):
+    def getRunningProcesses(self):
         res = []
         images = []
         pids = []
@@ -182,4 +199,5 @@ class Backend(QObject):
         return res, images, pids
 
     def scan(self, value: bytes, condition: Condition) -> None:
+        self.proc_queue_in.put(Message(MessageType.RESET))
         self.scanner_queue_in.put(Message(MessageType.START_SCAN, [value, condition]))
