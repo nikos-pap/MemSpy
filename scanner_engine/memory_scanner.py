@@ -10,6 +10,24 @@ TOKEN_ADJUST_PRIVILEGES = 0x0020
 TOKEN_QUERY = 0x0008
 SE_PRIVILEGE_ENABLED = 0x00000002
 
+
+# ——— Structures ———
+class ProcessMemoryCountersEx(ctypes.Structure):
+    _fields_ = [
+        ('cb', wintypes.DWORD),
+        ('PageFaultCount', wintypes.DWORD),
+        ('PeakWorkingSetSize', ctypes.c_size_t),
+        ('WorkingSetSize', ctypes.c_size_t),
+        ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+        ('PagefileUsage', ctypes.c_size_t),
+        ('PeakPagefileUsage', ctypes.c_size_t),
+        ('PrivateUsage', ctypes.c_size_t),
+    ]
+
+
 # ——— Load libraries ———
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 psapi = ctypes.WinDLL('Psapi', use_last_error=True)
@@ -34,6 +52,11 @@ advapi32.AdjustTokenPrivileges.argtypes = (
     wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p
 )
 advapi32.AdjustTokenPrivileges.restype = wintypes.BOOL
+
+psapi.GetProcessMemoryInfo.argtypes = (
+    wintypes.HANDLE, ctypes.POINTER(ProcessMemoryCountersEx), wintypes.DWORD
+)
+psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
 
 
 # ——— Helper: enable SeDebugPrivilege ———
@@ -82,8 +105,15 @@ class AbstractMemoryScanner(ABC):
         # open new handle
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
 
+    def get_working_memory_size(self) -> int:
+        cnt = ProcessMemoryCountersEx()
+        cnt.cb = ctypes.sizeof(cnt)
+        if not psapi.GetProcessMemoryInfo(self.handle, ctypes.byref(cnt), cnt.cb):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return cnt.WorkingSetSize
+
     @abstractmethod
-    def scan_value(self, value: bytes) -> list[int]:
+    def scan_value(self, value: bytes) -> tuple[int, int]:
         pass
 
     @abstractmethod
@@ -91,7 +121,7 @@ class AbstractMemoryScanner(ABC):
         pass
 
     @abstractmethod
-    def write_bytes(self, address: int, value: int) -> None:
+    def write_bytes(self, address: int, value: bytes) -> None:
         pass
 
     def close(self):
