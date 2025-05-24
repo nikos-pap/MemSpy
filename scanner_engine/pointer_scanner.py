@@ -703,16 +703,16 @@ def scan_value(pid, value, type):
     return lens
 
 if __name__ == '__main__':
-    pid = 19960
+    pid = 18648
     # print(scan_value(pid, 80, np.uint32))
-    rgns = get_memory_regions(pid)  #REGIONS
-    rngs = get_memory_ranges(rgns)  #RANGES
-    mdls = get_memory_modules(pid)  #MODULES
+    # rgns = get_memory_regions(pid)  #REGIONS
+    # rngs = get_memory_ranges(rgns)  #RANGES
+    # mdls = get_memory_modules(pid)  #MODULES
 
-    # pointer_map = load_map(r'C:\Users\dimos\Desktop\scanner\first')
-    # pntr_map, updated_chain = get_pointers_list_results(pointer_map, pid, 97)
-    # for i in pntr_map[:100]:
-    #     print(i)
+    pointer_map = load_map(r'C:\Users\dimos\Desktop\scanner\first')
+    pntr_map, updated_chain = get_pointers_list_results(pointer_map, pid, 97)
+    for i in pntr_map:
+        print(i)
 
     #
     cuda_available = cuda.is_available()
@@ -720,32 +720,32 @@ if __name__ == '__main__':
     # print(scan_value(pid, 97, np.uint32))
     # print(time.time()-s)
 
-    # cuda_available = False
-    for region in rgns:
-        region.data2values(rngs, np.uint64, cuda_available, Condition.BETWEEN, False)
-        region.pointers_annotate_regions(rngs, cuda_available)
-
-    rgns, rngs = preprocess_pointers(rgns, rngs, cuda_available)
-
-    addresses = get_addresses(rgns)
-    print(len(addresses))
-    X = 0x29031c001cc
-    sr = 0
-    for region in rgns:
-        if region.base_address <= X <= region.base_address + region.size:
-            sr = region.id
-            break
-
-    unique = preprocess_unique_transitions(addresses)
-    print(len(unique))
-    region_graph = build_region_graph(unique)
-    reachable_regions = dfs_regions(region_graph, start_region=sr, max_depth=3)
-    print(len(reachable_regions))
-    filtered_addresses = filter_addresses_by_regions(addresses, reachable_regions)
-    print(len(filtered_addresses))
-    results = dfs_indexed(filtered_addresses, X, max_depth=3)
-    print(len(results))
-    chain = make_pointers_list(results, rgns, mdls, pid) #TODO
-    pntr_map, updated_chain = get_pointers_list_results(chain, pid, None)
-    for i in pntr_map[:100]:
-        print(i)
+    # # cuda_available = False
+    # for region in rgns:
+    #     region.data2values(rngs, np.uint64, cuda_available, Condition.BETWEEN, False)
+    #     region.pointers_annotate_regions(rngs, cuda_available)
+    #
+    # rgns, rngs = preprocess_pointers(rgns, rngs, cuda_available)
+    #
+    # addresses = get_addresses(rgns)
+    # print(len(addresses))
+    # X = 0x29031c001cc
+    # sr = 0
+    # for region in rgns:
+    #     if region.base_address <= X <= region.base_address + region.size:
+    #         sr = region.id
+    #         break
+    #
+    # unique = preprocess_unique_transitions(addresses)
+    # print(len(unique))
+    # region_graph = build_region_graph(unique)
+    # reachable_regions = dfs_regions(region_graph, start_region=sr, max_depth=3)
+    # print(len(reachable_regions))
+    # filtered_addresses = filter_addresses_by_regions(addresses, reachable_regions)
+    # print(len(filtered_addresses))
+    # results = dfs_indexed(filtered_addresses, X, max_depth=3)
+    # print(len(results))
+    # chain = make_pointers_list(results, rgns, mdls, pid) #TODO
+    # pntr_map, updated_chain = get_pointers_list_results(chain, pid, None)
+    # for i in pntr_map[:100]:
+    #     print(i)
