@@ -44,13 +44,34 @@ class Region:
         self.pointers = np.array([])
         self.id = id
 
+    # def data2values2(self, ranges, window_size):
+    #     test = np.frombuffer(self.data, dtype=np.uint8)
+    #     if len(test) < window_size:
+    #         return np.array([], dtype=int)
+    #
+    #     windows = np.lib.stride_tricks.sliding_window_view(test, window_shape=window_size)
+    #     contiguous = np.ascontiguousarray(windows)
+    #
+    #     # Choose dtype based on window size (e.g., 4 -> uint32, 8 -> uint64)
+    #     if window_size == 4:
+    #         dtype = f'<u4'
+    #     elif window_size == 8:
+    #         dtype = f'<u8'
+    #     else:
+    #         raise ValueError("Only 4 or 8 byte window sizes are supported")
+    #
+    #     values = contiguous.view(dtype).squeeze()
+    #     matches = np.where(values == ranges[0, 0])[0]  # Indexes where match occurs
+    #     addresses = matches + self.base_address
+    #     matched_values = values[matches]
+    #     self.pointers = np.column_stack((addresses, matched_values))
+
     def data2values(self, ranges, values_type, use_gpu=True, condition=Condition.EQUAL, step_enable=False):
         values_type_size = np.dtype(values_type).itemsize
         length = len(self.data) - values_type_size - 1
 
         if use_gpu:
             # GPU path
-            s = time.time()
             d_data = cuda.to_device(self.data)
             d_ranges = cuda.to_device(ranges)
 
@@ -67,7 +88,6 @@ class Region:
             count = d_counts.copy_to_host()[0]
             addrs = d_addrs.copy_to_host()[:count]
             values = d_values.copy_to_host()[:count]
-            print(time.time() - s)
         else:
             addrs, values = parallel_utils.filter_and_extract_values_cpu(self.data, self.base_address, ranges, values_type, values_type_size, length, condition, step_enable)
         self.pointers = np.column_stack((addrs, values))
@@ -127,6 +147,7 @@ class MemoryScanner(AbstractMemoryScanner):
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
             region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, True, Condition.EQUAL, False)
+            # region.data2values2(np.array([[value, 0, 0]], dtype=np.uint32), 4)
             if region.pointers.shape[0]>0:
                 for address, value in region.pointers:
                     yield int(address), (current_size * 100) // total_size
