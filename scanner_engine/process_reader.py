@@ -158,6 +158,7 @@ class MemoryScanner(AbstractMemoryScanner):
                     yield int(address), (current_size * 100) // total_size
 
             current_size += region.size
+        yield None
 
     def read_bytes(self, address: int, size: int) -> bytes:
         if not self.handle:

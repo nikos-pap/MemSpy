@@ -1,3 +1,4 @@
+from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 from scanner_engine.scanner import MemoryScanner
@@ -7,7 +8,7 @@ from utils.message import MessageType, Message
 from utils.types import Type, Condition
 from backend.memoryview import MemoryView
 from multiprocessing import Queue
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 import psutil
 import os
 
@@ -19,6 +20,7 @@ class QueueWorker(QObject):
     sendValues = pyqtSignal(int, bytes)
     progressSignal = pyqtSignal(int)
     totalValuesSignal = pyqtSignal(int)
+    filterValuesSignal = pyqtSignal(int)
     pageRangeSignal = pyqtSignal(int)
 
     def __init__(self, queue: Queue):
@@ -26,7 +28,6 @@ class QueueWorker(QObject):
         self.queue = queue
 
     def run(self):
-        c = 0
         while True:
             msg = self.queue.get()       # block until data arrives
             match msg.message_type:
@@ -40,16 +41,16 @@ class QueueWorker(QObject):
                     self.pageRangeSignal.emit(msg.message[0])
                 case MessageType.SET_TOTAL_VALUES:
                     self.totalValuesSignal.emit(msg.message[0])
+                case MessageType.SET_FILTERED_VALUES:
+                    self.filterValuesSignal.emit(msg.message[0])
                 case _:
-                    print(f'Got Message: {msg}')
+                    print(f'(Queue Listener) Got Message: {msg}')
         self.finished.emit()
 
 
 class Backend(QObject):
-
     update = pyqtSignal(str, bytes)
     newAddress = pyqtSignal(int, RowEntry)
-
 
     def __init__(self):
         super().__init__()
@@ -59,6 +60,9 @@ class Backend(QObject):
         self.proc_queue_in: Queue = Queue()
         self.proc_queue_out: Queue = Queue()
         self.scanner_queue_in: Queue = Queue(maxsize=10)
+        self.running_process_names: list[str] = []
+        self.images: list[Image] = []
+        self.pids: list[int] = []
 
         # self.process_reader: Optional[ProcessInspector] = None  # REMOVE
         # self.listener: Optional[QueueWorker] = None  # REMOVE
@@ -69,7 +73,7 @@ class Backend(QObject):
         self.thread.started.connect(self.listener.run)
         self.listener.finished.connect(self.thread.quit)
         self.thread.start()
-        self.memory_view: Optional[MemoryView] = MemoryView(self.proc_queue_in, self.proc_queue_out, name='Test')
+        self.memory_view: Optional[MemoryView] = MemoryView(self.proc_queue_in, self.proc_queue_out)
         self.memory_view.start()
 
         self.scanner_process: Optional[MemoryScanner] = MemoryScanner(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out)
@@ -97,13 +101,7 @@ class Backend(QObject):
     #     self.proc_queue_in.put(message.Message(message_type='DELETE_ADDRESS', message=[index]))
 
     def set_value(self, address: str, value: bytes) -> None:
-        print(MessageType.EDIT_ADDRESS)
         self.proc_queue_in.put(message.Message(MessageType.EDIT_ADDRESS, message=[address, value]))
-
-    def watch_addresses(self, address_list: List[int], value: bytes):
-        self.select_addresses(address_list, value)
-        # for address in address_list:
-        #     self.select_address(address)
 
     def value_scan(self, value: bytes, progress_bar) -> Dict[str, RowEntry]:
         address_list = []
@@ -117,6 +115,10 @@ class Backend(QObject):
 
     def get_next_page(self) -> None:
         self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE))
+
+    def filter_addresses(self, pattern: str) -> None:
+        print(pattern)
+        self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
 
     def get_previous_page(self) -> None:
         self.proc_queue_in.put(Message(MessageType.GET_PREV_PAGE))
@@ -179,24 +181,20 @@ class Backend(QObject):
             self.memory_view.join()
 
     def getRunningProcesses(self):
-        res = []
-        images = []
-        pids = []
         filtered_list = ['svchost.exe']
 
         for proc in psutil.process_iter():
             try:
                 name = proc.name()
-                if name not in filtered_list and os.access(proc.exe(), os.R_OK):
+                if name not in filtered_list and name not in self.running_process_names and os.access(proc.exe(), os.R_OK):
                     image = image_extractor.get_process_image(proc.exe())
-                    index = insort(res, proc.name(), key=lambda a: a.lower())
-                    images.insert(index, image)
-                    pids.insert(index, proc.pid)
+                    index = insort(self.running_process_names, proc.name(), key=lambda a: a.lower())
+                    self.images.insert(index, image)
+                    self.pids.insert(index, proc.pid)
             except psutil.AccessDenied as e:
                 print(f'Cannot access: {e}')
                 pass
-        print('Processes loaded.')
-        return res, images, pids
+        return self.running_process_names, self.images, self.pids
 
     def scan(self, value: bytes, condition: Condition) -> None:
         self.proc_queue_in.put(Message(MessageType.RESET))

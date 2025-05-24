@@ -27,7 +27,7 @@ class PaginatedTable(QWidget):
         self.page_size = 100
         self.current_page = 0
         self.model = SortedPagedTableModel(self)
-        self.filtered_data: Dict[str, RowEntry] = dict()
+        # self.filtered_data: Dict[str, RowEntry] = dict()
         self.font = QFont()
         self.font.setPointSize(12)
 
@@ -56,7 +56,7 @@ class PaginatedTable(QWidget):
         # Filter input
         self.filter_input.setPlaceholderText("Filter by name (column 1)...")
         # noinspection PyUnresolvedReferences
-        # self.filter_input.textChanged.connect(self.on_filter_text_changed)
+        self.filter_input.textChanged.connect(self.filterSignal)
         layout.addWidget(self.filter_input)
 
         # Table
@@ -170,7 +170,7 @@ class PaginatedTable(QWidget):
     #     self.table.blockSignals(False)
 
     def show_message(self):
-        filtered_text = f'{self.filtered}of ' if self.filtered != -1 else ''
+        filtered_text = f'{self.filtered} of ' if self.filter_input.text() else ''
         start = self.page_start
         end = self.page_end
         self.info_label.setText(f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)")
@@ -180,32 +180,32 @@ class PaginatedTable(QWidget):
         self.filtered_data = address_list
         self.current_page = 0
 
-    def on_checkbox_state_changed(self, address: str, state: Any):
-        self.filtered_data[address].isFrozen = state == Qt.CheckState.Checked.value
-        self.freeze_command(address)
+    # def on_checkbox_state_changed(self, address: str, state: Any):
+    #     self.filtered_data[address].isFrozen = state == Qt.CheckState.Checked.value
+    #     self.freeze_command(address)
 
-    def on_item_changed(self, item: QTableWidgetItem):
-        if item.column() != 2:
-            return  # Only process value column here
-
-        # row = item.row()
-        # global_index = self.filtered_data[self.current_page * self.page_size + row]
-        new_value = item.text()
-        address = item.data(Qt.ItemDataRole.UserRole)
-        entry = self.filtered_data[address]
-        entry.new_value = convert_to_bytes(new_value, entry.data_type)
-
-        color = 'white'
-        n_val = convert_from_bytes(entry.new_value, Type.UInt32)
-        o_val = convert_from_bytes(entry.value, Type.UInt32)
-        if n_val > o_val:
-            color = 'limegreen'
-        elif n_val < o_val:
-            color = 'red'
-
-        item.setForeground(QBrush(QColor(color)))
-
-        self.change_value_command(address, entry.new_value)
+    # def on_item_changed(self, item: QTableWidgetItem):
+    #     if item.column() != 2:
+    #         return  # Only process value column here
+    #
+    #     # row = item.row()
+    #     # global_index = self.filtered_data[self.current_page * self.page_size + row]
+    #     new_value = item.text()
+    #     address = item.data(Qt.ItemDataRole.UserRole)
+    #     entry = self.filtered_data[address]
+    #     entry.new_value = convert_to_bytes(new_value, entry.data_type)
+    #
+    #     color = 'white'
+    #     n_val = convert_from_bytes(entry.new_value, Type.UInt32)
+    #     o_val = convert_from_bytes(entry.value, Type.UInt32)
+    #     if n_val > o_val:
+    #         color = 'limegreen'
+    #     elif n_val < o_val:
+    #         color = 'red'
+    #
+    #     item.setForeground(QBrush(QColor(color)))
+    #
+    #     self.change_value_command(address, entry.new_value)
 
     # def setValue(self, address: str, value: bytes) -> None:
     #     self.table.blockSignals(True)
@@ -247,10 +247,17 @@ class PaginatedTable(QWidget):
     def setTotal(self, total: int) -> None:
         self.total = total
 
+    def setFiltered(self, value):
+        self.filtered = value
+
     @pyqtSlot()
     def _on_rows_changed(self):
         # Whenever rows are added/removed/reset, update the variable
         self.page_end = self.page_start + self.model.rowCount()
+
+    def clear(self):
+        self.filter_input.setText('')
+        self.clear_table()
 
     def next_page(self):
         # if (self.current_page + 1) * self.page_size < len(self.filtered_data):
@@ -265,3 +272,6 @@ class PaginatedTable(QWidget):
         #     self.render_current_page()
         self.model.clear()
         self.previousPageSignal.emit()
+
+    def clear_table(self):
+        self.model.clear()

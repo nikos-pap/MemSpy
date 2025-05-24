@@ -49,8 +49,8 @@ class MemoryScannerUI(QMainWindow):
         # self.models = Model()
         self.backend = Backend()
         horizontal_spacing = 10
-        width = 1000
-        height = 700
+        width = 1400
+        height = 900
 
         # Get the screen resolution
         screen = QApplication.primaryScreen()
@@ -95,7 +95,7 @@ class MemoryScannerUI(QMainWindow):
         self.typeCombo.setFont(self.font)
 
         self.condition_combo = QComboBox()
-        self.condition_combo.setFixedWidth(100)
+        # self.condition_combo.setFixedWidth(100)
         self.condition_combo.setFont(self.font)
 
         process_row.addWidget(self.typeCombo)
@@ -163,8 +163,10 @@ class MemoryScannerUI(QMainWindow):
         self.backend.listener.progressSignal.connect(self.progress_bar.setValue)
         self.backend.listener.totalValuesSignal.connect(self.finished_scan)
         self.backend.listener.pageRangeSignal.connect(self.search_address_table.setPageRanges)
+        self.backend.listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
         self.search_address_table.previousPageSignal.connect(self.backend.get_previous_page)
+        self.search_address_table.filterSignal.connect(self.filter_command)
         # self.models.dataChanged.connect(self.search_address_table.setValue)
         # self.thread = None
         # self.pool = QThreadPool.globalInstance()
@@ -175,6 +177,8 @@ class MemoryScannerUI(QMainWindow):
     def initialise(self):
         for t in Type:
             self.typeCombo.addItem(t.value, t)
+        for t in Condition:
+            self.condition_combo.addItem(t.name, t)
         self.typeCombo.setCurrentIndex(6)
         # noinspection PyUnresolvedReferences
         self.typeCombo.currentTextChanged.connect(self.validate_input)
@@ -248,7 +252,11 @@ class MemoryScannerUI(QMainWindow):
                     self.process_box.addItem(label, name)
             else:
                 self.process_box.addItem(label)
-        print(f'It takes {time.time() - start}')
+        print(f'Loading Process List takes {time.time() - start}')
+
+    def filter_command(self, pattern: str):
+        self.search_address_table.clear_table()
+        self.backend.filter_addresses(pattern)
 
     def scan_command(self):
         if not self.isAttached:
@@ -256,10 +264,11 @@ class MemoryScannerUI(QMainWindow):
             return
         if not self.search_input.text():
             return
+        self.search_address_table.clear()
         value = convert_to_bytes(self.search_input.text(), self.typeCombo.currentData())
         if not value:
             return
-        condition = Condition.EQUAL
+        condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
         self.disable_scan_navigation()
         self.backend.scan(value, condition)
         # Connect signals
