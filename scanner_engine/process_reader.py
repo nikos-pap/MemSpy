@@ -68,9 +68,9 @@ class Region:
 
     def data2values(self, ranges, values_type, use_gpu=True, condition=Condition.EQUAL, step_enable=False):
         values_type_size = np.dtype(values_type).itemsize
-        length = len(self.data) - values_type_size - 1
 
         if use_gpu:
+            length = len(self.data) - values_type_size + 1
             # GPU path
             d_data = cuda.to_device(self.data)
             d_ranges = cuda.to_device(ranges)
@@ -89,7 +89,12 @@ class Region:
             addrs = d_addrs.copy_to_host()[:count]
             values = d_values.copy_to_host()[:count]
         else:
+            length = len(self.data) - values_type_size - 1
             addrs, values = parallel_utils.filter_and_extract_values_cpu(self.data, self.base_address, ranges, values_type, values_type_size, length, condition, step_enable)
+            mask = addrs != 0
+            addrs = addrs[mask]
+            values = values[mask]
+
         self.pointers = np.column_stack((addrs, values))
         self.data = []
 
@@ -146,7 +151,7 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, True, Condition.EQUAL, False)
+            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, True, Condition.EQUAL, True)
             # region.data2values2(np.array([[value, 0, 0]], dtype=np.uint32), 4)
             if region.pointers.shape[0]>0:
                 for address, value in region.pointers:

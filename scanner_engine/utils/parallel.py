@@ -27,54 +27,39 @@ def warm_up_gpu():
 
 @njit(parallel=True)
 def filter_and_extract_values_cpu(data, base_address, ranges, values_type, values_type_size, length, search_condition, step_enable):
-    temp_addrs = np.zeros(length, dtype=np.uint64)
-    temp_values = np.zeros(length, dtype=values_type)
+    # max_results = length // (values_type_size if step_enable else 1)
+    out_addrs = np.zeros(length, dtype=np.uint64)
+    out_values = np.zeros(length, dtype=values_type)
     step_size = values_type_size if step_enable else 1
 
+    count = 0
     for idx in prange(length - values_type_size + 1):
         if idx % step_size == 0:
             val = 0
             for i in range(values_type_size):
                 val |= data[idx + i] << (8 * i)
 
-            if search_condition == Condition.BETWEEN:  # BETWEEN
-                in_range = False
-                for j in range(ranges.shape[0]):
-                    start = ranges[j, 0]
-                    end = ranges[j, 1]
-                    if start <= val <= end:
-                        in_range = True
-                        break
-                if in_range:
-                    temp_addrs[idx] = base_address + idx
-                    temp_values[idx] = val
+            flag = False
+            for j in range(ranges.shape[0]):
+                start = ranges[j, 0]
+                end = ranges[j, 1]
 
-            elif search_condition == Condition.EQUAL:  # EQUAL
-                is_equal = False
-                for j in range(ranges.shape[0]):
-                    start = ranges[j, 0]
-                    if start == val:
-                        is_equal = True
-                        break
-                if is_equal:
-                    temp_addrs[idx] = base_address + idx
-                    temp_values[idx] = val
+                if search_condition == Condition.BETWEEN:
+                    flag = start <= val <= end
+                elif search_condition == Condition.NOT_EQUAL:
+                    flag = start != val
+                elif search_condition == Condition.EQUAL:
+                    flag = start == val
+                elif search_condition == Condition.GREATER_THAN:
+                    flag = start <= val
+                elif search_condition == Condition.LESS_THAN:
+                    flag = start >= val
 
-    # Post-process results: remove zeros
-    count = 0
-    for i in range(length):
-        if temp_addrs[i] != 0:
-            count += 1
-
-    out_addrs = np.empty(count, dtype=np.uint64)
-    out_values = np.empty(count, dtype=values_type)
-
-    j = 0
-    for i in range(length):
-        if temp_addrs[i] != 0:
-            out_addrs[j] = temp_addrs[i]
-            out_values[j] = temp_values[i]
-            j += 1
+                if flag:
+                    out_addrs[idx] = base_address + idx
+                    out_values[idx] = val
+                    count += 1
+                    break
 
     return out_addrs, out_values
 
@@ -82,10 +67,7 @@ def filter_and_extract_values_cpu(data, base_address, ranges, values_type, value
 def filter_and_extract_values_gpu(data, base_address, ranges, addrs, ptrs, counts, values_type_size, length, search_condition, step_enable):
     thread_idx = cuda.grid(1)
 
-    step_size = 1
-    if step_enable:
-        step_size = values_type_size
-
+    step_size = values_type_size if step_enable else 1
     idx = thread_idx * step_size
 
     if idx + values_type_size <= length:
@@ -93,29 +75,33 @@ def filter_and_extract_values_gpu(data, base_address, ranges, addrs, ptrs, count
         for i in range(values_type_size):
             val |= data[idx + i] << (8 * i)
 
-        if search_condition == Condition.BETWEEN:
-            in_range = False
-            for j in range(ranges.shape[0]):
-                start = ranges[j, 0]
-                end = ranges[j, 1]
+        flag = False
+        for j in range(ranges.shape[0]):
+            start = ranges[j, 0]
+            end = ranges[j, 1]
+
+            if search_condition == Condition.BETWEEN:
                 if start <= val <= end:
-                    in_range = True
+                    flag = True
+                    break
+            elif search_condition == Condition.NOT_EQUAL:
+                if val != start:
+                    flag = True
+                    break
+            elif search_condition == Condition.EQUAL:
+                if val == start:
+                    flag = True
+                    break
+            elif search_condition == Condition.GREATER_THAN:
+                if val > start:
+                    flag = True
+                    break
+            elif search_condition == Condition.LESS_THAN:
+                if val < start:
+                    flag = True
                     break
 
-            if in_range:
-                pos = cuda.atomic.add(counts, 0, 1)
-                addrs[pos] = base_address + idx
-                ptrs[pos] = val
-
-        elif search_condition == Condition.EQUAL:
-            is_equal = False
-            for j in range(ranges.shape[0]):
-                start = ranges[j, 0]
-                if start == val:
-                    is_equal = True
-                    break
-
-            if is_equal:
-                pos = cuda.atomic.add(counts, 0, 1)
-                addrs[pos] = base_address + idx
-                ptrs[pos] = val
+        if flag:
+            pos = cuda.atomic.add(counts, 0, 1)
+            addrs[pos] = base_address + idx
+            ptrs[pos] = val
