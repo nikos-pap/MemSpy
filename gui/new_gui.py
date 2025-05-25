@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
 from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
 
-from backend import Backend
+from backend.backend2 import Backend
 from guiwidgets import DynamicComboBox
 from guiwidgets.paged_table import PaginatedTable
 from models.model import Model
@@ -237,7 +237,8 @@ class MemoryScannerUI(QMainWindow):
 
         self.process_box.clear()
         self.process_box.insertItem(0, "-- Select Process --", None)
-        names, images, pids = self.backend.getRunningProcesses()
+        # names, images, pids = self.backend.getRunningProcesses()
+        names, images, pids = self.backend.get_running_processes()
 
         for name, image, pid in zip(names, images, pids):
             label = format_item(name, pid)
@@ -376,5 +377,5 @@ class MemoryScannerUI(QMainWindow):
             self.valid_input = False
 
     def closeEvent(self, event):
-        self.backend.stop_loop()
+        self.backend.stop()
         event.accept()
