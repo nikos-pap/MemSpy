@@ -1,7 +1,9 @@
 from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
+from backend.memoryview2 import MemoryViewImproved
 from scanner_engine.scanner import MemoryScanner
+from scanner_engine.scanner2 import MemoryScannerImproved
 from utils import insort, message, image_extractor, RowEntry
 
 from utils.message import MessageType, Message
@@ -73,10 +75,10 @@ class Backend(QObject):
         self.thread.started.connect(self.listener.run)
         self.listener.finished.connect(self.thread.quit)
         self.thread.start()
-        self.memory_view: Optional[MemoryView] = MemoryView(self.proc_queue_in, self.proc_queue_out)
+        self.memory_view: Optional[MemoryView] = MemoryViewImproved(self.proc_queue_in, self.proc_queue_out)
         self.memory_view.start()
 
-        self.scanner_process: Optional[MemoryScanner] = MemoryScanner(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out)
+        self.scanner_process: Optional[MemoryScannerImproved] = MemoryScannerImproved(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out, True)
         self.scanner_process.start()
 
     def init_process_reader(self, proc_id: int):

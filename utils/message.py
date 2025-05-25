@@ -7,6 +7,7 @@ message_types: List[str] = ['EXIT', 'ADD_ADDRESS', 'DELETE_ADDRESS', 'EDIT_ADDRE
 
 
 class MessageType(Enum):
+    CANCEL_SCAN = auto()
     INIT_SCANNER = auto()
     SET_PROCESS = auto()
     EXIT = auto()

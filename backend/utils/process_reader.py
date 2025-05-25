@@ -108,7 +108,7 @@ class ProcessInspector(AbstractMemoryScanner):
 
         # return regions
 
-    def scan_value(self, pattern: bytes) -> tuple[int, int]:
+    def scan_value(self, pattern: bytes, **kwargs) -> tuple[int, int]:
         """
         Search for a byte sequence 'pattern' in all committed, readable regions.
         Returns a list of (address, data) tuples for each match.

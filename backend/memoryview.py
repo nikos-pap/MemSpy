@@ -3,6 +3,8 @@ from typing import List
 
 from multiprocessing import Process, Queue
 
+import numpy as np
+
 from backend.utils import ProcessInspector
 from scanner_engine.process_reader import MemoryScanner
 from utils.message import Message, MessageType
@@ -15,25 +17,20 @@ class MemoryView(Process):
 	def __init__(self, in_queue: Queue, out_queue: Queue, **kwargs):
 		super(MemoryView, self).__init__(kwargs=kwargs)
 		self.filter_val = ''
-		self.frozen_addresses = []
+		self.frozen_addresses: list[int | np.uint64] = []
 		self.selected_addresses: list[int] = []
 		self.in_queue: Queue = in_queue
 		self.out_queue: Queue = out_queue
-		self.proc_id: int = -1
 		self.process_reader = MemoryScanner()
 		self.active_page = 0
 		self.page_size = 100
 		self.filter_size = 0
-		# min(self.active_page * self.page_size + self.page_size, len(self.selected_addresses))
 
 	def run(self):
-		start = self.active_page * self.page_size
-		end = start + self.page_size
 		empty = Message(MessageType.EMPTY, [])
 		proc_message: Message = empty
 		delay = time.time()
 		total_addresses = 0
-		i = 0
 		while True:
 			real_list = filter(self.address_filter, self.selected_addresses)
 			filter_size = sum(1 for _ in real_list)
@@ -45,14 +42,13 @@ class MemoryView(Process):
 			if not self.process_reader and proc_message.message_type not in [MessageType.SET_PROCESS, MessageType.EXIT]:
 				# print('(MemoryView) Scanner not initialized!!')
 				continue
-			# print(proc_message.message_type, proc_message.message)
+
 			now = time.time()
 			action = proc_message.message_type
 			match action:
 				case MessageType.SET_PROCESS:
-					self.proc_id = proc_message.message[0]
-					self.process_reader.change_process(self.proc_id)
-					print(f'(MemoryView) Process id set to {self.proc_id}')
+					self.process_reader.change_process(proc_message.message[0])
+					print(f'(MemoryView) Process id set to {proc_message.message[0]}')
 				case MessageType.EXIT:
 					print('(MemoryView) Closing')
 					self.out_queue.empty()
@@ -63,12 +59,10 @@ class MemoryView(Process):
 				case MessageType.GET_NEXT_PAGE:
 					self.active_page = min(self.active_page + 1, self.filter_size // self.page_size)
 					start = self.active_page * self.page_size
-					end = min(start + self.page_size, self.filter_size)
 					self.out_queue.put(Message(MessageType.SET_PAGE_RANGE, [start]))
 				case MessageType.GET_PREV_PAGE:
 					self.active_page = max(self.active_page - 1, 0)
 					start = self.active_page * self.page_size
-					end = min(start + self.page_size, self.filter_size)
 					self.out_queue.put(Message(MessageType.SET_PAGE_RANGE, [start]))
 				case MessageType.FILTER_ADDRESSES:
 					self.filter_val = proc_message.message[0]
@@ -81,25 +75,7 @@ class MemoryView(Process):
 					pass
 				case _:
 					print(f'(MemoryView) Unexpected message: {action.name}')
-			# if action == MessageType.RESET:
-			# 	self.reset_process(proc_message.message[0])
-			# if not proc_message.message[0]:
-			# self.process_reader.close()
-			# else:
-			# self.process_reader = ProcessInspector(self.proc_id)
-			# if action == MessageType.ADD_ADDRESS:
-			# 	self.select_address(proc_message.message[0], proc_message.message[1])
-			# self.select_addresses(proc_message.message[0], proc_message.message[1])
-			# if action == MessageType.DELETE_ADDRESS:
-			# 	self.delete_address(proc_message.message[0])
-			# if action == MessageType.EDIT_ADDRESS:
-			# 	self.set_value(proc_message.message[0], proc_message.message[1])
-			# if action == MessageType.FREEZE_ADDRESS:
-			# 	self.freeze_address(proc_message.message[0])
-			# if action == MessageType.UNFREEZE_ADDRESS:
-			# 	self.unfreeze_address(proc_message.message[0])
-			# if action == MessageType.VALUE_CHANGED:  # REMOVE
-			# 	self.out_queue.put(Message(message_type='UPDATE_RESULT', message=self.collect_values()))  # REMOVE
+
 			proc_message = empty
 			if now - delay < 0.5:
 				continue

@@ -93,10 +93,10 @@ def enable_debug_privilege():
 
 class AbstractMemoryScanner(ABC):
     @abstractmethod
-    def __init__(self, pid: int, enable_debug: bool = False):
+    def __init__(self, enable_debug: bool = False):
         if enable_debug:
             enable_debug_privilege()
-        self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
+        self.handle: wintypes.HANDLE | None = None
 
     def change_process(self, pid: int):
         # clean up previous handle
