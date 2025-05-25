@@ -142,7 +142,7 @@ class MemoryScanner(AbstractMemoryScanner):
                     buffer = ctypes.create_string_buffer(region_size)
                     bytes_read = ctypes.c_size_t()
                     base_address = ctypes.c_void_p(memory_info.BaseAddress)
-                    if ReadProcessMemory(self.handle, base_address, buffer, region_size,
+                    if ReadProcessMemory(self.handle, base_address, buffer, ctypes.c_size_t(region_size),
                                          ctypes.byref(bytes_read)):
                         data = buffer.raw[:bytes_read.value]
                         yield Region(base_addr, region_size, region_name, data, id)
@@ -154,10 +154,11 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            matches = find_matches(bytestream=region.data ,mode=condition, target=[value,0], element_size=4)
-            # yield list(matches, dtype=int), (current_size * 100) // total_size
-            for match in matches:
-                yield int(match), (current_size * 100) // total_size
+            matches = find_matches(bytestream=region.data, base_address=region.base_address ,mode=condition, target=[value,0], element_size=4)
+
+            yield matches, (current_size * 100) // total_size
+            # for match in matches:
+            #     yield int(match), (current_size * 100) // total_size
         # for region in self.read_memory():
         #     s = time.time()
         #     # region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, use_gpu, condition, step_enable)

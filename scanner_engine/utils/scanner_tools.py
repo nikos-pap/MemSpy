@@ -2,7 +2,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from utils.types import Condition
 
-def find_matches(bytestream: bytes = None, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4):
+def find_matches(bytestream: bytes = None, base_address:int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4):
     if bytestream is None or target is None:
         return
 
@@ -45,4 +45,4 @@ def find_matches(bytestream: bytes = None, mode: Condition = Condition.EQUAL, ta
     else:
         return
 
-    return indices
+    return indices+base_address

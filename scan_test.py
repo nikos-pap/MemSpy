@@ -14,20 +14,20 @@ from utils.types import Condition
 
 if __name__ == "__main__":
     scanner1 = MemoryScanner()
-    scanner1.change_process(18084)
-    addresses = scanner1.scan_value((97).to_bytes(4, byteorder='little'))  # Example value
-    s = time.time()
-    ads1 = [address for address in addresses]
-    print(len(ads1))
+    scanner1.change_process(6404)
+    # addresses = scanner1.scan_value((97).to_bytes(4, byteorder='little'))  # Example value
+    # s = time.time()
+    # ads1 = [address for address in addresses]
+    # print(len(ads1))
 
     # print(len(ads))
-    # print(scanner.read_bytes(0x15130a2b1cc, 4))
+    # print(scanner1.read_bytes(35364418, 4))
     # scanner.write_bytes(0x15130a2b1cc, (12321).to_bytes(4, byteorder='little'))
     # print(scanner.read_bytes(0x15130a2b1cc, 4))
 
     scanner1.close()
-    print(time.time() - s)
-    print(ads1[:10])
+    # print(time.time() - s)
+    # print(ads1[:10])
 
     #
     #
