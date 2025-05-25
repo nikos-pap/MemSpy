@@ -73,8 +73,11 @@ ReadProcessMemory.restype = wintypes.BOOL
 
 # ——— ProcessInspector Class ———
 class ProcessInspector(AbstractMemoryScanner):
-    def __init__(self, pid: int, enable_debug: bool = False):
-        super().__init__(pid, enable_debug)
+    def __init__(self):
+        pass
+
+    # def __init__(self, pid: int, enable_debug: bool = False):
+    #     super().__init__(pid, enable_debug)
 
     def get_memory_regions(self):
         regions = []
@@ -110,7 +113,6 @@ class ProcessInspector(AbstractMemoryScanner):
         Search for a byte sequence 'pattern' in all committed, readable regions.
         Returns a list of (address, data) tuples for each match.
         """
-        results = []
         totalSize = self.get_working_memory_size()
         currentSize = 0
         for region in self.get_memory_regions():
@@ -134,11 +136,11 @@ class ProcessInspector(AbstractMemoryScanner):
             idx = data.find(pattern)
             while idx != -1:
                 match_addr = addr + idx
-                match_data = data[idx:idx + len(pattern)]
+                # match_data = data[idx:idx + len(pattern)]
                 yield match_addr, int(currentSize / totalSize * 100)
                 idx = data.find(pattern, idx + 4)
             currentSize += region.RegionSize
-        # return results
+        yield None
 
     def search_bytes_fast(self, pattern: bytes, progress_command: Callable[[Any], None] = lambda a: None):
         """

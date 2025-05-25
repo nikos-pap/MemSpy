@@ -34,7 +34,7 @@ class QueueWorker(QObject):
                 case MessageType.EXIT:
                     break                       # sentinel to stop
                 case MessageType.VALUE_CHANGED:
-                    self.dataReady.emit(msg.message[0], msg.message[1])
+                    self.dataReady.emit(int(msg.message[0]), msg.message[1])
                 case MessageType.SET_PROGRESS:
                     self.progressSignal.emit(msg.message[0])
                 case MessageType.SET_PAGE_RANGE:

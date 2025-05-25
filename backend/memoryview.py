@@ -59,9 +59,8 @@ class MemoryView(Process):
 					self.out_queue.put(proc_message)
 					return
 				case MessageType.ADD_ADDRESS:
-					self.selected_addresses.append(proc_message.message[0])  # [proc_message.message[0]] = proc_message.message[1]
+					self.selected_addresses.extend(list(proc_message.message))  # [proc_message.message[0]] = proc_message.message[1]
 				case MessageType.GET_NEXT_PAGE:
-
 					self.active_page = min(self.active_page + 1, self.filter_size // self.page_size)
 					start = self.active_page * self.page_size
 					end = min(start + self.page_size, self.filter_size)

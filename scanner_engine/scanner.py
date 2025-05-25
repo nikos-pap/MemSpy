@@ -14,7 +14,7 @@ class MemoryScanner(Process):
         self.queueIn: Queue = scanner_queue
         self.queueOut: Queue = results_queue
         self.queueMain: Queue = out_queue
-        # self.scanner: Optional[ProcessInspector] = None
+        # self.scanner = ProcessInspector()
         self.scanner = newMemoryScanner()
 
     def run(self):
@@ -46,7 +46,8 @@ class MemoryScanner(Process):
                     condition = message.message[1]
                     start = time.time()
                     scanning = True
-                    scan_gen = self.scanner.scan_value(value, use_gpu=False, condition=condition, step_enable=True)
+                    # scan_gen = self.scanner.scan_value(value)
+                    scan_gen = self.scanner.scan_value(value, use_gpu=False, condition=condition, step_enable=False)
                     # self.value_scan(value, condition)
                 case MessageType.EMPTY:
                     pass
@@ -61,9 +62,11 @@ class MemoryScanner(Process):
                     self.queueMain.put(Message(MessageType.SET_PROGRESS, [100]))
                     message = Message(MessageType.EMPTY)
                     continue
-                address, progress = result
-                c += 1
-                self.queueOut.put(Message(MessageType.ADD_ADDRESS, [address]))
+                addresses, progress = result
+                # c += 1
+                c += len(addresses)
+                self.queueOut.put(Message(MessageType.ADD_ADDRESS, addresses))
+                # self.queueOut.put(Message(MessageType.ADD_ADDRESS, [addresses]))
                 if (progress // 10) * 10 != last_progress or time.time() - now > 0.8:
                     # print(progress)
                     self.queueMain.put(Message(MessageType.SET_PROGRESS, [progress]))

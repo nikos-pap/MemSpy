@@ -44,27 +44,27 @@ class Region:
         self.pointers = np.array([])
         self.id = id
 
-    # def data2values2(self, ranges, window_size):
-    #     test = np.frombuffer(self.data, dtype=np.uint8)
-    #     if len(test) < window_size:
-    #         return np.array([], dtype=int)
-    #
-    #     windows = np.lib.stride_tricks.sliding_window_view(test, window_shape=window_size)
-    #     contiguous = np.ascontiguousarray(windows)
-    #
-    #     # Choose dtype based on window size (e.g., 4 -> uint32, 8 -> uint64)
-    #     if window_size == 4:
-    #         dtype = f'<u4'
-    #     elif window_size == 8:
-    #         dtype = f'<u8'
-    #     else:
-    #         raise ValueError("Only 4 or 8 byte window sizes are supported")
-    #
-    #     values = contiguous.view(dtype).squeeze()
-    #     matches = np.where(values == ranges[0, 0])[0]  # Indexes where match occurs
-    #     addresses = matches + self.base_address
-    #     matched_values = values[matches]
-    #     self.pointers = np.column_stack((addresses, matched_values))
+    def data2values2(self, ranges, window_size):
+        test = np.frombuffer(self.data, dtype=np.uint8)
+        if len(test) < window_size:
+            return np.array([], dtype=int)
+
+        windows = np.lib.stride_tricks.sliding_window_view(test, window_shape=window_size)
+        contiguous = np.ascontiguousarray(windows)
+
+        # Choose dtype based on window size (e.g., 4 -> uint32, 8 -> uint64)
+        if window_size == 4:
+            dtype = f'<u4'
+        elif window_size == 8:
+            dtype = f'<u8'
+        else:
+            raise ValueError("Only 4 or 8 byte window sizes are supported")
+
+        values = contiguous.view(dtype).squeeze()
+        matches = np.where(values == ranges[0, 0])[0]  # Indexes where match occurs
+        addresses = matches + self.base_address
+        matched_values = values[matches]
+        self.pointers = np.column_stack((addresses, matched_values))
 
     def data2values(self, ranges, values_type, use_gpu=True, condition=Condition.EQUAL, step_enable=False):
         values_type_size = np.dtype(values_type).itemsize
@@ -151,11 +151,10 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, use_gpu, condition, step_enable)
-            # region.data2values2(np.array([[value, 0, 0]], dtype=np.uint32), 4)
-            if region.pointers.shape[0]>0:
-                for address, value in region.pointers:
-                    yield int(address), (current_size * 100) // total_size
+            # region.data2values(np.array([[value, 0, 0]], dtype=np.uint32), np.uint32, use_gpu, condition, step_enable)
+            region.data2values2(np.array([[value, 0, 0]], dtype=np.uint32), 4)
+            if region.pointers.shape[0] > 0:
+                yield region.pointers[:, 0], (current_size * 100) // total_size
 
             current_size += region.size
         yield None
@@ -171,7 +170,7 @@ class MemoryScanner(AbstractMemoryScanner):
         # Read the memory
         success = ReadProcessMemory(
             self.handle,
-            ctypes.c_void_p(address),
+            ctypes.c_void_p(int(address)),
             buffer,
             size,
             ctypes.byref(bytes_read)
