@@ -27,9 +27,9 @@ def warm_up_gpu():
 
 @njit(parallel=True)
 def filter_and_extract_values_cpu(data, base_address, ranges, values_type, values_type_size, length, search_condition, step_enable):
-    # max_results = length // (values_type_size if step_enable else 1)
-    out_addrs = np.zeros(length, dtype=np.uint64)
-    out_values = np.zeros(length, dtype=values_type)
+    max_results = length // (values_type_size if step_enable else 1)
+    out_addrs = np.zeros(max_results, dtype=np.uint64)
+    out_values = np.zeros(max_results, dtype=values_type)
     step_size = values_type_size if step_enable else 1
 
     count = 0
@@ -44,15 +44,15 @@ def filter_and_extract_values_cpu(data, base_address, ranges, values_type, value
                 start = ranges[j, 0]
                 end = ranges[j, 1]
 
-                if search_condition == Condition.BETWEEN:
+                if search_condition == 0:
                     flag = start <= val <= end
-                elif search_condition == Condition.NOT_EQUAL:
+                elif search_condition == 1:
                     flag = start != val
-                elif search_condition == Condition.EQUAL:
+                elif search_condition == 2:
                     flag = start == val
-                elif search_condition == Condition.GREATER_THAN:
+                elif search_condition == 3:
                     flag = start <= val
-                elif search_condition == Condition.LESS_THAN:
+                elif search_condition == 4:
                     flag = start >= val
 
                 if flag:
@@ -80,23 +80,23 @@ def filter_and_extract_values_gpu(data, base_address, ranges, addrs, ptrs, count
             start = ranges[j, 0]
             end = ranges[j, 1]
 
-            if search_condition == Condition.BETWEEN:
+            if search_condition == 0:
                 if start <= val <= end:
                     flag = True
                     break
-            elif search_condition == Condition.NOT_EQUAL:
+            elif search_condition == 1:
                 if val != start:
                     flag = True
                     break
-            elif search_condition == Condition.EQUAL:
+            elif search_condition == 2:
                 if val == start:
                     flag = True
                     break
-            elif search_condition == Condition.GREATER_THAN:
+            elif search_condition == 3:
                 if val > start:
                     flag = True
                     break
-            elif search_condition == Condition.LESS_THAN:
+            elif search_condition == 4:
                 if val < start:
                     flag = True
                     break
