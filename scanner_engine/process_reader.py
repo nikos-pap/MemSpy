@@ -111,7 +111,7 @@ class MemoryScanner(AbstractMemoryScanner):
     #         parallel_utils.warm_up_gpu()
     #     parallel_utils.warm_up_cpu()
 
-    def read_memory(self):
+    def read_memory(self, chunk_size=2**25, element_size=4):
         if not self.handle:
             print("Failed to open process. Try running as Administrator.")
             return
@@ -119,6 +119,8 @@ class MemoryScanner(AbstractMemoryScanner):
         memory_info = MEMORY_BASIC_INFORMATION()
         address = 0
         id = 0
+        overlap = element_size - 1
+
         while address < 0x7FFFFFFFFFFF:  # Max user space address (Windows x64)
             size = VirtualQueryEx(self.handle, ctypes.c_void_p(address), ctypes.byref(memory_info),
                                   ctypes.sizeof(memory_info))
@@ -131,22 +133,35 @@ class MemoryScanner(AbstractMemoryScanner):
             if memory_info.State == 0x1000:  # MEM_COMMIT
                 if memory_info.Protect & (0x02 | 0x04 | 0x10 | 0x20 | 0x40 | 0x80):
                     module_name = ctypes.create_unicode_buffer(MAX_PATH)
-
-                    # Fix is here: cast AllocationBase to c_void_p
                     module_base = ctypes.c_void_p(memory_info.AllocationBase)
+
                     if GetModuleFileNameEx(self.handle, module_base, module_name, MAX_PATH) > 0:
                         region_name = os.path.basename(module_name.value)
                     else:
                         region_name = None
 
-                    buffer = ctypes.create_string_buffer(region_size)
-                    bytes_read = ctypes.c_size_t()
-                    base_address = ctypes.c_void_p(memory_info.BaseAddress)
-                    if ReadProcessMemory(self.handle, base_address, buffer, ctypes.c_size_t(region_size),
-                                         ctypes.byref(bytes_read)):
-                        data = buffer.raw[:bytes_read.value]
-                        yield Region(base_addr, region_size, region_name, data, id)
-                        id += 1
+                    chunk_offset = 0
+                    while chunk_offset < region_size:
+                        # First chunk has no overlap
+                        if chunk_offset == 0:
+                            read_start = base_addr
+                            read_size = min(chunk_size, region_size)
+                        else:
+                            read_start = base_addr + chunk_offset - overlap
+                            read_size = min(chunk_size + overlap, region_size - chunk_offset + overlap)
+
+                        buffer = ctypes.create_string_buffer(read_size)
+                        bytes_read = ctypes.c_size_t()
+                        read_address = ctypes.c_void_p(read_start)
+
+                        if ReadProcessMemory(self.handle, read_address, buffer, ctypes.c_size_t(read_size),
+                                             ctypes.byref(bytes_read)):
+                            data = buffer.raw[:bytes_read.value]
+                            yield Region(read_start, bytes_read.value, region_name, data, id)
+                            id += 1
+
+                        chunk_offset += chunk_size
+
             address += memory_info.RegionSize
 
     def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
@@ -154,9 +169,9 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         value = np.frombuffer(value, dtype=np.uint32)[0]
         for region in self.read_memory():
-            matches = find_matches(bytestream=region.data, base_address=region.base_address ,mode=condition, target=[value,0], element_size=4)
-
-            yield matches, (current_size * 100) // total_size
+            # for match in find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=[value, 0], element_size=4):
+            #     yield np.array([match], dtype=np.uint64), (current_size * 100) // total_size
+            yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=[value, 0], element_size=4), (current_size * 100) // total_size
             # for match in matches:
             #     yield int(match), (current_size * 100) // total_size
         # for region in self.read_memory():
