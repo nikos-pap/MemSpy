@@ -13,11 +13,6 @@ class Model(QObject):
     def __init__(self):
         super().__init__()
         self.backend = Backend()
-        # self.full_address_table: Dict[str, RowEntry] = dict()
-        # self.filtered_address_list: List[int] = []
-        # self.backend.update.connect(self._on_update)
-        # self.backend.newAddress.connect(self.onInsert)
-        # self.scan_time = 0
 
     def filter_addresses(self, text: str) -> Dict[str, RowEntry]:
         text = text.strip().lower()

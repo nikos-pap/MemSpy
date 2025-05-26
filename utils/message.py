@@ -19,6 +19,7 @@ class MessageType(Enum):
     GET_PREV_PAGE = auto()
     SET_PAGE_RANGE = auto()
     SET_FILTERED_VALUES = auto()
+    SCAN_COMPLETED = auto()
     # DELETE_ADDRESS = auto()
     # FREEZE_ADDRESS = auto()
     # UNFREEZE_ADDRESS = auto()

@@ -19,7 +19,7 @@ class QueueWorker(QObject):
     totalValuesSignal = pyqtSignal(int)
     filterValuesSignal = pyqtSignal(int)
     pageRangeSignal = pyqtSignal(int)
-    finished = pyqtSignal()
+    scanCompletedSignal = pyqtSignal()
 
     def __init__(self, queue: Queue):
         super().__init__()
@@ -43,18 +43,18 @@ class QueueWorker(QObject):
                     self.totalValuesSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SET_FILTERED_VALUES:
                     self.filterValuesSignal.emit(msg.message[0])
+                elif msg.message_type == MessageType.SCAN_COMPLETED:
+                    self.scanCompletedSignal.emit()
                 else:
                     print(f"[QueueWorker] Unhandled message: {msg}")
         except Exception as e:
             print(f"[QueueWorker] Error: {e}")
         finally:
-            self.finished.emit()
+            QThread.currentThread().quit()
 
 
 class Backend(QObject):
     """Central coordinator: manages memory scanning, process enumeration, and inter-thread communication."""
-    update = pyqtSignal(str, bytes)
-    newAddress = pyqtSignal(int, RowEntry)
 
     def __init__(self):
         super().__init__()
@@ -68,18 +68,12 @@ class Backend(QObject):
         self.listener = QueueWorker(self.proc_queue_out)
         self.listener.moveToThread(self._thread)
         self._thread.started.connect(self.listener.run)
-        self.listener.finished.connect(self._thread.quit)
         self._thread.start()
 
         # Memory and scanner processes
         self._memory_view = MemoryViewImproved(self.proc_queue_in, self.proc_queue_out)
         self._memory_view.start()
-        self._scanner = MemoryScannerImproved(
-            self.scanner_queue_in,
-            self.proc_queue_in,
-            self.proc_queue_out,
-            daemon=True
-        )
+        self._scanner = MemoryScannerImproved(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out)
         self._scanner.start()
 
         # Cached process list
@@ -112,12 +106,22 @@ class Backend(QObject):
         self.proc_queue_in.put(Message(MessageType.RESET, []))
         self.scanner_queue_in.put(Message(MessageType.START_SCAN, [value, condition]))
 
+    def stop_scan(self):
+        self.scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
+
     def stop(self) -> None:
         """Gracefully stop background processes without blocking on crashed ones."""
         # Signal exit
         exit_msg = Message(MessageType.EXIT, [0])
-        self.proc_queue_in.put_nowait(exit_msg)
+        while not self.scanner_queue_in.empty():
+            self.scanner_queue_in.get()
         self.scanner_queue_in.put_nowait(exit_msg)
+        while not self.proc_queue_in.empty():
+            self.proc_queue_in.get()
+        self.proc_queue_in.put_nowait(exit_msg)
+        while not self.proc_queue_out.empty():
+            self.proc_queue_out.get()
+        self.proc_queue_out.put_nowait(exit_msg)
 
         # Non-blocking join: poll exitcode immediately
         if self._scanner.is_alive():
@@ -125,25 +129,23 @@ class Backend(QObject):
             self._scanner.join()
         if self._memory_view.is_alive():
             self._memory_view.join()
-
-        # Stop listener thread
-        self.proc_queue_out.put_nowait(exit_msg)
+        # self._thread.quit()
         print(self._thread.isFinished())
-        # self._thread.wait()
+        self._thread.wait()
 
     def get_running_processes(self) -> Tuple[List[str], List[Image.Image], List[int]]:
         """Retrieve and cache running processes and their icons."""
         skip = {'svchost.exe'}
         for proc in psutil.process_iter(['pid', 'name', 'exe']):
             try:
-                name = proc.info['name']
+                name = proc.name()
                 if name not in skip and name not in self.running_process_names:
-                    exe = proc.info['exe']
+                    exe = proc.exe()
                     if exe and os.access(exe, os.R_OK):
                         img = image_extractor.get_process_image(exe)
                         idx = insort(self.running_process_names, name, key=str.lower)
                         self.images.insert(idx, img)
-                        self.pids.insert(idx, proc.info['pid'])
+                        self.pids.insert(idx, proc.pid)
             except (psutil.AccessDenied, psutil.NoSuchProcess):
                 continue
         return self.running_process_names, self.images, self.pids

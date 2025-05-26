@@ -100,10 +100,10 @@ class MemoryScannerImproved(Process):
         )
         self._scanning = True
         self._scan_start = time.time()
-        self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]))
+        self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
         print('(MemoryScannerImproved) Scan started')
 
-    def _emit_results(self, addresses: Union[list[int], np.ndarray], progress: int) -> None:
+    def _emit_results(self, addresses: list[int] | np.ndarray | int, progress: int) -> None:
         """Send addresses batch and periodic progress updates without conversion overhead."""
         if isinstance(addresses, np.ndarray):
             if addresses.size > 0:
@@ -118,6 +118,7 @@ class MemoryScannerImproved(Process):
         self._scanning = False
         self._current_scan = None
         elapsed = time.time() - self._scan_start
+        self.queue_progress.put(Message(MessageType.SCAN_COMPLETED), False)
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [100]), False)
         print(f'(MemoryScannerImproved) Scan finished in {elapsed:.3f} seconds')
 

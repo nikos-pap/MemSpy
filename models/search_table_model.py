@@ -40,7 +40,7 @@ class SortedPagedTableModel(QAbstractTableModel):
         key = self._keys[global_idx]
         if index.column() == 0:
             return hex(key)
-        elif index.column() == 1:
+        elif index.column() == 2:
             init_val = self._initial.get(key)
             return convert_from_bytes(init_val, Type.UInt32) if init_val is not None else ""
         else:
@@ -53,7 +53,7 @@ class SortedPagedTableModel(QAbstractTableModel):
 
         if orientation == Qt.Orientation.Horizontal:
             # your existing column headers
-            return ["Key", "Previous", "Current"][section]
+            return ["Address", "Current", "Previous"][section]
 
         elif orientation == Qt.Orientation.Vertical:
             # show a 1-based line number, taking paging into account
@@ -119,8 +119,8 @@ class SortedPagedTableModel(QAbstractTableModel):
             page = idx // self.page_size
             if page == self.current_page:
                 local = idx % self.page_size
-                top_left = self.index(local, 2)
-                bottom_right = self.index(local, 2)
+                top_left = self.index(local, 1)
+                bottom_right = self.index(local, 1)
                 self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
 
     @pyqtSlot(str)

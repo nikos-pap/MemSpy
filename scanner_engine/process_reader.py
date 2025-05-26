@@ -167,11 +167,12 @@ class MemoryScanner(AbstractMemoryScanner):
     def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
         total_size = self.get_working_memory_size()
         current_size = 0
-        value = np.frombuffer(value, dtype=np.uint32)[0]
+        element_size = len(value) // 2
+        value = np.frombuffer(value, dtype=f'<u{element_size}')
         for region in self.read_memory():
             # for match in find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=[value, 0], element_size=4):
             #     yield np.array([match], dtype=np.uint64), (current_size * 100) // total_size
-            yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=[value, 0], element_size=4), (current_size * 100) // total_size
+            yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
             # for match in matches:
             #     yield int(match), (current_size * 100) // total_size
         # for region in self.read_memory():

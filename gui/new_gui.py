@@ -86,7 +86,11 @@ class MemoryScannerUI(QMainWindow):
         self.valid_input = False
         self.search_input = QLineEdit()
         self.search_input.setFont(self.font)
-        self.search_input.setPlaceholderText("Search...")
+        # self.search_input.setPlaceholderText("")
+        self.search_input2 = QLineEdit()
+        # self.search_input2.setPlaceholderText("")
+        self.search_input2.setFont(self.font)
+
         # noinspection PyUnresolvedReferences
         self.search_input.textChanged.connect(self.validate_input)
 
@@ -95,11 +99,12 @@ class MemoryScannerUI(QMainWindow):
         self.typeCombo.setFont(self.font)
 
         self.condition_combo = QComboBox()
-        # self.condition_combo.setFixedWidth(100)
         self.condition_combo.setFont(self.font)
+        self.condition_combo.currentIndexChanged.connect(self.condition_changed_command)
 
         process_row.addWidget(self.typeCombo)
         process_row.addWidget(self.search_input)
+        process_row.addWidget(self.search_input2)
         process_row.addWidget(self.condition_combo)
         self.new_scan_btn = QPushButton("New Scan")
         # noinspection PyUnresolvedReferences
@@ -165,9 +170,10 @@ class MemoryScannerUI(QMainWindow):
         self.initialise()
         self.backend.listener.dataReady.connect(self.search_address_table.handleUpdate)
         self.backend.listener.progressSignal.connect(self.progress_bar.setValue)
-        self.backend.listener.totalValuesSignal.connect(self.finished_scan)
+        self.backend.listener.totalValuesSignal.connect(self.scan_progress)
         self.backend.listener.pageRangeSignal.connect(self.search_address_table.setPageRanges)
         self.backend.listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
+        self.backend.listener.scanCompletedSignal.connect(self.finished_scan)
         self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
         self.search_address_table.previousPageSignal.connect(self.backend.get_previous_page)
         self.search_address_table.filterSignal.connect(self.filter_command)
@@ -197,12 +203,10 @@ class MemoryScannerUI(QMainWindow):
 
         # Add actions to File menu
         open_action = QAction("Open", self)
-        # noinspection PyUnresolvedReferences
         open_action.triggered.connect(lambda: self.show_message("Open clicked"))
         file_menu.addAction(open_action)
 
         exit_action = QAction("Exit", self)
-        # noinspection PyUnresolvedReferences
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
 
@@ -210,7 +214,6 @@ class MemoryScannerUI(QMainWindow):
         help_menu = menu_bar.addMenu("Help")
 
         about_action = QAction("About", self)
-        # noinspection PyUnresolvedReferences
         about_action.triggered.connect(lambda: self.show_message("This is a PyQt6 app"))
         help_menu.addAction(about_action)
 
@@ -259,6 +262,13 @@ class MemoryScannerUI(QMainWindow):
                 self.process_box.addItem(label)
         print(f'Loading Process List takes {time.time() - start}')
 
+    def condition_changed_command(self, text: str) -> None:
+        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
+            self.search_input2.show()
+        else:
+            self.search_input2.hide()
+            self.search_input2.setText('')
+
     def filter_command(self, pattern: str):
         self.search_address_table.clear_table()
         self.backend.filter_addresses(pattern)
@@ -268,26 +278,44 @@ class MemoryScannerUI(QMainWindow):
             self.set_message('⚠️ Select a process before starting a scan!')
             return
         if not self.search_input.text():
+            self.set_message('⚠️ Fill scan value before scanning')
+            return
+        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN and not self.search_input2.text():
+            self.set_message('⚠️ Fill scan value before scanning')
             return
         self.search_address_table.clear()
         value = convert_to_bytes(self.search_input.text(), self.typeCombo.currentData())
         if not value:
             return
+        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
+            value += convert_to_bytes(self.search_input2.text(), self.typeCombo.currentData())
+        else:
+            value += b'\x00' * len(value)
+
         condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
         self.disable_scan_navigation()
         self.backend.scan(value, condition)
-        # Connect signals
-        # task = ScannerThread(self.models, value)
-        # task.signals.finished.connect(self.finished_scan)
-        # task.signals.progress.connect(self.progress_bar.setValue)
-        # task.signals.error.connect(self.on_scan_error)
-        # self.pool.start(task)
+        self.new_scan_btn.disconnect()
+        self.new_scan_btn.setText('Cancel Scan')
+        self.new_scan_btn.clicked.connect(self.stop_scan_command)
+
+    def stop_scan_command(self):
+        self.backend.stop_scan()
+        self.new_scan_btn.disconnect()
+        self.new_scan_btn.setText('New Scan')
+        self.new_scan_btn.clicked.connect(self.scan_command)
+        self.enable_scan_navigation()
 
     def on_scan_error(self, e):
         print(e)
 
-    def finished_scan(self, total: int):
+    def finished_scan(self):
+        self.new_scan_btn.setText('New Scan')
         self.enable_scan_navigation()
+        self.new_scan_btn.disconnect()
+        self.new_scan_btn.clicked.connect(self.scan_command)
+
+    def scan_progress(self, total: int):
         self.search_address_table.setTotal(total)
         self.search_address_table.show_message()
 
@@ -295,14 +323,14 @@ class MemoryScannerUI(QMainWindow):
         self.typeCombo.setDisabled(True)
         self.search_input.setDisabled(True)
         self.condition_combo.setDisabled(True)
-        self.new_scan_btn.setDisabled(True)
+        # self.new_scan_btn.setDisabled(True)
         self.filter_btn.setDisabled(True)
 
     def enable_scan_navigation(self):
         self.typeCombo.setDisabled(False)
         self.search_input.setDisabled(False)
         self.condition_combo.setDisabled(False)
-        self.new_scan_btn.setDisabled(False)
+        # self.new_scan_btn.setDisabled(False)
         self.filter_btn.setDisabled(False)
 
     def process_selection_handle(self, icon, proc_id):

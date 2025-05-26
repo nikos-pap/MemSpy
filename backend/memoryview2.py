@@ -84,7 +84,6 @@ class MemoryViewImproved(Process):
             self._reset_all()
         elif typ == MessageType.EXIT:
             print('(MemoryView) Exiting')
-            self.out_queue.put(msg)
         else:
             # Ignore unsupported types or EMPTY
             pass
