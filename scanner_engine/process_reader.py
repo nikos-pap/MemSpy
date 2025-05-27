@@ -14,6 +14,15 @@ from utils.types import Condition
 PROCESS_ALL_ACCESS = 0x1F0FFF
 MAX_PATH = 260
 
+MEM_COMMIT = 0x1000
+PAGE_READONLY = 0x02
+PAGE_READWRITE = 0x04
+PAGE_EXECUTE = 0x10
+PAGE_EXECUTE_READ = 0x20
+PAGE_EXECUTE_READWRITE = 0x40
+PAGE_EXECUTE_WRITECOPY = 0x80
+
+
 class MEMORY_BASIC_INFORMATION(ctypes.Structure):
     _fields_ = [
         ("BaseAddress", wintypes.LPVOID),
@@ -130,8 +139,8 @@ class MemoryScanner(AbstractMemoryScanner):
             base_addr = ctypes.cast(memory_info.BaseAddress, ctypes.c_void_p).value
             region_size = memory_info.RegionSize
 
-            if memory_info.State == 0x1000:  # MEM_COMMIT
-                if memory_info.Protect & (0x02 | 0x04 | 0x10 | 0x20 | 0x40 | 0x80):
+            if memory_info.State == MEM_COMMIT:  # MEM_COMMIT
+                if memory_info.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY):
                     module_name = ctypes.create_unicode_buffer(MAX_PATH)
                     module_base = ctypes.c_void_p(memory_info.AllocationBase)
 
@@ -169,7 +178,7 @@ class MemoryScanner(AbstractMemoryScanner):
         current_size = 0
         element_size = len(value) // 2
         value = np.frombuffer(value, dtype=f'<u{element_size}')
-        for region in self.read_memory():
+        for region in self.read_memory(element_size=element_size):
             # for match in find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=[value, 0], element_size=4):
             #     yield np.array([match], dtype=np.uint64), (current_size * 100) // total_size
             yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
