@@ -1,1 +1,1 @@
-from gui.new_gui import MemoryScannerUI
+from gui.new_gui2 import MemoryScannerUI

@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, pyqtSlot, pyqtSignal
 
 from models.search_table_model import SortedPagedTableModel
-from utils import Type, RowEntry
 from utils.types import convert_from_bytes, convert_to_bytes
 
 

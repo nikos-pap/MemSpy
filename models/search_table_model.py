@@ -151,5 +151,3 @@ class SortedPagedTableModel(QAbstractTableModel):
         self._keys.clear()
         self.current_page = 0
         self.endResetModel()
-
-

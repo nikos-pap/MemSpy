@@ -2,9 +2,8 @@ from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 
 from backend.memoryview2 import MemoryViewImproved
-from scanner_engine.scanner import MemoryScanner
 from scanner_engine.scanner2 import MemoryScannerImproved
-from utils import insort, message, image_extractor, RowEntry
+from utils import insort, message, image_extractor
 
 from utils.message import MessageType, Message
 from utils.types import Type, Condition

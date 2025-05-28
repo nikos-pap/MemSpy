@@ -6,8 +6,9 @@ import win32api
 import os
 
 
-# noinspection SpellCheckingInspection
 def get_process_image(path: str):
+	if not (path and os.access(path, os.R_OK)):
+		return None
 	path = os.path.abspath(path)
 	if not os.path.exists(path):
 		return None

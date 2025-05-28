@@ -1,13 +1,14 @@
 from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from multiprocessing import Queue
-from typing import List, Tuple
+from typing import List, Tuple, NamedTuple
 import psutil
 import os
 
 from backend.memoryview2 import MemoryViewImproved
 from scanner_engine.scanner2 import MemoryScannerImproved
-from utils import insort, image_extractor, RowEntry
+from utils import insort, image_extractor
+from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
 from utils.types import Condition
 
@@ -77,9 +78,11 @@ class Backend(QObject):
         self._scanner.start()
 
         # Cached process list
+        self.running_procs: list[ProcessEntry] = []
         self.running_process_names: List[str] = []
         self.images: List[Image.Image] = []
         self.pids: List[int] = []
+        self.active_processes: set = set()
 
     def init_process_reader(self, pid: int) -> None:
         """Initialize memory scanning for a given process ID."""
@@ -87,10 +90,10 @@ class Backend(QObject):
         self.proc_queue_in.put(msg)
         self.scanner_queue_in.put(msg)
 
-    def set_value(self, address: str, value: bytes) -> None:
-        """Edit a memory address value."""
-        msg = Message(MessageType.EDIT_ADDRESS, [address, value])
-        self.proc_queue_in.put(msg)
+    # def set_value(self, address: str, value: bytes) -> None:
+    #     """Edit a memory address value."""
+    #     msg = Message(MessageType.EDIT_ADDRESS, [address, value])
+    #     self.proc_queue_in.put(msg)
 
     def get_next_page(self) -> None:
         self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE, []))
@@ -123,29 +126,42 @@ class Backend(QObject):
             self.proc_queue_out.get()
         self.proc_queue_out.put_nowait(exit_msg)
 
-        # Non-blocking join: poll exitcode immediately
         if self._scanner.is_alive():
-            # If process already exited, no wait; else, attempt quick join
             self._scanner.join()
         if self._memory_view.is_alive():
             self._memory_view.join()
-        # self._thread.quit()
-        print(self._thread.isFinished())
+
         self._thread.wait()
 
-    def get_running_processes(self) -> Tuple[List[str], List[Image.Image], List[int]]:
+    def get_running_processes(self) -> list[NamedTuple]:
         """Retrieve and cache running processes and their icons."""
         skip = {'svchost.exe'}
+        found = set()
+        pids = []
         for proc in psutil.process_iter(['pid', 'name', 'exe']):
             try:
-                name = proc.name()
-                if name not in skip and name not in self.running_process_names:
-                    exe = proc.exe()
-                    if exe and os.access(exe, os.R_OK):
-                        img = image_extractor.get_process_image(exe)
-                        idx = insort(self.running_process_names, name, key=str.lower)
-                        self.images.insert(idx, img)
-                        self.pids.insert(idx, proc.pid)
-            except (psutil.AccessDenied, psutil.NoSuchProcess):
-                continue
-        return self.running_process_names, self.images, self.pids
+                name = proc.info['name']
+                exe = proc.info['exe']
+                pid = proc.info['pid']
+
+                if name in skip:
+                    continue
+
+                pids.append(pid)
+                if pid not in self.active_processes:
+                    # print(pid)
+                    self.active_processes.add(pid)
+                    img = image_extractor.get_process_image(exe)
+                    process = ProcessEntry(name, pid, img)
+                    idx = insort(self.running_procs, process, key=lambda p: p.name.lower())
+                    # self.running_procs.insert(idx, process)
+                found.add(pid)
+            except (psutil.AccessDenied, psutil.NoSuchProcess) as e:
+                print(f'Error Loading Process: {e}')
+
+        removed = self.active_processes - found
+        if removed:
+            self.active_processes = found
+            self.running_procs = [proc for proc in self.running_procs if proc.pid in found]
+
+        return self.running_procs
