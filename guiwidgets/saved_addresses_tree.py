@@ -4,7 +4,10 @@ from PyQt6.QtWidgets import (
     QLineEdit, QFormLayout, QHeaderView
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QFont
-from PyQt6.QtCore import Qt, QModelIndex
+from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
+
+from utils import convert_to_bytes, Type
+from utils.types import convert_from_bytes
 
 # Custom data role for frozen state
 FREEZE_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -20,6 +23,11 @@ class TreeModel(QStandardItemModel):
 
 
 class AddressTreeView(QTreeView):
+    freezeSignal = pyqtSignal('quint64', bytes, bool)
+    setValueSignal = pyqtSignal('quint64', bytes)
+    addAddressSignal = pyqtSignal('quint64')
+    removeAddressSignal = pyqtSignal('quint64')
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setDragEnabled(True)
@@ -50,9 +58,45 @@ class AddressTreeView(QTreeView):
         add_address = QAction("Add Address", self)
         add_group.triggered.connect(lambda: self.add_group(index))
         add_address.triggered.connect(lambda: self.add_address_dialog(index))
+
+        if index.isValid():
+            parent = index.parent()
+            cols = self.model.columnCount(parent)
+            row = index.row()
+            row_items = [
+                self.model.data(self.model.index(row, col, parent), Qt.ItemDataRole.DisplayRole)
+                for col in range(cols)
+            ]
+            delete_action = QAction("Delete", self)
+            freeze_action = QAction("Freeze", self)
+            delete_action.triggered.connect(lambda: self.delete_address(index, row_items))
+            freeze_action.triggered.connect(lambda: self.freeze_address(index, row_items))
+            menu.addAction(delete_action)
+            menu.addAction(freeze_action)
+            # print()
         menu.addAction(add_group)
         menu.addAction(add_address)
         menu.exec(self.viewport().mapToGlobal(pos))
+
+    def delete_address(self, index, row_items):
+        self.removeAddressSignal.emit(int(row_items[2], 16))
+        print(f'Deleting {row_items[2]}')
+        self.model.removeRow(index.row(), index.parent())
+
+    def freeze_address(self, index, row_items):
+        row = index.row()
+        parent = index.parent()
+        name_item = self.model.itemFromIndex(self.model.index(row, 0, parent))
+        frozen = name_item.data(FREEZE_ROLE)
+        new_name = name_item.text()
+        if frozen:
+            name_item.setText(new_name.rstrip(' 🔒'))
+        else:
+            name_item.setText(f"{new_name} 🔒")
+        name_item.setData(not frozen, FREEZE_ROLE)
+        print(f'Freezing {row_items[3]}, {row_items}')
+        self.freezeSignal.emit(int(row_items[2], 16), convert_to_bytes(row_items[3], Type.UInt32), not frozen)
+        # self.model.removeRow(index.row(), parent)
 
     def add_group(self, index: QModelIndex = QModelIndex()):
         name, ok = QInputDialog.getText(self, "New Group", "Group name:")
@@ -82,16 +126,18 @@ class AddressTreeView(QTreeView):
         """
         Programmatically add an address entry under given index (or root if invalid).
         """
-        item = QStandardItem(label)
+
+        item = QStandardItem(label.strip())
         item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         item.setFlags(flags)
         desc = QStandardItem("")
         desc.setFlags(flags)
-        addr_item = QStandardItem(address_str)
+        addr_item = QStandardItem(address_str.strip())
         addr_item.setFlags(flags)
         value = QStandardItem("")
         value.setFlags(flags)
+        self.addAddressSignal.emit(int(address_str, 16))
         parent_item = self.model.itemFromIndex(index) if index.isValid() else None
         if parent_item and parent_item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
             parent_item.appendRow([item, desc, addr_item, value])
@@ -150,10 +196,12 @@ class AddressTreeView(QTreeView):
             # update display instantly
             new_name = name_edit.text()
             if data:
+                self.freezeSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32), True)
                 name_item.setText(f"{new_name} 🔒")
                 value_item.setText(value_edit.text())
                 print(f"Freezing {new_name} at value {value_edit.text()}")
             else:
+                self.freezeSignal.emit(int(addr_item.text(), 16), b'', False)
                 name_item.setText(new_name.rstrip(' 🔒'))
                 print(f"Attempting to Freeze {new_name} at value {value_edit.text()}")
 
@@ -175,6 +223,7 @@ class AddressTreeView(QTreeView):
             desc_item.setText(desc_edit.text())
             addr_item.setText(addr_edit.text())
             value_item.setText(value_edit.text())
+            self.setValueSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32))
             print(name_item.data(FREEZE_ROLE))
         ok_btn = QPushButton("OK")
         apply_btn = QPushButton("Apply")
@@ -190,8 +239,27 @@ class AddressTreeView(QTreeView):
 
         dlg.exec()
 
+    def update_saved_addresses(self, name: int, new_val: bytes):
+        root = self.model.invisibleRootItem()
+        row_count = root.rowCount()
+        name = hex(name)
+        new_val = str(convert_from_bytes(new_val, Type.UInt32))
+        for row in range(row_count):
+            name_item = root.child(row, 2)
+            print(name_item.text())
+            if name_item.text() == name:
+                # get the item in column 2 and update it
+                target_item = root.child(row, 3)
+                if target_item is None:
+                    # if it doesn’t exist yet, create it
+                    target_item = QStandardItem()
+                    root.setChild(row, 3, target_item)
+                target_item.setText(new_val)
+                break
+
 
 class AddressTreeContainer(QWidget):
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.tree_view = AddressTreeView(self)

@@ -21,6 +21,7 @@ class QueueWorker(QObject):
     filterValuesSignal = pyqtSignal(int)
     pageRangeSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
+    updateSavedSignal = pyqtSignal('quint64', bytes)
 
     def __init__(self, queue: Queue):
         super().__init__()
@@ -42,6 +43,8 @@ class QueueWorker(QObject):
                     self.pageRangeSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SET_TOTAL_VALUES:
                     self.totalValuesSignal.emit(msg.message[0])
+                elif msg.message_type == MessageType.SAVED_VALUE_CHANGED:
+                    self.updateSavedSignal.emit(msg.message[0], msg.message[1])
                 elif msg.message_type == MessageType.SET_FILTERED_VALUES:
                     self.filterValuesSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SCAN_COMPLETED:
@@ -90,10 +93,20 @@ class Backend(QObject):
         self.proc_queue_in.put(msg)
         self.scanner_queue_in.put(msg)
 
-    # def set_value(self, address: str, value: bytes) -> None:
-    #     """Edit a memory address value."""
-    #     msg = Message(MessageType.EDIT_ADDRESS, [address, value])
-    #     self.proc_queue_in.put(msg)
+    def set_value(self, address: int, value: bytes) -> None:
+        """Edit a memory address value."""
+        msg = Message(MessageType.EDIT_ADDRESS, [address, value])
+        self.proc_queue_in.put(msg)
+
+    def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
+        message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
+        self.proc_queue_in.put(Message(message, [address, value]))
+
+    def save_address(self, address: int) -> None:
+        self.proc_queue_in.put(Message(MessageType.SAVE_ADDRESS, [address]))
+
+    def unsave_address(self, address: int) -> None:
+        self.proc_queue_in.put(Message(MessageType.UNSAVE_ADDRESS, [address]))
 
     def get_next_page(self) -> None:
         self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE, []))

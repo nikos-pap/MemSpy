@@ -7,7 +7,7 @@ from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLineEdit, QDockWidget, QStatusBar,
-    QProgressBar, QMessageBox, QTableWidget, QHeaderView
+    QProgressBar, QMessageBox, QHeaderView
 )
 
 from backend.backend2 import Backend
@@ -190,6 +190,7 @@ class MemoryScannerUI(QMainWindow):
         listener.pageRangeSignal.connect(self.search_address_table.setPageRanges)
         listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
+        listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
 
         self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
         self.search_address_table.previousPageSignal.connect(
@@ -203,6 +204,11 @@ class MemoryScannerUI(QMainWindow):
         self.typeCombo.currentTextChanged.connect(self.validate_input)
         self.condition_combo.currentIndexChanged.connect(self.condition_changed_command)
         self.new_scan_btn.clicked.connect(self.scan_command)
+
+        self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
+        self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
+        self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
+        self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
 
     @staticmethod
     def fix_dock_close_event(dock: QDockWidget,
