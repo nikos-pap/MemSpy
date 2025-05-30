@@ -4,12 +4,13 @@ from ctypes import wintypes
 
 # ——— Constants ———
 PROCESS_ALL_ACCESS = 0x1F0FFF
+TH32CS_SNAPMODULE = 0x00000008
+TH32CS_SNAPMODULE32 = 0x00000010  # For 32-bit modules in a 64-bit process or vice-versa
 
 # Privilege constants
 TOKEN_ADJUST_PRIVILEGES = 0x0020
 TOKEN_QUERY = 0x0008
 SE_PRIVILEGE_ENABLED = 0x00000002
-
 
 # ——— Structures ———
 class ProcessMemoryCountersEx(ctypes.Structure):
@@ -27,7 +28,6 @@ class ProcessMemoryCountersEx(ctypes.Structure):
         ('PrivateUsage', ctypes.c_size_t),
     ]
 
-
 # ——— Load libraries ———
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 psapi = ctypes.WinDLL('Psapi', use_last_error=True)
@@ -41,7 +41,6 @@ OpenProcess.restype = wintypes.HANDLE
 CloseHandle = kernel32.CloseHandle
 CloseHandle.argtypes = (wintypes.HANDLE,)
 CloseHandle.restype = wintypes.BOOL
-
 
 advapi32.OpenProcessToken.argtypes = (wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE))
 advapi32.OpenProcessToken.restype = wintypes.BOOL
@@ -58,6 +57,11 @@ psapi.GetProcessMemoryInfo.argtypes = (
 )
 psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
 
+
+
+CreateToolhelp32Snapshot = kernel32.CreateToolhelp32Snapshot
+CreateToolhelp32Snapshot.restype = ctypes.wintypes.HANDLE
+CreateToolhelp32Snapshot.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD]
 
 # ——— Helper: enable SeDebugPrivilege ———
 def enable_debug_privilege():
@@ -97,6 +101,7 @@ class AbstractMemoryScanner(ABC):
         if enable_debug:
             enable_debug_privilege()
         self.handle: wintypes.HANDLE | None = None
+        self.hSnapshot: wintypes.HANDLE | None = None
 
     def change_process(self, pid: int):
         # clean up previous handle
@@ -104,6 +109,7 @@ class AbstractMemoryScanner(ABC):
             CloseHandle(self.handle)
         # open new handle
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
+        self.hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
 
     def get_working_memory_size(self) -> int:
         cnt = ProcessMemoryCountersEx()
@@ -128,6 +134,9 @@ class AbstractMemoryScanner(ABC):
         if self.handle:
             CloseHandle(self.handle)
             self.handle = None
+        if self.hSnapshot:
+            CloseHandle(self.hSnapshot)
+            self.hSnapshot = None
 
     def __enter__(self):
         return self
