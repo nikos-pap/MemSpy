@@ -276,9 +276,7 @@ class MemoryScanner(AbstractMemoryScanner):
         value = np.frombuffer(value, dtype=f'<u{element_size}')
         # regions = self.get_regions(element_size=element_size)
         for region in self.read_memory(element_size=element_size):
-            # s = time.time()
             yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
-            # print(time.time() - s)
             current_size += region.size
         # for region in self.get_regions(element_size=element_size):
         #     self.read_memory_by_region(region)
@@ -304,7 +302,8 @@ class MemoryScanner(AbstractMemoryScanner):
         )
 
         if not success:
-            raise ctypes.WinError(ctypes.get_last_error())
+            print(f"Invalid access to memory at address: {hex(address)}")
+            return None
 
         # Return the raw bytes read
         return buffer.raw[:bytes_read.value]

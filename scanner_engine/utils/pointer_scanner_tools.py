@@ -105,11 +105,9 @@ def filter_existing_pointers_cpu(ptrs, ranges):
     mask = np.isin(ptrs[:, 3], list(valid_ids))  # B_id is at index 3
     return ptrs[mask]
 
-# ADDRESSES
 def build_index(pointer_data):
     b_map = defaultdict(list)
     for A, _, B, _, C in pointer_data:
-        # for _,A, _,B, C in pointer_data:
         b_map[B].append((A, C))
     sorted_bs = sorted(b_map)
     return sorted_bs, b_map

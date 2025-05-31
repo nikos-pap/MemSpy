@@ -1,13 +1,9 @@
-import ctypes
-import time
-
 import numpy as np
 import pickle
-from numba import njit, prange, cuda
+from numba import cuda
 import warnings
 from numba.core.errors import NumbaWarning
-from utils.types import Condition
-from scanner_engine.process_reader import MemoryScanner, Region
+from scanner_engine.process_reader import MemoryScanner
 from typing import Optional
 import scanner_engine.utils.pointer_scanner_tools as pst
 
@@ -22,12 +18,14 @@ class PointerScanner:
         self.regions = []
         self.ranges = []
         self.chain = []
-        self.modules = []
+        self.modules = self.scanner.get_modules()
 
-    def read_pointer_chain(self, base_addr, offsets, size):
+    def read_pointer_chain(self, base_addr: int, offsets: list, size: int):
         addr = base_addr
         for offset in offsets:
             data = self.scanner.read_bytes(addr, 8)
+            if data is None:
+                return addr, None
             addr = int(np.frombuffer(data, dtype='<u8')[0]) + offset
 
         return addr, int(np.frombuffer(self.scanner.read_bytes(addr, size), dtype=f'<u{size}')[0])
@@ -46,15 +44,14 @@ class PointerScanner:
             self.chain.append([base_address_name, base_address_offset, offsets])
         return self.chain
 
-    def get_pointers_list_results(self, value):
+    def get_pointers_list_results(self, value: bytes):
         pointer_map = []
-        modules = self.scanner.get_modules()
         new_chain = []
         for pointer_chain in self.chain:
             region_name = pointer_chain[0]
             base_address_offset = pointer_chain[1]
             offsets = pointer_chain[2]
-            base_address = modules[region_name] + base_address_offset
+            base_address = self.modules[region_name] + base_address_offset
             last_address, read_value = self.read_pointer_chain(base_address, offsets, 4)
             if value is None or value == read_value:
                 pointer_map.append(
@@ -91,11 +88,11 @@ class PointerScanner:
             addresses.extend(region.pointers)
         self.addresses = np.array(addresses, dtype=np.uint64)
 
-    def save_map(self, name):
+    def save_map(self, name: str):
         with open(name, 'wb') as f:
             pickle.dump(self.chain, f)
 
-    def load_map(self, name):
+    def load_map(self, name: str):
         with open(name, 'rb') as f:
             self.chain = pickle.load(f)
 
@@ -110,7 +107,7 @@ class PointerScanner:
         # for region in self.regions:
         #     region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
         #     region.pointers_annotate_regions(self.ranges, True)
-
+        print("Getting process regions")
         for region in self.scanner.get_regions(element_size=8):
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
@@ -120,21 +117,26 @@ class PointerScanner:
             if region.data:
                 region.data2values(self.ranges, np.uint64, use_gpu = True, step_enable=True)
 
-        self.modules = self.scanner.get_modules()
-        s = time.time()
+        print("Preprocessing pointers")
         self.preprocess_pointers()
-        print(time.time() - s)
+        print("Getting addresses")
         self.get_addresses()
 
-    def pointer_scan(self, depth):
+    def pointer_scan(self, depth: int):
         sr = 0
         for region in self.regions:
             if region.base_address <= self.target_address <= region.base_address + region.size:
                 sr = region.id
                 break
+        print("Searching unique regions")
         unique = pst.preprocess_unique_transitions(self.addresses)
+        print("Making a regions 'graph'")
         region_graph = pst.build_region_graph(unique)
+        print("Getting valid regions for depth %d" % depth)
         reachable_regions = pst.dfs_regions(graph=region_graph, start_region=sr, max_depth=depth)
+        print("Getting filtered addresses")
         filtered_addresses = pst.filter_addresses_by_regions(self.addresses, reachable_regions)
+        print("Performing DFS")
         results = pst.dfs_indexed(filtered_addresses, self.target_address, max_depth=depth)
+        print("Finalize the pointers list")
         return self.make_pointers_list(results)
