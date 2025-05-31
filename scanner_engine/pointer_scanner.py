@@ -1,4 +1,6 @@
 import ctypes
+import time
+
 import numpy as np
 import pickle
 from numba import njit, prange, cuda
@@ -51,10 +53,7 @@ class PointerScanner:
         for pointer_chain in self.chain:
             region_name = pointer_chain[0]
             base_address_offset = pointer_chain[1]
-            try:
-                offsets = pointer_chain[2]
-            except:
-                pass
+            offsets = pointer_chain[2]
             base_address = modules[region_name] + base_address_offset
             last_address, read_value = self.read_pointer_chain(base_address, offsets, 4)
             if value is None or value == read_value:
@@ -63,7 +62,7 @@ class PointerScanner:
                 new_chain.append(pointer_chain)
         return pointer_map, new_chain
 
-    def preprocess_pointers(self, use_gpu=True):
+    def preprocess_pointers(self):
         regions = self.regions.copy()
         ranges = self.ranges.copy()
 
@@ -71,7 +70,7 @@ class PointerScanner:
         while f:
             f = False
             for i, region in enumerate(regions):
-                region.pointers_filter(ranges, use_gpu)
+                region.pointers_filter(ranges)
                 region.check_loops()
                 if len(region.pointers) == 0:
                     f = True
@@ -119,11 +118,12 @@ class PointerScanner:
         for region in self.regions:
             self.scanner.read_memory_by_region(region)
             if region.data:
-                region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
-                region.pointers_annotate_regions(self.ranges, True)
+                region.data2values(self.ranges, np.uint64, use_gpu = True, step_enable=True)
 
         self.modules = self.scanner.get_modules()
-        self.preprocess_pointers(True)
+        s = time.time()
+        self.preprocess_pointers()
+        print(time.time() - s)
         self.get_addresses()
 
     def pointer_scan(self, depth):

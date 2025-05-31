@@ -75,34 +75,12 @@ class Region:
         self.data = data
         self.pointers = np.array([])
         self.id = id
-    #
-    # def data2values2(self, ranges, window_size):
-    #     test = np.frombuffer(self.data, dtype=np.uint8)
-    #     if len(test) < window_size:
-    #         return np.array([], dtype=int)
-    #
-    #     windows = np.lib.stride_tricks.sliding_window_view(test, window_shape=window_size)
-    #     contiguous = np.ascontiguousarray(windows)
-    #
-    #     # Choose dtype based on window size (e.g., 4 -> uint32, 8 -> uint64)
-    #     if window_size == 4:
-    #         dtype = f'<u4'
-    #     elif window_size == 8:
-    #         dtype = f'<u8'
-    #     else:
-    #         raise ValueError("Only 4 or 8 byte window sizes are supported")
-    #
-    #     values = contiguous.view(dtype).squeeze()
-    #     matches = np.where(values == ranges[0, 0])[0]  # Indexes where match occurs
-    #     addresses = matches + self.base_address
-    #     matched_values = values[matches]
-    #     self.pointers = np.column_stack((addresses, matched_values))
-    #
-    def data2values(self, ranges, values_type, use_gpu=True, condition=Condition.EQUAL, step_enable=False):
+
+    def data2values(self, ranges, values_type, use_gpu=True, step_enable=True):
         values_type_size = np.dtype(values_type).itemsize
         data_array = np.frombuffer(self.data, dtype=np.uint8)
 
-        ranges_np = np.array(ranges, dtype=np.int64)
+        ranges_np = np.array(ranges, dtype=np.uint64)
         ranges_len = ranges_np.shape[0]
 
         if use_gpu:
@@ -113,93 +91,48 @@ class Region:
 
             d_addrs = cuda.device_array(length, dtype=np.uint64)
             d_values = cuda.device_array(length, dtype=values_type)
-            d_counts = cuda.to_device(np.array([0], dtype=np.int32))
+            d_ids = cuda.device_array(length, dtype=np.uint32)
+            d_counts = cuda.to_device(np.array([0], dtype=np.uint32))
 
             threads_per_block = 256
             blocks = (length + threads_per_block - 1) // threads_per_block
 
             pst.filter_and_extract_values_gpu[blocks, threads_per_block](
-                d_data, self.base_address, d_ranges, ranges_len, d_addrs, d_values, d_counts,
-                values_type_size, length, condition, step_enable
+                d_data, self.base_address, d_ranges, ranges_len, d_addrs, d_values, d_ids, d_counts,
+                values_type_size, length, step_enable
             )
 
             count = d_counts.copy_to_host()[0]
             addrs = d_addrs.copy_to_host()[:count]
             values = d_values.copy_to_host()[:count]
+            ids = d_ids.copy_to_host()[:count]
+            addr_id = np.full((count, 1), self.id, dtype=np.uint32)
+            addr_static = np.full((count, 1), self.static, dtype=np.uint8)
         else:
             length = len(data_array)
-            addrs, values = pst.filter_and_extract_values_cpu(
+            addrs, values, ids = pst.filter_and_extract_values_cpu(
                 data_array, self.base_address, ranges_np, values_type, values_type_size,
-                length, condition, step_enable
+                length, step_enable
             )
-
             mask = addrs != 0
             addrs = addrs[mask]
             values = values[mask]
+            ids = ids[mask]
+            addr_id = np.full((len(addrs), 1), self.id, dtype=np.uint32)
+            addr_static = np.full((len(addrs), 1), self.static, dtype=np.uint8)
 
-        self.pointers = np.column_stack((addrs, values))
+
+        self.pointers = np.column_stack((addrs,addr_id, values, ids, addr_static))
         self.data = None  # clear reference
 
-    def pointers_filter(self, ranges, use_gpu=True):
+    def pointers_filter(self, ranges):
         if self.pointers is None or len(self.pointers) == 0:
             self.pointers = np.empty((0, 5), dtype=np.uint64)
             return
 
         ptrs_in = self.pointers.astype(np.uint64)  # shape (N, 5)
         ranges = np.asarray(ranges, dtype=np.uint64)
-
-        if use_gpu:
-            d_ptrs_in = cuda.to_device(ptrs_in)
-            d_ranges = cuda.to_device(ranges)
-            d_out = cuda.device_array((ptrs_in.shape[0], 5), dtype=np.uint64)
-            d_count = cuda.to_device(np.array([0], dtype=np.int32))
-
-            threads_per_block = 256
-            blocks = (ptrs_in.shape[0] + threads_per_block - 1) // threads_per_block
-
-            pst.filter_existing_pointers_gpu[blocks, threads_per_block](
-                d_ptrs_in, d_ranges, d_out, d_count
-            )
-
-            count = d_count.copy_to_host()[0]
-            filtered = d_out.copy_to_host()[:count]
-        else:
-            filtered = pst.filter_existing_pointers_cpu(ptrs_in, ranges)
-
-        self.pointers = filtered
-
-    def pointers_annotate_regions(self, ranges_with_ids, use_gpu=True):
-        """
-        Enhances self.pointers to include region ids of addresses and values.
-        Output: [A, self.id, B, idB, static]
-        """
-        if self.pointers is None or len(self.pointers) == 0:
-            self.pointers = np.empty((0, 5), dtype=object)
-            return
-
-        ptrs_in = self.pointers.astype(np.uint64)
-        ranges = np.asarray(ranges_with_ids, dtype=np.int64)
-
-        if use_gpu:
-            d_ptrs_in = cuda.to_device(ptrs_in)
-            d_ranges = cuda.to_device(ranges)
-            d_ptrs_out = cuda.device_array((ptrs_in.shape[0], 4), dtype=np.int64)
-
-            threads_per_block = 256
-            blocks = (ptrs_in.shape[0] + threads_per_block - 1) // threads_per_block
-
-            pst.annotate_pointers_with_region_ids_gpu[blocks, threads_per_block](
-                d_ptrs_in, d_ranges, d_ptrs_out
-            )
-
-            result = d_ptrs_out.copy_to_host()
-        else:
-            result = pst.annotate_pointers_with_region_ids_cpu(ptrs_in, ranges)
-
-        region_ids = np.full((result.shape[0], 1), self.id, dtype=np.int64)
-        region_static = np.full((result.shape[0], 1), self.static, dtype=np.bool_)
-
-        self.pointers = np.hstack([result[:, [0]], region_ids, result[:, [2, 3]], region_static])
+        self.pointers = pst.filter_existing_pointers_cpu(ptrs_in, ranges)
 
     def check_loops(self):
         if np.all(self.pointers[:, 3] == self.id):
@@ -207,14 +140,8 @@ class Region:
 
 class MemoryScanner(AbstractMemoryScanner):
     def __init__(self):
-        # pass
+        pass
         # super().__init__(pid)
-        self.warm_up_parallel()
-
-    def warm_up_parallel(self):
-        if cuda.is_available():
-            pst.warm_up_gpu()
-        pst.warm_up_cpu()
 
     def read_memory(self, chunk_size=2**25, element_size=4):
         if not self.handle:

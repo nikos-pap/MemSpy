@@ -6,15 +6,15 @@ from memory_profiler import profile
 # @profile
 def test():
     m_scanner = MemoryScanner()
-    m_scanner.change_process(7108)
-    p_scanner = PointerScanner(0xD3048FF6B8, m_scanner)
+    m_scanner.change_process(16020)
+    p_scanner = PointerScanner(0x3C247FF5E8, m_scanner)
 
     s = time.time()
 
     p_scanner.get_pointer_map()
     chain = p_scanner.pointer_scan(3)
     # p_scanner.update_chain(chain)
-    pntr_map, updated_chain = p_scanner.get_pointers_list_results(1)
+    pntr_map, updated_chain = p_scanner.get_pointers_list_results(91)
     for i in pntr_map[:100]:
         print(i)
 
