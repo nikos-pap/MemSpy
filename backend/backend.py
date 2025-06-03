@@ -118,7 +118,6 @@ class Backend(QObject):
         self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE))
 
     def filter_addresses(self, pattern: str) -> None:
-        print(pattern)
         self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
 
     def get_previous_page(self) -> None:

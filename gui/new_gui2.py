@@ -197,6 +197,7 @@ class MemoryScannerUI(QMainWindow):
             self.backend.get_previous_page
         )
         self.search_address_table.filterSignal.connect(self.filter_command)
+        self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.saved_table_action)
 
@@ -204,6 +205,7 @@ class MemoryScannerUI(QMainWindow):
         self.typeCombo.currentTextChanged.connect(self.validate_input)
         self.condition_combo.currentIndexChanged.connect(self.condition_changed_command)
         self.new_scan_btn.clicked.connect(self.scan_command)
+        self.filter_btn.clicked.connect(self.filter_scan_command)
 
         self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
         self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
@@ -321,6 +323,28 @@ class MemoryScannerUI(QMainWindow):
         self.new_scan_btn.clicked.disconnect()
         self.new_scan_btn.setText('Cancel Scan')
         self.new_scan_btn.clicked.connect(self.stop_scan_command)
+
+    def filter_scan_command(self):
+        if not self.isAttached:
+            self.set_message('⚠️ Select a process before starting a scan!')
+            return
+        condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
+        if not self.search_input.text():
+            self.set_message('⚠️ Fill scan value before scanning')
+            return
+        if condition == Condition.BETWEEN and not self.search_input2.text():
+            self.set_message('⚠️ Fill scan value before scanning')
+            return
+
+        self.search_address_table.clear()
+        values = [convert_to_bytes(
+            self.search_input.text(), self.typeCombo.currentData()
+        )]
+        if not values:
+            return
+        if condition == Condition.BETWEEN:
+            values.append(convert_to_bytes(self.search_input2.text(), self.typeCombo.currentData()))
+        self.backend.filter_scan(condition, values)
 
     def stop_scan_command(self):
         self.backend.stop_scan()

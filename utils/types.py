@@ -26,6 +26,16 @@ class Condition(Enum):
     NOT_EQUAL = auto()
 
 
+filter_cases = {
+            Condition.EQUAL: lambda parameters, current_value: parameters[0] == current_value,
+            Condition.BETWEEN: lambda parameters, current_value: parameters[0] <= current_value <= parameters[1],
+            Condition.LESS_THAN: lambda parameters, val: val <= parameters[0],
+            Condition.GREATER_THAN: lambda parameters, val: val >= parameters[0],
+            Condition.NOT_EQUAL: lambda parameters, val: val != parameters[0],
+            Condition.CHANGED: lambda parameters, val: val != parameters[0]
+        }
+
+
 def convert_to_bytes(value: str, to_type: Type) -> bytes:
     match to_type:
         case Type.String:
@@ -69,36 +79,6 @@ TYPE_RANGES = {
     Type.Double: (float("-1.7e308"), float("1.7e308")),  # 64-bit float
     Type.String: (None, None)  # Any string
 }
-
-# def convert_to_bytes(value: str, value_type: Type):
-#     result = None
-#     try:
-#         if Type.String == value_type:
-#             result = value.encode('utf-8')
-#         elif Type.Int8 == value_type:
-#             result = int(value).to_bytes(1, byteorder, signed=True)
-#         elif Type.Int16 == value_type:
-#             result = int(value).to_bytes(2, byteorder, signed=True)
-#         elif Type.Int32 == value_type:
-#             result = int(value).to_bytes(4, byteorder, signed=True)
-#         elif Type.Int64 == value_type:
-#             result = int(value).to_bytes(8, byteorder, signed=True)
-#         elif Type.UInt8 == value_type:
-#             result = int(value).to_bytes(1, byteorder)
-#         elif Type.UInt16 == value_type:
-#             result = int(value).to_bytes(2, byteorder)
-#         elif Type.UInt32 == value_type:
-#             result = int(value).to_bytes(4, byteorder)
-#         elif Type.UInt64 == value_type:
-#             result = int(value).to_bytes(8, byteorder)
-#         elif Type.Float == value_type:
-#             result = struct.pack('=f', float(value))
-#         elif Type.Double == value_type:
-#             result = struct.pack('=d', float(value))
-#
-#     except ValueError:
-#         print(f'Wrong Type:{value_type}')
-#     return result
 
 
 def convert_from_bytes(value: bytes, value_type: Type):

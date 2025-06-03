@@ -15,7 +15,7 @@ from utils.types import Condition
 
 class QueueWorker(QObject):
     """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
-    dataReady = pyqtSignal('qulonglong', bytes)
+    dataReady = pyqtSignal('quint64', bytes, bytes)
     progressSignal = pyqtSignal(int)
     totalValuesSignal = pyqtSignal(int)
     filterValuesSignal = pyqtSignal(int)
@@ -35,8 +35,8 @@ class QueueWorker(QObject):
                     print(f"[QueueWorker] Exiting")
                     break
                 elif msg.message_type == MessageType.VALUE_CHANGED:
-                    address, raw = msg.message
-                    self.dataReady.emit(int(address), raw)
+                    address, raw, initial_value = msg.message
+                    self.dataReady.emit(int(address), raw, initial_value)
                 elif msg.message_type == MessageType.SET_PROGRESS:
                     self.progressSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SET_PAGE_RANGE:
@@ -121,6 +121,9 @@ class Backend(QObject):
         """Trigger a new memory scan with the given value and condition."""
         self.proc_queue_in.put(Message(MessageType.RESET, []))
         self.scanner_queue_in.put(Message(MessageType.START_SCAN, [value, condition]))
+
+    def filter_scan(self, condition: Condition, values: list[bytes]):
+        self.proc_queue_in.put(Message(MessageType.SCAN_ADDRESS_LIST, [condition, *values]))
 
     def stop_scan(self):
         self.scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))

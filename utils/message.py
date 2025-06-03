@@ -1,18 +1,15 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import List
-
-message_types: List[str] = ['EXIT', 'ADD_ADDRESS', 'DELETE_ADDRESS', 'EDIT_ADDRESS', 'FREEZE_ADDRESS',
-                            'UNFREEZE_ADDRESS', 'RESET', 'EMPTY', 'ADDRESS_ADDED', 'ADDRESS_CHANGED']
+from numpy import ndarray
 
 
 class MessageType(Enum):
-    CANCEL_SCAN = auto()
-    INIT_SCANNER = auto()
     SET_PROCESS = auto()
     EXIT = auto()
     RESET = auto()
     EMPTY = auto()
+    #  Memory View messages
+    SCAN_ADDRESS_LIST = auto()
     ADD_ADDRESS = auto()
     FILTER_ADDRESSES = auto()
     GET_NEXT_PAGE = auto()
@@ -28,7 +25,9 @@ class MessageType(Enum):
     SAVE_ADDRESS = auto()
     UNSAVE_ADDRESS = auto()
     # scanner messages
+    INIT_SCANNER = auto()
     START_SCAN = auto()
+    CANCEL_SCAN = auto()
     SET_TOTAL_VALUES = auto()
     SET_PROGRESS = auto()
 
@@ -36,4 +35,4 @@ class MessageType(Enum):
 @dataclass
 class Message:
     message_type: MessageType = MessageType.EMPTY
-    message: list = field(default_factory=list)
+    message: list | ndarray = field(default_factory=list)

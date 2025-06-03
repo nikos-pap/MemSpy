@@ -45,4 +45,6 @@ def find_matches(bytestream: bytes = None, base_address:int = 0, mode: Condition
     else:
         return
 
-    return indices+base_address
+    flat_vals = arr.ravel()[indices]
+    pairs = np.column_stack((indices+base_address, flat_vals)).astype('uint64')
+    return pairs

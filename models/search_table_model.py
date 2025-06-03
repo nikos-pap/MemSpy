@@ -84,8 +84,8 @@ class SortedPagedTableModel(QAbstractTableModel):
             self.beginInsertRows(QModelIndex(), 0, new_count - 1)
             self.endInsertRows()
 
-    @pyqtSlot('qulonglong', bytes)
-    def handleUpdate(self, key: int, val: bytes):
+    @pyqtSlot('quint64', bytes, bytes)
+    def handleUpdate(self, key: int, val: bytes, initial_value: bytes):
         """
         Insert or update a key with a bytes value.
         Tracks and displays initial value (under "Previous") alongside current.
@@ -98,7 +98,7 @@ class SortedPagedTableModel(QAbstractTableModel):
 
         # record initial value only once
         if is_new:
-            self._initial[key] = val
+            self._initial[key] = initial_value
 
         # update current store
         self._data[key] = val

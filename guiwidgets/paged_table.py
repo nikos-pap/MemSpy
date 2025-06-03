@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QTableWidgetItem, QLineEdit, QPushButton, QLabel, QCheckBox, QTableView, QHeaderView
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, pyqtSignal
+from PyQt6.QtCore import Qt, QSize, pyqtSlot, pyqtSignal, QModelIndex
 
 from models.search_table_model import SortedPagedTableModel
 from utils.types import convert_from_bytes, convert_to_bytes
@@ -18,6 +18,7 @@ class PaginatedTable(QWidget):
     freezeSignal = pyqtSignal(int)
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
+    addressActivated = pyqtSignal(str)
 
     def __init__(self, *args):
         super().__init__()
@@ -80,6 +81,8 @@ class PaginatedTable(QWidget):
 
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
+
+        self.table.doubleClicked.connect(self._forward_double_click)
 
         self.model.rowsInserted.connect(self._on_rows_changed)
         self.model.rowsRemoved.connect(self._on_rows_changed)
@@ -233,9 +236,9 @@ class PaginatedTable(QWidget):
         self.page_start = start
         self._on_rows_changed()
 
-    @pyqtSlot('qulonglong', bytes)
-    def handleUpdate(self, key: int, val: bytes):
-        self.model.handleUpdate(key, val)
+    @pyqtSlot('quint64', bytes, bytes)
+    def handleUpdate(self, key: int, val: bytes, old_val: bytes):
+        self.model.handleUpdate(key, val, old_val)
         self.show_message()
 
     def getPageRange(self):
@@ -253,6 +256,20 @@ class PaginatedTable(QWidget):
     def _on_rows_changed(self):
         # Whenever rows are added/removed/reset, update the variable
         self.page_end = self.page_start + self.model.rowCount()
+
+    def _forward_double_click(self, index: QModelIndex) -> None:
+        """
+        Emit addressActivated(quint64) with the address from the clicked row.
+        Assumes your *address* lives in the column whose header text is 'Address'.
+        """
+        model = index.model()
+        # Find which column holds the text 'Address'
+        for col in range(model.columnCount()):
+            if model.headerData(col, Qt.Orientation.Horizontal) == "Address":
+                addr_str = model.data(model.index(index.row(), col), Qt.ItemDataRole.DisplayRole)
+                if addr_str:
+                    self.addressActivated.emit(addr_str)
+                break
 
     def clear(self):
         self.filter_input.setText('')

@@ -1,3 +1,6 @@
+import re
+from random import randint
+
 from PyQt6.QtWidgets import (
     QWidget, QTreeView, QMenu, QInputDialog,
     QPushButton, QHBoxLayout, QVBoxLayout, QStyle, QDialog,
@@ -246,7 +249,6 @@ class AddressTreeView(QTreeView):
         new_val = str(convert_from_bytes(new_val, Type.UInt32))
         for row in range(row_count):
             name_item = root.child(row, 2)
-            print(name_item.text())
             if name_item.text() == name:
                 # get the item in column 2 and update it
                 target_item = root.child(row, 3)
@@ -256,6 +258,37 @@ class AddressTreeView(QTreeView):
                     root.setChild(row, 3, target_item)
                 target_item.setText(new_val)
                 break
+
+    def next_temp_label(self) -> str:
+        """
+        Return “New address <N>”, where <N> is one higher than any existing
+        temporary address label in the tree.
+
+        Labels are matched case-sensitively against the pattern
+        ``^New address (\\d+)$``.  A trailing “ 🔒” (freeze mark) is ignored.
+        """
+        pattern = re.compile(r"^New address (\d+)$")
+        max_num = 0
+
+        def walk(item):
+            nonlocal max_num
+            for row in range(item.rowCount()):
+                name_item = item.child(row, 0)
+                if name_item is None:
+                    continue
+
+                # strip the lock-emoji if the row is frozen
+                label = name_item.text().rstrip(" 🔒")
+                m = pattern.match(label)
+                if m:
+                    max_num = max(max_num, int(m.group(1)))
+
+                # recurse into sub-groups (they have the drop-enabled flag)
+                if name_item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
+                    walk(name_item)
+
+        walk(self.model.invisibleRootItem())
+        return f"New address {max_num + 1}"
 
 
 class AddressTreeContainer(QWidget):
@@ -275,7 +308,11 @@ class AddressTreeContainer(QWidget):
         main_layout.addLayout(btn_layout)
         main_layout.addWidget(self.tree_view)
         main_layout.setContentsMargins(0, 0, 0, 0)
+
         self.setLayout(main_layout)
+
+    def add_address(self, address: str):
+        self.tree_view.add_address(self.tree_view.next_temp_label(), address)
 
     def import_data(self): pass
     def export_data(self): pass
