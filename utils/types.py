@@ -27,12 +27,12 @@ class Condition(Enum):
 
 
 filter_cases = {
-            Condition.EQUAL: lambda parameters, current_value: parameters[0] == current_value,
-            Condition.BETWEEN: lambda parameters, current_value: parameters[0] <= current_value <= parameters[1],
-            Condition.LESS_THAN: lambda parameters, val: val <= parameters[0],
-            Condition.GREATER_THAN: lambda parameters, val: val >= parameters[0],
-            Condition.NOT_EQUAL: lambda parameters, val: val != parameters[0],
-            Condition.CHANGED: lambda parameters, val: val != parameters[0]
+            Condition.EQUAL: lambda parameters, current_value: current_value is not None and parameters[0] == current_value,
+            Condition.BETWEEN: lambda parameters, current_value: current_value is not None and parameters[0] <= current_value <= parameters[1],
+            Condition.LESS_THAN: lambda parameters, current_value: current_value is not None and current_value <= parameters[0],
+            Condition.GREATER_THAN: lambda parameters, current_value: current_value is not None and current_value >= parameters[0],
+            Condition.NOT_EQUAL: lambda parameters, current_value: current_value is not None and current_value != parameters[0],
+            Condition.CHANGED: lambda parameters, current_value: current_value is not None and current_value != parameters[0]
         }
 
 
