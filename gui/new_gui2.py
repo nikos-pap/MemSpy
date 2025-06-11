@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from backend.backend2 import Backend
 from guiwidgets import DynamicComboBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
+from guiwidgets.settings_window import SettingsDialog
 from utils import Type, TYPE_RANGES, convert_to_bytes
 from utils.types import Condition
 
@@ -154,6 +155,12 @@ class MemoryScannerUI(QMainWindow):
         self.open_action.triggered.connect(lambda: self.show_message("Open clicked"))
         self.file_menu.addAction(self.open_action)
 
+        tools = self.menu_bar.addMenu('Tools')
+        tools.setFont(secondary_font)
+        settings = QAction("Settings", self)
+        settings.triggered.connect(self.open_settings)
+        tools.addAction(settings)
+
         self.exit_action = QAction("Exit", self)
         self.exit_action.triggered.connect(self.close)
         self.file_menu.addAction(self.exit_action)
@@ -181,6 +188,10 @@ class MemoryScannerUI(QMainWindow):
             lambda: self.show_message("This is a PyQt6 app")
         )
         self.help_menu.addAction(about_action)
+
+    def open_settings(self):
+        dlg = SettingsDialog(self)
+        dlg.exec()
 
     def _connect_signals(self):
         listener = self.backend.listener
