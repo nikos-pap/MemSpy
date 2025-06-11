@@ -39,6 +39,7 @@ class MemoryScannerImproved(Process):
         self._scan_start: float = 0.0
 
     def run(self) -> None:
+        total = 0
         """Main loop: process commands and stream scan results."""
         while True:
             if self._scanning and not self.queue_in.empty():
@@ -58,8 +59,11 @@ class MemoryScannerImproved(Process):
 
                 if result is None:
                     self._finish_scan()
-                else:
+                    print(f'Found: {total} addresses')
+                    total = 0
+                elif result:
                     addresses, progress = result
+                    total += len(addresses)
                     self._emit_results(addresses, progress)
 
     def _handle_message(self, msg: Message) -> None:
@@ -67,14 +71,19 @@ class MemoryScannerImproved(Process):
         data = msg.message
 
         if typ == MessageType.SET_PROCESS:
+            self._cancel_scan()
             pid = data[0]
-            if self.use_inspector:
+            backend = ''
+            if self.use_inspector and not self.scanner:
                 self.scanner = ProcessInspector()
                 backend = 'ProcessInspector'
-            else:
+            elif not self.scanner:
                 self.scanner = NewMemoryScanner()
                 backend = 'NewMemoryScanner'
             self.scanner.change_process(pid)
+            while not self.queue_out.empty():
+                self.queue_out.get_nowait()
+            self.queue_out.put(Message(MessageType.RESET))
             print(f'(MemoryScannerImproved) Process set to {pid} using {backend}')
 
         elif typ == MessageType.START_SCAN:

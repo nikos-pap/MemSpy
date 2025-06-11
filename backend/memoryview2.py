@@ -72,7 +72,9 @@ class MemoryViewImproved(Process):
 
         if typ == MessageType.SET_PROCESS:
             pid = data[0]
-            self.process_reader = MemoryScanner()
+            self._reset_all()
+            if not self.process_reader:
+                self.process_reader = MemoryScanner()
             self.process_reader.change_process(pid)
             print(f'(MemoryView) Process set to {pid}')
         elif typ == MessageType.ADD_ADDRESS:
@@ -111,7 +113,12 @@ class MemoryViewImproved(Process):
             self._last_total = total
 
         self._filter = filter(self._address_filter, self.selected_addresses)
-        filter_count = sum(1 for _ in self._filter)
+
+        if not self.filter_val:
+            filter_count = total
+        else:
+            filter_count = sum(1 for _ in self._filter)
+
         if filter_count != self._last_filter_count:
             self.out_queue.put(Message(MessageType.SET_FILTERED_VALUES, [filter_count]))
             self._last_filter_count = filter_count
@@ -145,12 +152,13 @@ class MemoryViewImproved(Process):
         self.out_queue.put(Message(MessageType.SET_PAGE_RANGE, [start]))
 
     def _reset_all(self) -> None:
-        self.selected_addresses.clear()
+        self.selected_addresses = []
         self.active_page = 0
         self.filter_val = ''
         self._filter = []
-        self._last_total = 0
-        self._last_filter_count = 0
+        self.frozen_addresses = {}
+        self.saved_addresses = []
+        # self._last_filter_count = 0
 
     def freeze_address(self, address: tuple[int, bytes]) -> None:
         if address in self.selected_addresses and address not in self.frozen_addresses:

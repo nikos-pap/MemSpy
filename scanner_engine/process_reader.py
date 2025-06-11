@@ -139,9 +139,8 @@ class Region:
             self.pointers = np.array([])
 
 class MemoryScanner(AbstractMemoryScanner):
-    def __init__(self):
-        pass
-        # super().__init__(pid)
+    def __init__(self, enable_debug: bool = False):
+        super().__init__(enable_debug=enable_debug)
 
     def read_memory(self, chunk_size=2**25, element_size=4):
         if not self.handle:

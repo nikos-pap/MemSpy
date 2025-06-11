@@ -290,6 +290,15 @@ class AddressTreeView(QTreeView):
         walk(self.model.invisibleRootItem())
         return f"New address {max_num + 1}"
 
+    def clear(self):
+        """
+        Remove all items from the tree (but keep the column headers),
+        and expand the now-empty model, so it redraws cleanly.
+        """
+        self.model.clear()
+        self.model.setHorizontalHeaderLabels(["Name", "Description", "Address", "Value"])
+        self.expandAll()
+
 
 class AddressTreeContainer(QWidget):
 
@@ -316,3 +325,6 @@ class AddressTreeContainer(QWidget):
 
     def import_data(self): pass
     def export_data(self): pass
+
+    def clear_tree(self):
+        self.tree_view.clear()

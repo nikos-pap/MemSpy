@@ -2,15 +2,16 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from utils.types import Condition
 
-def find_matches(bytestream: bytes = None, base_address:int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4, aligment: bool = False) -> np.ndarray:
+
+def find_matches(bytestream: bytes | None = None, base_address:int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4, aligment: bool = False) -> np.ndarray | list | None:
     if bytestream is None or target is None:
-        return
+        return []
 
     data = np.frombuffer(bytestream, dtype=np.uint8)
     length = len(data)
 
     if length < element_size:
-        return  # No windows possible of this size
+        return  []# No windows possible of this size
 
     stride = data.strides[0]
 
@@ -43,7 +44,7 @@ def find_matches(bytestream: bytes = None, base_address:int = 0, mode: Condition
     #     mask = (arr < start) | (arr > end)
     #     indices = np.flatnonzero(mask)
     else:
-        return
+        return []
 
     flat_vals = arr.ravel()[indices]
     pairs = np.column_stack((indices+base_address, flat_vals)).astype('uint64')

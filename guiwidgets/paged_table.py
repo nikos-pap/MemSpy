@@ -175,7 +175,8 @@ class PaginatedTable(QWidget):
         filtered_text = f'{self.filtered} of ' if self.filter_input.text() else ''
         start = self.page_start
         end = self.page_end
-        self.info_label.setText(f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)")
+        text = f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)" if self.total else ''
+        self.info_label.setText(text)
 
     def fill_data(self, address_list):
         self.filter_input.setText('')
@@ -247,6 +248,8 @@ class PaginatedTable(QWidget):
         return start, end
 
     def setTotal(self, total: int) -> None:
+        if total == 0:
+            self.clear()
         self.total = total
 
     def setFiltered(self, value):

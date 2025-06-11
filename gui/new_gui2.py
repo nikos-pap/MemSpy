@@ -348,20 +348,33 @@ class MemoryScannerUI(QMainWindow):
 
     def stop_scan_command(self):
         self.backend.stop_scan()
-        self.new_scan_btn.clicked.disconnect()
-        self.new_scan_btn.setText('New Scan')
-        self.new_scan_btn.clicked.connect(self.scan_command)
+        self.toggle_scan_button()
         self.enable_scan_navigation()
 
     def finished_scan(self):
-        self.new_scan_btn.setText('New Scan')
-        self.new_scan_btn.clicked.disconnect()
-        self.new_scan_btn.clicked.connect(self.scan_command)
+        self.toggle_scan_button()
         self.enable_scan_navigation()
+
+    def toggle_scan_button(self):
+        self.new_scan_btn.clicked.disconnect()
+        if self.new_scan_btn.text() == 'Cancel Scan':
+            self.new_scan_btn.setText('New Scan')
+            self.new_scan_btn.clicked.connect(self.scan_command)
+        elif self.new_scan_btn.text() == 'New Scan':
+            self.new_scan_btn.setText('Cancel Scan')
+            self.new_scan_btn.clicked.connect(self.stop_scan_command)
 
     def scan_progress(self, total: int):
         self.search_address_table.setTotal(total)
         self.search_address_table.show_message()
+
+    def initialise_scan_navigation(self):
+        if self.new_scan_btn.text() == 'Cancel Scan':
+            self.toggle_scan_button()
+        self.typeCombo.setDisabled(False)
+        self.search_input.setDisabled(False)
+        self.condition_combo.setDisabled(False)
+        self.filter_btn.setDisabled(True)
 
     def disable_scan_navigation(self):
         self.typeCombo.setDisabled(True)
@@ -384,6 +397,8 @@ class MemoryScannerUI(QMainWindow):
         self.backend.init_process_reader(proc_id)
         print(f'Attached in {time.time() - start:.2f}s')
         self.setWindowIcon(icon or QIcon())
+        self.initialise_scan_navigation()
+        self.saved_address_tree.clear_tree()
 
     def set_message(self, message: str):
         self.status.showMessage(message)
