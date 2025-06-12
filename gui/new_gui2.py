@@ -361,11 +361,9 @@ class MemoryScannerUI(QMainWindow):
 
     def pointer_scan_command(self, address: int):
         options = self.settings_manager.get_pointer_scan_options()
-        self.backend.pointer_scan(address,
-                                  options[PointerSettingsType.DEPTH],
-                                  options[PointerSettingsType.MAX_OFFSET],
-                                  options[PointerSettingsType.NEGATIVE_OFFSETS],
-                                  options[PointerSettingsType.DEVICE])
+        offset_range = (address - options[PointerSettingsType.MAX_OFFSET] * options[PointerSettingsType.NEGATIVE_OFFSETS],
+                        address + options[PointerSettingsType.MAX_OFFSET])
+        self.backend.pointer_scan(address, options[PointerSettingsType.DEPTH], offset_range, options[PointerSettingsType.DEVICE])
 
     def stop_scan_command(self):
         self.backend.stop_scan()
