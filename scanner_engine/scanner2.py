@@ -144,8 +144,8 @@ class MemoryScannerImproved(Process):
             self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
             print('(MemoryScannerImproved) Scan cancelled')
 
-    def _start_pointer_scan(self, address: int, depth: int, offset_range: tuple[int, int], use_gpu: bool) -> None:
-        print(address, depth, offset_range, use_gpu)
+    def _start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
+        print(address, depth, max_offset, negative_offsets_enabled, use_gpu)
         self.pointer_scanner = PointerScanner(address, self.scanner)
         self.pointer_scanner.get_pointer_map()
         chain = self.pointer_scanner.pointer_scan(3)
