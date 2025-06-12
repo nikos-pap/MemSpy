@@ -1,13 +1,7 @@
-import sys
 from typing import Any
-
-import pywintypes
-import wmi
 
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QApplication,
-    QMainWindow,
     QDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -26,11 +20,7 @@ from PyQt6.QtWidgets import (
     QTabWidget
 )
 from PyQt6.QtCore import QSize, QSettings
-from PyQt6.QtGui import QAction
-from numba.cuda import CudaSupportError
-from numba.cuda.cudadrv.driver import CudaAPIError
-from numba.cuda.cudadrv.error import CudaDriverError
-
+from guiwidgets.device_handler import list_devices
 from utils.types import PointerSettingsType
 
 
@@ -41,8 +31,7 @@ class SettingsManager:
     def __init__(self):
         self.settings = QSettings("MyCompany", "MyApp")
 
-        self.devices = []
-        self.list_devices()
+        self.devices = list_devices()
         # default values
         self._defaults = {
             'pointer_scan': {
@@ -61,15 +50,13 @@ class SettingsManager:
         # Load pointer_scan
         ps = {}
         for key, default in self._defaults['pointer_scan'].items():
-            ps[key] = self.settings.value(f"pointer_scan/{key}", default, type(default))
+            ps[key] = self.settings.value(f"pointer_scan/{key.name}", default, type(default))
         self._data['pointer_scan'] = ps
-        print(ps)
         # TODO: load other categories similarly
 
     def save_all(self):
         # Save pointer_scan
         for key, val in self._data['pointer_scan'].items():
-            print(key, val)
             self.settings.setValue(f"pointer_scan/{key.name}", val)
         # TODO: save other categories similarly
         self.settings.sync()
@@ -81,61 +68,6 @@ class SettingsManager:
         for key, val in args:
             if key in self._data['pointer_scan']:
                 self._data['pointer_scan'][key] = val
-
-    def _list_cpus(self):
-        """Return a list of CPU names on Windows via WMI."""
-        cpus = []
-        try:
-            c = wmi.WMI()
-            for cpu in c.Win32_Processor():
-                cpus.append(cpu.Name.strip())
-        except pywintypes.com_error as e:
-            print("⚠️ WMI COM error:", e)
-        except wmi.x_wmi as e:
-            print("⚠️ WMI query error:", e)
-        return cpus
-
-    def _list_gpus(self):
-        """Return a list of CUDA-capable GPU names via Numba."""
-        gpu_list = []
-        try:
-            from numba import cuda
-            if cuda.is_available():
-                for dev in cuda.gpus:
-                    # .name is a bytestring, decode to UTF-8
-                    gpu_list.append(dev.name.decode('utf-8'))
-        except (CudaSupportError, CudaDriverError, CudaAPIError) as e:
-            print("⚠️ CUDA driver error:", e)
-        except UnicodeDecodeError as e:
-            print("⚠️ GPU name decoding error:", e)
-        return gpu_list
-
-    def list_devices(self):
-        # CPUs
-        cpus = self._list_cpus()
-        for idx, name in enumerate(cpus, start=1):
-            self.devices.append({
-                'type': 'CPU',
-                'index': idx,
-                'name': name
-            })
-
-        # GPUs
-        gpus = self._list_gpus()
-        for idx, name in enumerate(gpus, start=1):
-            self.devices.append({
-                'type': 'GPU',
-                'index': idx,
-                'name': name
-            })
-
-        # Print summary
-        if not self.devices:
-            print("No devices found.")
-        else:
-            print("Detected devices:")
-            for dev in self.devices:
-                print(f"  [{dev['type']} {dev['index']}] {dev['name']}")
 
 
 class SettingsDialog(QDialog):
@@ -176,20 +108,20 @@ class SettingsDialog(QDialog):
         root_layout.addLayout(content_layout)
 
         # Buttons with Reset
-        btns = QDialogButtonBox(
+        buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Reset |
             QDialogButtonBox.StandardButton.Apply |
             QDialogButtonBox.StandardButton.Ok |
             QDialogButtonBox.StandardButton.Cancel
         )
         # Label Reset
-        btns.button(QDialogButtonBox.StandardButton.Reset).setText("Reset")
-        btns.button(QDialogButtonBox.StandardButton.Apply).setText("Apply")
-        btns.accepted.connect(self.on_ok)
-        btns.rejected.connect(self.reject)
-        btns.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self.on_apply)
-        btns.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self.on_reset)
-        root_layout.addWidget(btns)
+        buttons.button(QDialogButtonBox.StandardButton.Reset).setText("Reset")
+        buttons.button(QDialogButtonBox.StandardButton.Apply).setText("Apply")
+        buttons.accepted.connect(self.on_ok)
+        buttons.rejected.connect(self.reject)
+        buttons.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self.on_apply)
+        buttons.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self.on_reset)
+        root_layout.addWidget(buttons)
 
         self.sidebar.setCurrentRow(0)
 
@@ -346,27 +278,3 @@ class SettingsDialog(QDialog):
         lbl = QLabel(title); lbl.setFont(QFont('Segoe UI',16,QFont.Weight.Bold)); l.addWidget(lbl)
         d = QLabel(desc); d.setWordWrap(True); l.addWidget(d)
         return w
-
-
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Memory Scanner")
-        self.resize(800, 600)
-        self.init_menu()
-
-    def init_menu(self):
-        m = self.menuBar().addMenu("File")
-        a = QAction("Settings", self)
-        a.triggered.connect(self.open_settings)
-        m.addAction(a)
-
-    def open_settings(self):
-        dlg = SettingsDialog(self)
-        dlg.exec()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    w = MainWindow(); w.show()
-    sys.exit(app.exec())

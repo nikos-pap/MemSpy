@@ -1,201 +1,186 @@
 from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
-
-from backend.memoryview2 import MemoryViewImproved
-from scanner_engine.scanner2 import MemoryScannerImproved
-from utils import insort, message, image_extractor
-
-from utils.message import MessageType, Message
-from utils.types import Type, Condition
-from backend.memoryview import MemoryView
 from multiprocessing import Queue
-from typing import Dict, Optional
+from typing import List, Tuple, NamedTuple
 import psutil
 import os
 
+from backend.memoryview import MemoryViewProcess
+from scanner_engine.memory_parser import MemoryParserProcess
+from utils import insort, image_extractor
+from utils.entry import ProcessEntry
+from utils.message import MessageType, Message
+from utils.types import Condition
+
 
 class QueueWorker(QObject):
-    """Lives in a QThread, pulls ints from the multiprocessing.Queue and emits them."""
-    dataReady = pyqtSignal('qulonglong', bytes)
-    finished = pyqtSignal()
-    sendValues = pyqtSignal(int, bytes)
+    """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
+    dataReady = pyqtSignal('quint64', bytes, bytes)
     progressSignal = pyqtSignal(int)
     totalValuesSignal = pyqtSignal(int)
     filterValuesSignal = pyqtSignal(int)
     pageRangeSignal = pyqtSignal(int)
+    scanCompletedSignal = pyqtSignal()
+    updateSavedSignal = pyqtSignal('quint64', bytes)
 
     def __init__(self, queue: Queue):
         super().__init__()
-        self.queue = queue
+        self._queue = queue
 
-    def run(self):
-        while True:
-            msg = self.queue.get()       # block until data arrives
-            match msg.message_type:
-                case MessageType.EXIT:
-                    break                       # sentinel to stop
-                case MessageType.VALUE_CHANGED:
-                    self.dataReady.emit(int(msg.message[0]), msg.message[1])
-                case MessageType.SET_PROGRESS:
+    def run(self) -> None:
+        try:
+            while True:
+                msg: Message = self._queue.get()
+                if msg.message_type == MessageType.EXIT:
+                    print(f"[QueueWorker] Exiting")
+                    break
+                elif msg.message_type == MessageType.VALUE_CHANGED:
+                    address, raw, initial_value = msg.message
+                    self.dataReady.emit(int(address), raw, initial_value)
+                elif msg.message_type == MessageType.SET_PROGRESS:
                     self.progressSignal.emit(msg.message[0])
-                case MessageType.SET_PAGE_RANGE:
+                elif msg.message_type == MessageType.SET_PAGE_RANGE:
                     self.pageRangeSignal.emit(msg.message[0])
-                case MessageType.SET_TOTAL_VALUES:
+                elif msg.message_type == MessageType.SET_TOTAL_VALUES:
                     self.totalValuesSignal.emit(msg.message[0])
-                case MessageType.SET_FILTERED_VALUES:
+                elif msg.message_type == MessageType.SAVED_VALUE_CHANGED:
+                    self.updateSavedSignal.emit(msg.message[0], msg.message[1])
+                elif msg.message_type == MessageType.SET_FILTERED_VALUES:
                     self.filterValuesSignal.emit(msg.message[0])
-                case _:
-                    print(f'(Queue Listener) Got Message: {msg}')
-        self.finished.emit()
+                elif msg.message_type == MessageType.SCAN_COMPLETED:
+                    self.scanCompletedSignal.emit()
+                else:
+                    print(f"[QueueWorker] Unhandled message: {msg}")
+        except Exception as e:
+            print(f"[QueueWorker] Error: {e}")
+        finally:
+            QThread.currentThread().quit()
 
 
 class Backend(QObject):
-    update = pyqtSignal(str, bytes)
-    newAddress = pyqtSignal(int, RowEntry)
+    """Central coordinator: manages memory scanning, process enumeration, and inter-thread communication."""
 
     def __init__(self):
         super().__init__()
-        # self._thread: QThread = QThread()
-
-        # Queues for process communication
+        # Communication queues
         self.proc_queue_in: Queue = Queue()
         self.proc_queue_out: Queue = Queue()
         self.scanner_queue_in: Queue = Queue(maxsize=10)
-        self.running_process_names: list[str] = []
-        self.images: list[Image] = []
-        self.pids: list[int] = []
 
-        # self.process_reader: Optional[ProcessInspector] = None  # REMOVE
-        # self.listener: Optional[QueueWorker] = None  # REMOVE
-        self.thread = QThread(self)
+        # UI listener thread
+        self._thread = QThread(self)
         self.listener = QueueWorker(self.proc_queue_out)
-        self.listener.moveToThread(self.thread)
-        self.listener.finished.connect(self.thread.quit)
-        self.thread.started.connect(self.listener.run)
-        self.listener.finished.connect(self.thread.quit)
-        self.thread.start()
-        self.memory_view: Optional[MemoryView] = MemoryViewImproved(self.proc_queue_in, self.proc_queue_out)
-        self.memory_view.start()
+        self.listener.moveToThread(self._thread)
+        self._thread.started.connect(self.listener.run)
+        self._thread.start()
 
-        self.scanner_process: Optional[MemoryScannerImproved] = MemoryScannerImproved(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out, True)
-        self.scanner_process.start()
+        # Memory and scanner processes
+        self._memory_view = MemoryViewProcess(self.proc_queue_in, self.proc_queue_out)
+        self._memory_view.start()
+        self._scanner = MemoryParserProcess(self.scanner_queue_in, self.proc_queue_in, self.proc_queue_out)
+        self._scanner.start()
 
-    def init_process_reader(self, proc_id: int):
-        self.proc_queue_in.put(Message(MessageType.SET_PROCESS, [proc_id]))
-        self.scanner_queue_in.put(Message(MessageType.SET_PROCESS, [proc_id]))
+        # Cached process list
+        self.running_procs: list[ProcessEntry] = []
+        self.running_process_names: List[str] = []
+        self.images: List[Image.Image] = []
+        self.pids: List[int] = []
+        self.active_processes: set = set()
 
-    # def select_address(self, address: int, value: bytes):
-    #     m = message.add_address(address, value)
-    #     self.proc_queue_in.put(m)
-    #
-    # def select_addresses(self, addresses: List[int], value: bytes):
-    #     m = message.add_address(addresses, value)
-    #     self.proc_queue_in.put(m)
+    def init_process_reader(self, pid: int) -> None:
+        """Initialize memory scanning for a given process ID."""
+        msg = Message(MessageType.SET_PROCESS, [pid])
+        self.proc_queue_in.put(msg)
+        self.scanner_queue_in.put(msg)
 
-    # def freeze_address(self, address: str) -> None:
-    #     self.proc_queue_in.put(message.freeze_address(address))
+    def set_value(self, address: int, value: bytes) -> None:
+        """Edit a memory address value."""
+        msg = Message(MessageType.EDIT_ADDRESS, [address, value])
+        self.proc_queue_in.put(msg)
 
-    # def unfreeze_address(self, address: str) -> None:
-        # self.proc_queue_in.put(message.unfreeze_address(address))
+    def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
+        message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
+        self.proc_queue_in.put(Message(message, [address, value]))
 
-    # def delete_address(self, index: int):
-    #     self.proc_queue_in.put(message.Message(message_type='DELETE_ADDRESS', message=[index]))
+    def save_address(self, address: int) -> None:
+        self.proc_queue_in.put(Message(MessageType.SAVE_ADDRESS, [address]))
 
-    def set_value(self, address: str, value: bytes) -> None:
-        self.proc_queue_in.put(message.Message(MessageType.EDIT_ADDRESS, message=[address, value]))
-
-    def value_scan(self, value: bytes, progress_bar) -> Dict[str, RowEntry]:
-        address_list = []
-        address_list = [address for address in self.process_reader.search_bytes_fast(value, progress_bar)]
-        self.listener.sendValues.emit(address_list, value)
-            # self.newAddress.emit(address, RowEntry(False, value, value, Type.UInt32))
-        # print(address_list)
-        progress_bar(100)
-        return {hex(address): RowEntry(False, value, value, Type.UInt32) for address in address_list}
-        # return dict()
+    def unsave_address(self, address: int) -> None:
+        self.proc_queue_in.put(Message(MessageType.UNSAVE_ADDRESS, [address]))
 
     def get_next_page(self) -> None:
-        self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE))
+        self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE, []))
+
+    def get_previous_page(self) -> None:
+        self.proc_queue_in.put(Message(MessageType.GET_PREV_PAGE, []))
 
     def filter_addresses(self, pattern: str) -> None:
         self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
 
-    def get_previous_page(self) -> None:
-        self.proc_queue_in.put(Message(MessageType.GET_PREV_PAGE))
-    # def value_scan(self, value: bytes, progress_bar) -> Dict[str, RowEntry]:
-    #     address_list = self.process_reader.search_bytes(value, progress_bar)
-    #     progress_bar(100)
-    #     self.listener.sendValues.emit(address_list, value)
-    #     return {hex(address): RowEntry(False, hex(address), value, value, Type.UInt32) for address in address_list}
-
-    # def update_address_list(self):
-    #     if len(self.address_list) == 0:
-    #         return
-    #     self.proc_queue_in.put(message.Message(message_type='UPDATE_VALUES', message=[]))
-    #     response = self.proc_queue_out.get()
-    #     result = response.message
-    #
-    #     return result
-
-    # def get_address_list(self, value_type: Type):
-    #     result = []
-    #     for address in self.address_list:
-    #         value = convert_from_bytes(address.value, value_type)
-    #         result.append((hex(address), value))
-    #     return result
-    #
-    # def get_raw_address_list(self):
-    #     result = []
-    #     for address in self.address_list:
-    #         result.append((hex(address), address.value))
-    #     return result
-    #
-    # def filter_address_list(self, condition: Callable[[bytes, bytes], bool], input_val: bytes = None):
-    #     filtered_list = []
-    #
-    #     for address in self.address_list:
-    #         value = None
-    #         try:
-    #             value = self.process_reader.read_bytes(address, len(address))
-    #         except MemoryReadError as e:
-    #             print(e)
-    #         if value is None:
-    #             continue
-    #         if input_val is None and condition(address.value, value):
-    #             filtered_list.append(address)
-    #         elif input_val is not None and condition(value, input_val):
-    #             filtered_list.append(address)
-    #         address.value = value
-    #
-    #     self.address_list = filtered_list
-
-    def stop_loop(self):
-        if self.memory_view:
-            self.proc_queue_in.put(Message(MessageType.EXIT, [0]))
-        if self.scanner_process:
-            self.scanner_queue_in.put(Message(MessageType.EXIT, [0]))
-
-        if self.scanner_process:
-            self.scanner_process.join()
-        if self.memory_view:
-            self.memory_view.join()
-
-    def getRunningProcesses(self):
-        filtered_list = ['svchost.exe']
-
-        for proc in psutil.process_iter():
-            try:
-                name = proc.name()
-                if name not in filtered_list and name not in self.running_process_names and os.access(proc.exe(), os.R_OK):
-                    image = image_extractor.get_process_image(proc.exe())
-                    index = insort(self.running_process_names, proc.name(), key=lambda a: a.lower())
-                    self.images.insert(index, image)
-                    self.pids.insert(index, proc.pid)
-            except psutil.AccessDenied as e:
-                print(f'Cannot access: {e}')
-                pass
-        return self.running_process_names, self.images, self.pids
-
     def scan(self, value: bytes, condition: Condition) -> None:
-        self.proc_queue_in.put(Message(MessageType.RESET))
+        """Trigger a new memory scan with the given value and condition."""
+        self.proc_queue_in.put(Message(MessageType.RESET, []))
         self.scanner_queue_in.put(Message(MessageType.START_SCAN, [value, condition]))
+
+    def filter_scan(self, condition: Condition, values: list[bytes]):
+        self.proc_queue_in.put(Message(MessageType.SCAN_ADDRESS_LIST, [condition, *values]))
+
+    def stop_scan(self):
+        self.scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
+
+    def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool):
+        self.scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, max_offset, negative_offsets_enabled, use_gpu]))
+
+    def stop(self) -> None:
+        """Gracefully stop background processes without blocking on crashed ones."""
+        # Signal exit
+        exit_msg = Message(MessageType.EXIT, [0])
+        while not self.scanner_queue_in.empty():
+            self.scanner_queue_in.get()
+        self.scanner_queue_in.put_nowait(exit_msg)
+        while not self.proc_queue_in.empty():
+            self.proc_queue_in.get()
+        self.proc_queue_in.put_nowait(exit_msg)
+        while not self.proc_queue_out.empty():
+            self.proc_queue_out.get()
+        self.proc_queue_out.put_nowait(exit_msg)
+
+        if self._scanner.is_alive():
+            self._scanner.join()
+        if self._memory_view.is_alive():
+            self._memory_view.join()
+
+        self._thread.wait()
+
+    def get_running_processes(self) -> list[NamedTuple]:
+        """Retrieve and cache running processes and their icons."""
+        skip = {'svchost.exe'}
+        found = set()
+        pids = []
+        for proc in psutil.process_iter(['pid', 'name', 'exe']):
+            try:
+                name = proc.info['name']
+                exe = proc.info['exe']
+                pid = proc.info['pid']
+
+                if name in skip:
+                    continue
+
+                pids.append(pid)
+                if pid not in self.active_processes:
+                    # print(pid)
+                    self.active_processes.add(pid)
+                    img = image_extractor.get_process_image(exe)
+                    process = ProcessEntry(name, pid, img)
+                    idx = insort(self.running_procs, process, key=lambda p: p.name.lower())
+                    # self.running_procs.insert(idx, process)
+                found.add(pid)
+            except (psutil.AccessDenied, psutil.NoSuchProcess) as e:
+                print(f'Error Loading Process: {e}')
+
+        removed = self.active_processes - found
+        if removed:
+            self.active_processes = found
+            self.running_procs = [proc for proc in self.running_procs if proc.pid in found]
+
+        return self.running_procs

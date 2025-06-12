@@ -6,3 +6,4 @@ psutil
 pyqt6
 numpy
 numba
+wmi

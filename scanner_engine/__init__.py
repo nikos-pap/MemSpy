@@ -1,0 +1,1 @@
+from scanner_engine.memory_parser import MemoryParserProcess

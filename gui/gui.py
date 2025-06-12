@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
     QProgressBar, QMessageBox, QHeaderView
 )
 
-from backend.backend2 import Backend
+from backend.backend import Backend
 from guiwidgets import DynamicComboBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
@@ -282,17 +282,23 @@ class MemoryScannerUI(QMainWindow):
             label = format_item(name, pid)
             if image:
                 try:
+                    # ensure RGBA for QPixmap
                     if image.mode != "RGBA":
                         image = image.convert("RGBA")
                     pixmap = QPixmap.fromImage(ImageQt(image))
                     icon = QIcon(pixmap)
+                except (AttributeError, TypeError, ValueError):
+                    # image wasn’t what we expected or conversion failed; ignore
+                    icon = None
+
+                    # Add with icon if valid, otherwise text-only
+                if icon and not icon.isNull():
                     self.process_box.addItem(icon, label, pid)
-                except Exception:
+                else:
                     self.process_box.addItem(label)
             else:
                 self.process_box.addItem(label)
-        print(len(self.process_box))
-        print(f"Loaded process list in {time.time() - start:.2f}s")
+        print(f"[MemoryScannerUI] Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
 
     def condition_changed_command(self, _):
         if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
@@ -361,9 +367,11 @@ class MemoryScannerUI(QMainWindow):
 
     def pointer_scan_command(self, address: int):
         options = self.settings_manager.get_pointer_scan_options()
-        offset_range = (address - options[PointerSettingsType.MAX_OFFSET] * options[PointerSettingsType.NEGATIVE_OFFSETS],
-                        address + options[PointerSettingsType.MAX_OFFSET])
-        self.backend.pointer_scan(address, options[PointerSettingsType.DEPTH], offset_range, options[PointerSettingsType.DEVICE])
+        self.backend.pointer_scan(address,
+                                  options[PointerSettingsType.DEPTH],
+                                  options[PointerSettingsType.MAX_OFFSET],
+                                  options[PointerSettingsType.NEGATIVE_OFFSETS],
+                                  options[PointerSettingsType.DEVICE])
 
     def stop_scan_command(self):
         self.backend.stop_scan()

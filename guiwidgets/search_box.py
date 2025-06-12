@@ -1,10 +1,9 @@
-from PyQt6.QtCore import Qt, QRegularExpression, QRect
+from PyQt6.QtCore import Qt, QRect
 from PyQt6.QtWidgets import (
-    QWidget, QApplication, QComboBox, QLineEdit,
-    QHBoxLayout, QVBoxLayout, QLabel
+    QWidget, QComboBox, QLineEdit,
+    QHBoxLayout
 )
-from PyQt6.QtGui import QFont, QPainter, QRegularExpressionValidator
-import sys
+from PyQt6.QtGui import QFont, QPainter
 from utils import Type, TYPE_RANGES
 
 
@@ -174,10 +173,3 @@ class SearchBox(QWidget):
                 color: {color};
             }}
         """
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = SearchBox()
-    window.addItems(["Fashion", "Furniture", "Sports"])
-    window.show()
-    sys.exit(app.exec())

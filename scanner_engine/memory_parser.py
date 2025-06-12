@@ -10,9 +10,9 @@ from scanner_engine.process_reader import MemoryScanner as NewMemoryScanner
 from scanner_engine.pointer_scanner import PointerScanner
 
 
-class MemoryScannerImproved(Process):
+class MemoryParserProcess(Process):
     """
-    Improved MemoryScanner process for asynchronous memory value scanning.
+    MemoryScanner process for asynchronous memory value scanning.
 
     - Handles control messages without blocking.
     - Streams scan results and progress efficiently.
@@ -86,11 +86,11 @@ class MemoryScannerImproved(Process):
             while not self.queue_out.empty():
                 self.queue_out.get_nowait()
             self.queue_out.put(Message(MessageType.RESET))
-            print(f'(MemoryScannerImproved) Process set to {pid} using {backend}')
+            print(f'[MemoryParserProcess] Process set to {pid} using {backend}')
 
         elif typ == MessageType.START_SCAN:
             if not self.scanner:
-                print('(MemoryScannerImproved) Scanner not initialized!')
+                print('[MemoryParserProcess] Scanner not initialized!')
                 return
             value, condition = data
             self._start_scan(value, condition)
@@ -102,7 +102,7 @@ class MemoryScannerImproved(Process):
             self._start_pointer_scan(*data)
 
         elif typ == MessageType.EXIT:
-            print('(MemoryScannerImproved) Exiting')
+            print('[MemoryParserProcess] Exiting')
 
     def _start_scan(self, value: bytes, condition: Condition) -> None:
         """Initialize a new scan generator, note start time, and notify start."""
@@ -115,7 +115,7 @@ class MemoryScannerImproved(Process):
         self._scanning = True
         self._scan_start = time.time()
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
-        print('(MemoryScannerImproved) Scan started')
+        print('[MemoryParserProcess] Scan started')
 
     def _emit_results(self, addresses: list[int] | np.ndarray | int, progress: int) -> None:
         """Send addresses batch and periodic progress updates without conversion overhead."""
@@ -134,7 +134,7 @@ class MemoryScannerImproved(Process):
         elapsed = time.time() - self._scan_start
         self.queue_progress.put(Message(MessageType.SCAN_COMPLETED), False)
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [100]), False)
-        print(f'(MemoryScannerImproved) Scan finished in {elapsed:.3f} seconds')
+        print(f'[MemoryParserProcess] Scan finished in {elapsed:.3f} seconds')
 
     def _cancel_scan(self) -> None:
         """Cancel ongoing scan immediately."""
@@ -142,7 +142,7 @@ class MemoryScannerImproved(Process):
             self._scanning = False
             self._current_scan = None
             self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
-            print('(MemoryScannerImproved) Scan cancelled')
+            print('[MemoryParserProcess] Scan cancelled')
 
     def _start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
         print(address, depth, max_offset, negative_offsets_enabled, use_gpu)
