@@ -13,9 +13,9 @@ from PyQt6.QtWidgets import (
 from backend.backend2 import Backend
 from guiwidgets import DynamicComboBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
-from guiwidgets.settings_window import SettingsDialog
+from guiwidgets.settings_window import SettingsDialog, SettingsManager
 from utils import Type, TYPE_RANGES, convert_to_bytes
-from utils.types import Condition
+from utils.types import Condition, PointerSettingsType
 
 
 class MemoryScannerUI(QMainWindow):
@@ -46,6 +46,7 @@ class MemoryScannerUI(QMainWindow):
         self.setStyleSheet("QPushButton { padding: 5px; }")
 
     def _create_widgets(self):
+        self.settings_manager = SettingsManager()
         # Process selection
         self.process_box = DynamicComboBox(
             self.update_process_list_command, self.process_selection_handle
@@ -190,7 +191,7 @@ class MemoryScannerUI(QMainWindow):
         self.help_menu.addAction(about_action)
 
     def open_settings(self):
-        dlg = SettingsDialog(self)
+        dlg = SettingsDialog(self, self.settings_manager)
         dlg.exec()
 
     def _connect_signals(self):
@@ -219,6 +220,7 @@ class MemoryScannerUI(QMainWindow):
         self.filter_btn.clicked.connect(self.filter_scan_command)
 
         self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
+        self.saved_address_tree.tree_view.pointerScanSignal.connect(self.pointer_scan_command)
         self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
         self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
         self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
@@ -356,6 +358,12 @@ class MemoryScannerUI(QMainWindow):
         if condition == Condition.BETWEEN:
             values.append(convert_to_bytes(self.search_input2.text(), self.typeCombo.currentData()))
         self.backend.filter_scan(condition, values)
+
+    def pointer_scan_command(self, address: int):
+        options = self.settings_manager.get_pointer_scan_options()
+        offset_range = (address - options[PointerSettingsType.MAX_OFFSET] * options[PointerSettingsType.NEGATIVE_OFFSETS],
+                        address + options[PointerSettingsType.MAX_OFFSET])
+        self.backend.pointer_scan(address, options[PointerSettingsType.DEPTH], offset_range, options[PointerSettingsType.DEVICE])
 
     def stop_scan_command(self):
         self.backend.stop_scan()

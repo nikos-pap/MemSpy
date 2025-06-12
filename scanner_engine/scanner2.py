@@ -96,6 +96,9 @@ class MemoryScannerImproved(Process):
         elif typ == MessageType.CANCEL_SCAN:
             self._cancel_scan()
 
+        elif typ == MessageType.START_POINTER_SCAN:
+            self._start_pointer_scan(*data)
+
         elif typ == MessageType.EXIT:
             print('(MemoryScannerImproved) Exiting')
 
@@ -138,3 +141,7 @@ class MemoryScannerImproved(Process):
             self._current_scan = None
             self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
             print('(MemoryScannerImproved) Scan cancelled')
+
+    def _start_pointer_scan(self, address: int, depth: int, offset_range: tuple[int, int], use_gpu: bool) -> None:
+        print(address, depth, offset_range, use_gpu)
+        pass

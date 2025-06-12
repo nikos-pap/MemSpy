@@ -30,6 +30,7 @@ class AddressTreeView(QTreeView):
     setValueSignal = pyqtSignal('quint64', bytes)
     addAddressSignal = pyqtSignal('quint64')
     removeAddressSignal = pyqtSignal('quint64')
+    pointerScanSignal = pyqtSignal('quint64')
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -70,10 +71,13 @@ class AddressTreeView(QTreeView):
                 self.model.data(self.model.index(row, col, parent), Qt.ItemDataRole.DisplayRole)
                 for col in range(cols)
             ]
+            scan_action = QAction('Pointer Scan', self)
             delete_action = QAction("Delete", self)
             freeze_action = QAction("Freeze", self)
+            scan_action.triggered.connect(lambda: self.pointer_scan(index, row_items))
             delete_action.triggered.connect(lambda: self.delete_address(index, row_items))
             freeze_action.triggered.connect(lambda: self.freeze_address(index, row_items))
+            menu.addAction(scan_action)
             menu.addAction(delete_action)
             menu.addAction(freeze_action)
             # print()
@@ -100,6 +104,10 @@ class AddressTreeView(QTreeView):
         print(f'Freezing {row_items[3]}, {row_items}')
         self.freezeSignal.emit(int(row_items[2], 16), convert_to_bytes(row_items[3], Type.UInt32), not frozen)
         # self.model.removeRow(index.row(), parent)
+
+    def pointer_scan(self, index, row_items):
+        address = int(row_items[2], 16)
+        self.pointerScanSignal.emit(address)
 
     def add_group(self, index: QModelIndex = QModelIndex()):
         name, ok = QInputDialog.getText(self, "New Group", "Group name:")
@@ -298,6 +306,8 @@ class AddressTreeView(QTreeView):
         self.model.clear()
         self.model.setHorizontalHeaderLabels(["Name", "Description", "Address", "Value"])
         self.expandAll()
+
+
 
 
 class AddressTreeContainer(QWidget):

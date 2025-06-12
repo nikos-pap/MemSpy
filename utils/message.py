@@ -28,6 +28,7 @@ class MessageType(Enum):
     INIT_SCANNER = auto()
     START_SCAN = auto()
     CANCEL_SCAN = auto()
+    START_POINTER_SCAN = auto()
     SET_TOTAL_VALUES = auto()
     SET_PROGRESS = auto()
 

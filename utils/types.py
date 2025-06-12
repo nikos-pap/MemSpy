@@ -93,3 +93,11 @@ def convert_from_bytes(value: bytes, value_type: Type):
     if Type.Double == value_type:
         return struct.unpack('=d', value)
     raise Exception('Wrong Type:', value_type)
+
+
+class PointerSettingsType(Enum):
+    NEGATIVE_OFFSETS = auto()
+    DEVICE = auto()
+    DEPTH = auto()
+    MAX_OFFSET = auto()
+    RANDOM_SCAN = auto()

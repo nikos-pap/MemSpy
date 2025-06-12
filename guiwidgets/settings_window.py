@@ -23,12 +23,59 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QSize, QSettings
 from PyQt6.QtGui import QAction
 
+from utils.types import PointerSettingsType
+
+
+class SettingsManager:
+    """
+    Centralized settings storage with load/save via QSettings.
+    """
+    def __init__(self):
+        self.settings = QSettings("MyCompany", "MyApp")
+        # default values
+        self._defaults = {
+            'pointer_scan': {
+                PointerSettingsType.NEGATIVE_OFFSETS: True,
+                PointerSettingsType.DEVICE: 'CPU',
+                PointerSettingsType.DEPTH: 4,
+                PointerSettingsType.MAX_OFFSET: 1024,
+                PointerSettingsType.RANDOM_SCAN: False
+            },
+            # other categories defaults...
+        }
+        self._data = {}
+        self.load_all()
+
+    def load_all(self):
+        # Load pointer_scan
+        ps = {}
+        for key, default in self._defaults['pointer_scan'].items():
+            ps[key] = self.settings.value(f"pointer_scan/{key.name}", default, type(default))
+        self._data['pointer_scan'] = ps
+        # TODO: load other categories similarly
+
+    def save_all(self):
+        # Save pointer_scan
+        for key, val in self._data['pointer_scan'].items():
+            self.settings.setValue(f"pointer_scan/{key}", val)
+        # TODO: save other categories similarly
+        self.settings.sync()
+
+    def get_pointer_scan_options(self):
+        return dict(self._data['pointer_scan'])
+
+    def set_pointer_scan_options(self, **kwargs):
+        for key, val in kwargs.items():
+            if key in self._data['pointer_scan']:
+                self._data['pointer_scan'][key] = val
+
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, manager: SettingsManager = None):
         super().__init__(parent)
         # QSettings for persistence
         self.settings = QSettings("MyCompany", "MyApp")
+        self.manager = manager
         self.setWindowTitle("Settings")
         self.resize(800, 600)
         self._init_ui()
@@ -89,30 +136,27 @@ class SettingsDialog(QDialog):
             self.pages.setCurrentIndex(index)
 
     def load_settings(self):
-        # Load Pointer Scan
-        self.negative_offsets.setChecked(
-            self.settings.value("pointer_scan/negative_offsets", True, type=bool)
-        )
-        device = self.settings.value("pointer_scan/device", "CPU", type=str)
-        idx = self.device.findText(device)
-        if idx >= 0:
-            self.device.setCurrentIndex(idx)
-        self.depth.setValue(
-            self.settings.value("pointer_scan/depth", 4, type=int)
-        )
-        self.max_offset.setValue(
-            self.settings.value("pointer_scan/max_offset", 1024, type=int)
-        )
-        self.random_scan.setChecked(
-            self.settings.value("pointer_scan/random_scan", False, type=bool)
-        )
+        # load pointer_scan
+        opts = self.manager.get_pointer_scan_options()
+        self.negative_offsets.setChecked(opts['negative_offsets'])
+        idx = self.device.findText(opts['device'])
+        if idx>=0: self.device.setCurrentIndex(idx)
+        self.depth.setValue(opts['depth'])
+        self.max_offset.setValue(opts['max_offset'])
+        self.random_scan.setChecked(opts['random_scan'])
         # TODO: load other pages
 
     def save_settings(self):
-        opts = self.pointer_scan_options()
-        for key, val in opts.items():
-            self.settings.setValue(f"pointer_scan/{key}", val)
-        # TODO: save other pages
+        # gather pointer_scan
+        self.manager.set_pointer_scan_options(
+            negative_offsets=self.negative_offsets.isChecked(),
+            device=self.device.currentText(),
+            depth=self.depth.value(),
+            max_offset=self.max_offset.value(),
+            random_scan=self.random_scan.isChecked()
+        )
+        # TODO: other categories
+        self.manager.save_all()
 
     def on_apply(self):
         self.save_settings()
@@ -125,15 +169,6 @@ class SettingsDialog(QDialog):
         # Clear all stored settings and reset UI
         self.settings.clear()
         self.load_settings()
-
-    def pointer_scan_options(self) -> dict:
-        return {
-            "negative_offsets": self.negative_offsets.isChecked(),
-            "device": self.device.currentText(),
-            "depth": self.depth.value(),
-            "max_offset": self.max_offset.value(),
-            "random_scan": self.random_scan.isChecked(),
-        }
 
     def create_general_page(self) -> QWidget:
         page = QWidget()
