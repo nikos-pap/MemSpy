@@ -7,6 +7,7 @@ from backend.utils import ProcessInspector
 from utils.message import Message, MessageType
 from utils.types import Condition
 from scanner_engine.process_reader import MemoryScanner as NewMemoryScanner
+from scanner_engine.pointer_scanner import PointerScanner
 
 
 class MemoryScannerImproved(Process):
@@ -34,6 +35,7 @@ class MemoryScannerImproved(Process):
         self.queue_progress: Queue = progress_queue
         self.use_inspector: bool = use_inspector
         self.scanner: Optional[Union[NewMemoryScanner, ProcessInspector]] = None
+        self.pointer_scanner: Optional[PointerScanner] = None
         self._current_scan: Optional[Iterator] = None
         self._scanning: bool = False
         self._scan_start: float = 0.0
@@ -144,4 +146,9 @@ class MemoryScannerImproved(Process):
 
     def _start_pointer_scan(self, address: int, depth: int, offset_range: tuple[int, int], use_gpu: bool) -> None:
         print(address, depth, offset_range, use_gpu)
-        pass
+        self.pointer_scanner = PointerScanner(address, self.scanner)
+        self.pointer_scanner.get_pointer_map()
+        chain = self.pointer_scanner.pointer_scan(3)
+        pntr_map, updated_chain = self.pointer_scanner.get_pointers_list_results(None)
+        for i in pntr_map[:100]:
+            print(i)
