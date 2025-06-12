@@ -128,8 +128,8 @@ class Backend(QObject):
     def stop_scan(self):
         self.scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
 
-    def pointer_scan(self, address: int, depth: int, offset_range: tuple[int, int], use_gpu: bool):
-        self.scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, offset_range, use_gpu]))
+    def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool):
+        self.scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, max_offset, negative_offsets_enabled, use_gpu]))
 
     def stop(self) -> None:
         """Gracefully stop background processes without blocking on crashed ones."""

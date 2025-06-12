@@ -1,6 +1,9 @@
 import sys
 from typing import Any
 
+import pywintypes
+import wmi
+
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -24,6 +27,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QSize, QSettings
 from PyQt6.QtGui import QAction
+from numba.cuda import CudaSupportError
+from numba.cuda.cudadrv.driver import CudaAPIError
+from numba.cuda.cudadrv.error import CudaDriverError
 
 from utils.types import PointerSettingsType
 
@@ -34,11 +40,14 @@ class SettingsManager:
     """
     def __init__(self):
         self.settings = QSettings("MyCompany", "MyApp")
+
+        self.devices = []
+        self.list_devices()
         # default values
         self._defaults = {
             'pointer_scan': {
                 PointerSettingsType.NEGATIVE_OFFSETS: True,
-                PointerSettingsType.DEVICE: 'CPU',
+                PointerSettingsType.DEVICE: 0,
                 PointerSettingsType.DEPTH: 4,
                 PointerSettingsType.MAX_OFFSET: 1024,
                 PointerSettingsType.RANDOM_SCAN: False
@@ -52,24 +61,81 @@ class SettingsManager:
         # Load pointer_scan
         ps = {}
         for key, default in self._defaults['pointer_scan'].items():
-            ps[key] = self.settings.value(f"pointer_scan/{key.name}", default, type(default))
+            ps[key] = self.settings.value(f"pointer_scan/{key}", default, type(default))
         self._data['pointer_scan'] = ps
+        print(ps)
         # TODO: load other categories similarly
 
     def save_all(self):
         # Save pointer_scan
         for key, val in self._data['pointer_scan'].items():
-            self.settings.setValue(f"pointer_scan/{key}", val)
+            print(key, val)
+            self.settings.setValue(f"pointer_scan/{key.name}", val)
         # TODO: save other categories similarly
         self.settings.sync()
 
     def get_pointer_scan_options(self) -> dict[PointerSettingsType, Any]:
         return dict(self._data['pointer_scan'])
 
-    def set_pointer_scan_options(self, **kwargs):
-        for key, val in kwargs.items():
+    def set_pointer_scan_options(self, *args):
+        for key, val in args:
             if key in self._data['pointer_scan']:
                 self._data['pointer_scan'][key] = val
+
+    def _list_cpus(self):
+        """Return a list of CPU names on Windows via WMI."""
+        cpus = []
+        try:
+            c = wmi.WMI()
+            for cpu in c.Win32_Processor():
+                cpus.append(cpu.Name.strip())
+        except pywintypes.com_error as e:
+            print("⚠️ WMI COM error:", e)
+        except wmi.x_wmi as e:
+            print("⚠️ WMI query error:", e)
+        return cpus
+
+    def _list_gpus(self):
+        """Return a list of CUDA-capable GPU names via Numba."""
+        gpu_list = []
+        try:
+            from numba import cuda
+            if cuda.is_available():
+                for dev in cuda.gpus:
+                    # .name is a bytestring, decode to UTF-8
+                    gpu_list.append(dev.name.decode('utf-8'))
+        except (CudaSupportError, CudaDriverError, CudaAPIError) as e:
+            print("⚠️ CUDA driver error:", e)
+        except UnicodeDecodeError as e:
+            print("⚠️ GPU name decoding error:", e)
+        return gpu_list
+
+    def list_devices(self):
+        # CPUs
+        cpus = self._list_cpus()
+        for idx, name in enumerate(cpus, start=1):
+            self.devices.append({
+                'type': 'CPU',
+                'index': idx,
+                'name': name
+            })
+
+        # GPUs
+        gpus = self._list_gpus()
+        for idx, name in enumerate(gpus, start=1):
+            self.devices.append({
+                'type': 'GPU',
+                'index': idx,
+                'name': name
+            })
+
+        # Print summary
+        if not self.devices:
+            print("No devices found.")
+        else:
+            print("Detected devices:")
+            for dev in self.devices:
+                print(f"  [{dev['type']} {dev['index']}] {dev['name']}")
 
 
 class SettingsDialog(QDialog):
@@ -141,7 +207,7 @@ class SettingsDialog(QDialog):
         # load pointer_scan
         opts = self.manager.get_pointer_scan_options()
         self.negative_offsets.setChecked(opts[PointerSettingsType.NEGATIVE_OFFSETS])
-        idx = self.device.findText(opts[PointerSettingsType.DEVICE])
+        idx = opts[PointerSettingsType.DEVICE]
         if idx >= 0:
             self.device.setCurrentIndex(idx)
         self.depth.setValue(opts[PointerSettingsType.DEPTH])
@@ -152,11 +218,11 @@ class SettingsDialog(QDialog):
     def save_settings(self):
         # gather pointer_scan
         self.manager.set_pointer_scan_options(
-            negative_offsets=self.negative_offsets.isChecked(),
-            device=self.device.currentText(),
-            depth=self.depth.value(),
-            max_offset=self.max_offset.value(),
-            random_scan=self.random_scan.isChecked()
+            (PointerSettingsType.NEGATIVE_OFFSETS, self.negative_offsets.isChecked()),
+            (PointerSettingsType.DEVICE, self.device.currentIndex()),
+            (PointerSettingsType.DEPTH, self.depth.value()),
+            (PointerSettingsType.MAX_OFFSET, self.max_offset.value()),
+            (PointerSettingsType.RANDOM_SCAN , self.random_scan.isChecked())
         )
         # TODO: other categories
         self.manager.save_all()
@@ -247,22 +313,28 @@ class SettingsDialog(QDialog):
         page = QWidget()
         v = QVBoxLayout(page)
         v.setSpacing(15)
+        options = self.manager.get_pointer_scan_options()
         v.addWidget(self._make_header("Pointer Scan Settings", "Configure pointer scanning options."))
         grp = QGroupBox("Pointer Scan Options")
         f = QFormLayout(grp)
         self.negative_offsets = QCheckBox()
+        self.negative_offsets.setChecked(options[PointerSettingsType.NEGATIVE_OFFSETS])
         f.addRow("Negative Offsets:", self.negative_offsets)
         self.device = QComboBox()
-        self.device.addItems(["CPU", "GPU"])
+
+        self.device.addItems([device['name'] for device in self.manager.devices])
         f.addRow("Device:", self.device)
+        self.device.setCurrentIndex(options[PointerSettingsType.DEVICE])
         self.depth = QSpinBox()
         self.depth.setRange(1, 16)
+        self.depth.setValue(options[PointerSettingsType.DEPTH])
         f.addRow("Depth:", self.depth)
         self.max_offset = QSpinBox()
         self.max_offset.setRange(0, 1000000)
-        self.max_offset.setValue(1024)
+        self.max_offset.setValue(options[PointerSettingsType.MAX_OFFSET])
         f.addRow("Max Offset:", self.max_offset)
         self.random_scan = QCheckBox()
+        self.random_scan.setChecked(options[PointerSettingsType.RANDOM_SCAN])
         f.addRow("Random Scan:", self.random_scan)
         v.addWidget(grp)
         v.addStretch(1)
