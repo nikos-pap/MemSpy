@@ -1,4 +1,6 @@
 import sys
+from typing import Any
+
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QApplication,
@@ -61,7 +63,7 @@ class SettingsManager:
         # TODO: save other categories similarly
         self.settings.sync()
 
-    def get_pointer_scan_options(self):
+    def get_pointer_scan_options(self) -> dict[PointerSettingsType, Any]:
         return dict(self._data['pointer_scan'])
 
     def set_pointer_scan_options(self, **kwargs):
@@ -138,12 +140,13 @@ class SettingsDialog(QDialog):
     def load_settings(self):
         # load pointer_scan
         opts = self.manager.get_pointer_scan_options()
-        self.negative_offsets.setChecked(opts['negative_offsets'])
-        idx = self.device.findText(opts['device'])
-        if idx>=0: self.device.setCurrentIndex(idx)
-        self.depth.setValue(opts['depth'])
-        self.max_offset.setValue(opts['max_offset'])
-        self.random_scan.setChecked(opts['random_scan'])
+        self.negative_offsets.setChecked(opts[PointerSettingsType.NEGATIVE_OFFSETS])
+        idx = self.device.findText(opts[PointerSettingsType.DEVICE])
+        if idx >= 0:
+            self.device.setCurrentIndex(idx)
+        self.depth.setValue(opts[PointerSettingsType.DEPTH])
+        self.max_offset.setValue(opts[PointerSettingsType.MAX_OFFSET])
+        self.random_scan.setChecked(opts[PointerSettingsType.RANDOM_SCAN])
         # TODO: load other pages
 
     def save_settings(self):
