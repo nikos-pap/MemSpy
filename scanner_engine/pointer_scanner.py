@@ -10,11 +10,11 @@ import scanner_engine.utils.pointer_scanner_tools as pst
 warnings.simplefilter("ignore", category=NumbaWarning)
 
 class PointerScanner:
-    def __init__(self, target_address: int = 0, scanner: Optional['MemoryScanner'] = None):
+    def __init__(self, target_address: int = 0, scanner: Optional['MemoryScanner'] = None, use_gpu: int = 0):
         self.addresses = []
         self.target_address = target_address
         self.scanner = scanner
-        self.cuda_available = cuda.is_available()
+        self.cuda_available = cuda.is_available() and use_gpu
         self.regions = []
         self.ranges = []
         self.chain = []
@@ -27,8 +27,10 @@ class PointerScanner:
             if data is None:
                 return addr, None
             addr = int(np.frombuffer(data, dtype='<u8')[0]) + offset
-
-        return addr, int(np.frombuffer(self.scanner.read_bytes(addr, size), dtype=f'<u{size}')[0])
+        value = self.scanner.read_bytes(addr, size)
+        if value is None:
+            return addr, None
+        return addr, int(np.frombuffer(value, dtype=f'<u{size}')[0])
 
     def make_pointers_list(self, results):
         self.chain = []
@@ -122,7 +124,7 @@ class PointerScanner:
         print("Getting addresses")
         self.get_addresses()
 
-    def pointer_scan(self, depth: int):
+    def pointer_scan(self, depth: int = 3, max_offset: int = 1024, negative_offsets_enabled: bool = False, randomness: float = 0):
         sr = 0
         for region in self.regions:
             if region.base_address <= self.target_address <= region.base_address + region.size:
@@ -137,6 +139,6 @@ class PointerScanner:
         print("Getting filtered addresses")
         filtered_addresses = pst.filter_addresses_by_regions(self.addresses, reachable_regions)
         print("Performing DFS")
-        results = pst.dfs_indexed(filtered_addresses, self.target_address, max_depth=depth)
+        results = pst.dfs_indexed(filtered_addresses, self.target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
         print("Finalize the pointers list")
         return self.make_pointers_list(results)

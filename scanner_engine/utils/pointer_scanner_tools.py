@@ -67,39 +67,6 @@ def filter_and_extract_values_gpu(data, base_address, ranges, ranges_len, addrs,
                     ids[pos] = id
                     break
 
-@njit(parallel=True)
-def filter_existing_pointers_cpu(ptrs_in, ranges):
-    n = ptrs_in.shape[0]
-    mask = np.zeros(n, dtype=np.uint8)
-
-    # First pass: build mask
-    for i in prange(n):
-        val = ptrs_in[i, 2]
-        in_range = False
-        for j in range(ranges.shape[0]):
-            start = ranges[j, 0]
-            end = ranges[j, 1]
-            if start <= val <= end:
-                in_range = True
-                break
-        mask[i] = 1 if in_range else 0
-
-    # Count how many matched
-    count = np.sum(mask)
-
-    # Allocate output
-    out_temp = np.empty((count, 5), dtype=np.uint64)
-
-    # Second pass: compact
-    idx_out = 0
-    for i in range(n):
-        if mask[i]:
-            for k in range(5):
-                out_temp[idx_out, k] = ptrs_in[i, k]
-            idx_out += 1
-
-    return out_temp
-
 def filter_existing_pointers_cpu(ptrs, ranges):
     valid_ids = set(ranges[:, 2])  # Ids to check against
     mask = np.isin(ptrs[:, 3], list(valid_ids))  # B_id is at index 3
@@ -112,52 +79,62 @@ def build_index(pointer_data):
     sorted_bs = sorted(b_map)
     return sorted_bs, b_map
 
-def find_candidates(sorted_bs, b_map, current_x, offset_range):
-    half_range = offset_range // 2
-    low = current_x - half_range
-    high = current_x + half_range
+def find_candidates(sorted_bs:list, b_map:dict, current_x:int, offset_range:int, negatives:bool):
+    low = current_x - offset_range
+    high = current_x + offset_range if negatives else current_x
     left_idx = bisect.bisect_left(sorted_bs, low)
     right_idx = bisect.bisect_right(sorted_bs, high)
     candidates = []
-    local_b_map = b_map
     for B in sorted_bs[left_idx:right_idx]:
         offset = int(current_x) - int(B)  # Ensure signed subtraction
-        candidates.extend([(A, C, B, offset) for (A, C) in local_b_map[B]])
+        candidates.extend([(A, C, B, offset) for (A, C) in b_map[B]])
     return candidates
 
-def dfs_indexed(pointer_data, start_x, max_depth, offset_range=0x1000):
+def dfs_indexed(pointer_data, start_x, max_depth, offset_range, negatives, randomness):
     sorted_bs, b_map = build_index(pointer_data)
 
     results = []
     path = []
-    visited = set()
+    dead_ends = set()
 
     append_path = path.append
     pop_path = path.pop
-    add_visited = visited.add
-    remove_visited = visited.remove
     results_append = results.append
     local_find_candidates = find_candidates
     local_sorted_bs = sorted_bs
     local_b_map = b_map
 
     def backtrack(current_x, depth):
+        if current_x in dead_ends:
+            return False  # Known dead end
+
         if depth >= max_depth:
-            return
-        candidates = local_find_candidates(local_sorted_bs, local_b_map, current_x, offset_range)
+            return False  # Hit depth limit, no valid path
+
+        candidates = local_find_candidates(local_sorted_bs, local_b_map, current_x, offset_range, negatives)
         if not candidates:
-            return
+            dead_ends.add(current_x)
+            return False  # No options, mark as dead end
+
+        found_valid = False
+
         for A, C, B, offset in candidates:
-            if A in visited:
-                continue
+            if randomness > 0 and np.random.uniform(0, 1) < randomness:
+                continue  # Randomly skip this candidate
+
             append_path((B, int(offset)))
-            add_visited(A)
             if C:
                 results_append((A, list(path)))
+                found_valid = True
             else:
-                backtrack(A, depth + 1)
-            remove_visited(A)
+                if backtrack(A, depth + 1):
+                    found_valid = True
             pop_path()
+
+        if not found_valid:
+            dead_ends.add(current_x)  # Only mark as dead end if none of the paths were valid
+
+        return found_valid
 
     backtrack(start_x, 0)
     return results
@@ -190,7 +167,7 @@ def preprocess_unique_transitions(addresses):
     seen = set()
     unique = []
     for entry in addresses:
-        A, a, B, b, flag = entry
+        _, a, _, b, flag = entry
         key = (a, b)
         if key not in seen:
             seen.add(key)

@@ -144,11 +144,11 @@ class MemoryParserProcess(Process):
             self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
             print('[MemoryParserProcess] Scan cancelled')
 
-    def _start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
+    def _start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: int) -> None:
         print(address, depth, max_offset, negative_offsets_enabled, use_gpu)
-        self.pointer_scanner = PointerScanner(address, self.scanner)
+        self.pointer_scanner = PointerScanner(address, self.scanner, use_gpu)
         self.pointer_scanner.get_pointer_map()
-        chain = self.pointer_scanner.pointer_scan(3)
+        chain = self.pointer_scanner.pointer_scan(depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.6)
         pntr_map, updated_chain = self.pointer_scanner.get_pointers_list_results(None)
         for i in pntr_map[:100]:
             print(i)
