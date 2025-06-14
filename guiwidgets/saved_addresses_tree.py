@@ -147,6 +147,8 @@ class AddressTreeView(QTreeView):
         # item.setIcon(emoji_icon('📍', 20))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         item.setFlags(flags)
+        item.setData(SavedTreeTypes.ADDRESS, TYPE_ROLE)
+        item.setData(False, FREEZE_ROLE)
         desc = QStandardItem("")
         desc.setFlags(flags)
         addr_item = QStandardItem(address_str.strip())
@@ -246,17 +248,13 @@ class AddressTreeView(QTreeView):
 
     def _edit_address(self, index: QModelIndex):
         # skip groups
-        item = self.model.itemFromIndex(self.model.index(index.row(), 0, index.parent()))
-        if item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
-            return
-
         parent_index = index.parent()
         row = index.row()
         # retrieve items
-        name_item = self.model.itemFromIndex(self.model.index(row, 0, parent_index))
-        desc_item = self.model.itemFromIndex(self.model.index(row, 1, parent_index))
-        addr_item = self.model.itemFromIndex(self.model.index(row, 2, parent_index))
-        value_item = self.model.itemFromIndex(self.model.index(row, 3, parent_index))
+        name_item = self.model.itemFromIndex(index.siblingAtColumn(0))
+        desc_item = self.model.itemFromIndex(index.siblingAtColumn(1))
+        addr_item = self.model.itemFromIndex(index.siblingAtColumn(2))
+        value_item = self.model.itemFromIndex(index.siblingAtColumn(3))
 
         # locked state from data role
         raw_name = name_item.text()
@@ -310,7 +308,8 @@ class AddressTreeView(QTreeView):
             desc_item.setText(desc_edit.text())
             addr_item.setText(addr_edit.text())
             value_item.setText(value_edit.text())
-            self.setValueSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32))
+            if addr_item.text() and value_edit.text():
+                self.setValueSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32))
             print(name_item.data(FREEZE_ROLE))
         ok_btn = QPushButton("OK")
         apply_btn = QPushButton("Apply")
