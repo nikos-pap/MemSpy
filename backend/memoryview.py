@@ -85,11 +85,11 @@ class MemoryViewProcess(Process):
             self.selected_addresses.extend(data)
             self._update_stats()
         elif typ == MessageType.SAVE_ADDRESS:
-            self.saved_addresses.append(data[0])
+            self.add_saved_address(data[0])
         elif typ == MessageType.UNSAVE_ADDRESS:
             self.remove_saved_address(data[0])
         elif typ == MessageType.FREEZE_ADDRESS:
-            self.frozen_addresses[data[0]] = data[1]
+            self.freeze_address(data[0], data[1])
         elif typ == MessageType.UNFREEZE_ADDRESS:
             self.unfreeze_address(data[0])
         elif typ == MessageType.EDIT_ADDRESS:
@@ -165,9 +165,16 @@ class MemoryViewProcess(Process):
         self.saved_addresses = []
         # self._last_filter_count = 0
 
-    def freeze_address(self, address: tuple[int, bytes]) -> None:
-        if address in self.selected_addresses and address not in self.frozen_addresses:
-            self.frozen_addresses.append(address)
+    def freeze_address(self, address: int, value: bytes) -> None:
+        if not self.process_reader:
+            return
+        data_read = self.process_reader.read_bytes(address, 4)
+        if data_read is not None and value:
+            self.frozen_addresses[address] = value
+        elif data_read is not None:
+            self.frozen_addresses[address] = data_read
+        else:
+            self.out_queue.put(Message(MessageType.INVALID_ADDRESS, [address]))
 
     def unfreeze_address(self, address: int) -> None:
         self.frozen_addresses.pop(address, None)
@@ -175,6 +182,12 @@ class MemoryViewProcess(Process):
         #     if addr[0] == address:
         #         self.frozen_addresses.pop(index)
         #         break
+
+    def add_saved_address(self, address: int) -> None:
+        if self.process_reader and self.process_reader.read_bytes(address, 4) is not None:
+            self.saved_addresses.append(address)
+        else:
+            self.out_queue.put(Message(MessageType.INVALID_ADDRESS, [address]))
 
     def remove_saved_address(self, address: int) -> None:
         self.saved_addresses.remove(address)
@@ -196,7 +209,8 @@ class MemoryViewProcess(Process):
     def _push_saved_addresses(self):
         for address in self.saved_addresses:
             value = self.process_reader.read_bytes(address, 4)
-            self.out_queue.put(Message(MessageType.SAVED_VALUE_CHANGED, [address, value]))
+            if value is not None:
+                self.out_queue.put(Message(MessageType.SAVED_VALUE_CHANGED, [address, value]))
 
     def _filter_selected_addresses(self, data: list) -> None:
         condition = data[0]

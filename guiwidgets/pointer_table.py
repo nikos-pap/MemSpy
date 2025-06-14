@@ -1,0 +1,230 @@
+from PyQt6.QtWidgets import (
+    QApplication, QWidget, QTableView, QVBoxLayout, QHBoxLayout,
+    QHeaderView, QComboBox, QPushButton, QFileDialog, QMessageBox, QLabel
+)
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+import sys
+import csv
+import struct
+
+
+def parse_raw_bytes(rawHex: str) -> bytes:
+    # strip prefix and convert hex string to bytes
+    s = rawHex.strip().lower()
+    if s.startswith('0x'):
+        s = s[2:]
+    if len(s) % 2:
+        s = '0' + s
+    try:
+        return bytes.fromhex(s)
+    except ValueError:
+        return b''
+
+
+class PointerScanTableModel(QAbstractTableModel):
+    """
+    Model for pointer scan results with grouped offsets.
+
+    Input row format:
+      ( module_name: str,
+        module_address: int,
+        initial_offset: int,
+        offsets: tuple of ints,
+        target_address: int,
+        raw_bytes: bytes )
+
+    Columns:
+      0: Module+InitialOffset
+      1..N: Offsets
+      N+1: Target Address
+      N+2: Value
+    """
+    def __init__(self, data=None, parent=None):
+        super().__init__(parent)
+        self._raw = data or []  # list of tuples
+        self.value_type = "Integer"
+        self._update_structure()
+
+    def _update_structure(self):
+        # maximum offsets tuple length
+        if not self._raw:
+            self.offset_count = 0
+        else:
+            self.offset_count = max(len(r[3]) for r in self._raw)
+        self.headers = (
+            ["Base (module+off)"] +
+            [f"Offset {i}" for i in range(self.offset_count)] +
+            ["Target Address", "Value"]
+        )
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._raw)
+
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.headers)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
+            return None
+        row, col = index.row(), index.column()
+        module_name, module_addr, init_off, offsets, targ_addr, raw_bytes = self._raw[row]
+        # column mapping
+        if col == 0:
+            return f"{module_name}+0x{init_off:X}"
+        if 1 <= col <= self.offset_count:
+            idx = col - 1
+            if idx < len(offsets):
+                return f"0x{offsets[idx]:X}"
+            return ''
+        if col == self.offset_count + 1:
+            return f"0x{targ_addr:X}"
+        if col == self.offset_count + 2:
+            return self._format_value(raw_bytes)
+        return None
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+        if orientation == Qt.Orientation.Horizontal:
+            return self.headers[section]
+        return str(section + 1)
+
+    def _format_value(self, raw_bytes):
+        if not isinstance(raw_bytes, (bytes, bytearray)):
+            return str(raw_bytes)
+        try:
+            if self.value_type == "Integer":
+                num = int.from_bytes(raw_bytes, byteorder='little', signed=False)
+                return str(num)
+            fmt = '<f' if self.value_type == "Float" else '<d'
+            size = 4 if self.value_type == "Float" else 8
+            b = raw_bytes.ljust(size, b'\x00')[:size]
+            return struct.unpack(fmt, b)[0]
+        except Exception:
+            return str(raw_bytes)
+
+    def setValueType(self, vtype: str):
+        if vtype not in ("Integer", "Float", "Double"):
+            return
+        self.value_type = vtype
+        if self.rowCount() > 0:
+            col = self.offset_count + 2
+            top = self.index(0, col);
+            bottom = self.index(self.rowCount() - 1, col)
+            self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
+
+    def updateData(self, data):
+        self.beginResetModel()
+        self._raw = data
+        self._update_structure()
+        self.endResetModel()
+
+    def getData(self):
+        return self._raw
+
+
+class PointerScanTable(QWidget):
+    """
+    Widget for pointer scan results using grouped offsets.
+
+    Expects rows as defined in model docstring.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._init_ui()
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
+
+        ctrl = QHBoxLayout()
+        self.import_btn = QPushButton("Import CSV")
+        self.import_btn.clicked.connect(self.importData)
+        self.export_btn = QPushButton("Export CSV")
+        self.export_btn.clicked.connect(self.exportData)
+        ctrl.addWidget(self.import_btn)
+        ctrl.addWidget(self.export_btn)
+        ctrl.addStretch()
+        ctrl.addWidget(QLabel("Display As:"))
+        self.type_combo = QComboBox()
+        self.type_combo.addItems(["Integer", "Float", "Double"])
+        self.type_combo.currentTextChanged.connect(lambda t: self.model.setValueType(t))
+        ctrl.addWidget(self.type_combo)
+        layout.addLayout(ctrl)
+
+        self.table = QTableView()
+        self.model = PointerScanTableModel()
+        self.table.setModel(self.model)
+        self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.verticalHeader().hide()
+        self.table.doubleClicked.connect(self._onDoubleClick)
+        layout.addWidget(self.table)
+
+        self.count_label = QLabel("Total Rows: 0")
+        layout.addWidget(self.count_label)
+
+        self.model.modelReset.connect(lambda: self.count_label.setText(f"Total Rows: {self.model.rowCount()}"))
+
+    def _onDoubleClick(self, index: QModelIndex):
+        record = self.model.getData()[index.row()]
+        print(record)
+
+    def loadPointerData(self, rows):
+        # rows: list of tuples as per input format
+        self.model.updateData(rows)
+
+    def importData(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Import Pointer Data", "", "CSV Files (*.csv);;All Files (*)")
+        if not path:
+            return
+        try:
+            with open(path, newline='') as f:
+                reader = csv.reader(f)
+                next(reader, None)
+                data = []
+                for row in reader:
+                    if len(row) < 6:
+                        continue
+                    # parse fields
+                    module_name = row[0]
+                    module_address = int(row[1], 0)
+                    initial_offset = int(row[2], 0)
+                    # offsets grouped
+                    offsets = tuple(int(x,0) for x in row[3:-2])
+                    target_address = int(row[-2], 0)
+                    raw_bytes = parse_raw_bytes(row[-1])
+                    data.append((module_name, module_address, initial_offset, offsets, target_address, raw_bytes))
+            self.loadPointerData(data)
+        except Exception as e:
+            QMessageBox.critical(self, "Import Error", str(e))
+
+    def exportData(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Export Pointer Data", "", "CSV Files (*.csv);;All Files (*)")
+        if not path:
+            return
+        try:
+            rows = self.model.getData()
+            with open(path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(self.model.headers)
+                for module_name, module_address, initial_offset, offsets, target_address, raw_bytes in rows:
+                    row = [module_name, f"0x{module_address:X}", f"0x{initial_offset:X}"]
+                    row += [f"0x{off:X}" for off in offsets]
+                    row += [f"0x{target_address:X}", '0x' + raw_bytes.hex()]
+                    writer.writerow(row)
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    comp = PointerScanTable()
+    sample = [
+        ("steamclient64.dll", 0x1000, 0xAF6A7C, (-0x3E0, 0x778), 0x2BDF5E04, bytes.fromhex('78563412')),
+        ("game.exe", 0x2000, 0x105074, (), 0x40000000, bytes.fromhex('0000000040000000'))
+    ]
+    comp.loadPointerData(sample)
+    comp.resize(900, 400)
+    comp.show()
+    sys.exit(app.exec())

@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 from backend.backend import Backend
 from guiwidgets import ProcessSelectorBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
+from guiwidgets.pointer_table import PointerScanTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
 from utils import Type, TYPE_RANGES, convert_to_bytes
 from utils.types import Condition, PointerSettingsType
@@ -89,12 +90,14 @@ class MemoryScannerUI(QMainWindow):
         self.search_table_dock.setWidget(self.search_address_table)
 
         self.saved_address_tree = AddressTreeContainer(self)
-        # self.saved_table.setHorizontalHeaderLabels([
-        #     "Freeze", "Address", "Value", "Previous Value"
-        # ])
         self.saved_table_dock = QDockWidget("Saved Address Table", self)
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.saved_table_dock.setWidget(self.saved_address_tree)
+
+        self.search_pointer_table = PointerScanTable(self)
+        self.search_pointer_dock = QDockWidget("Pointer Scan Table", self)
+        self.search_pointer_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
+        self.search_pointer_dock.setWidget(self.search_pointer_table)
 
         # Status bar and progress
         self.progress_bar = QProgressBar()
@@ -131,11 +134,17 @@ class MemoryScannerUI(QMainWindow):
         dock_container.addDockWidget(
             Qt.DockWidgetArea.LeftDockWidgetArea, self.saved_table_dock
         )
-        dock_container.tabifyDockWidget(self.saved_table_dock, self.search_table_dock)
+        dock_container.addDockWidget(
+            Qt.DockWidgetArea.RightDockWidgetArea, self.search_pointer_dock
+        )
+        dock_container.tabifyDockWidget(self.search_table_dock, self.saved_table_dock)
+        dock_container.tabifyDockWidget(self.search_table_dock, self.search_pointer_dock)
         dock_container.setDockOptions(
             QMainWindow.DockOption.AllowNestedDocks |
             QMainWindow.DockOption.AllowTabbedDocks
         )
+
+        self.search_table_dock.raise_()
 
         main_layout.addWidget(dock_container)
         self.container.setLayout(main_layout)
@@ -182,6 +191,13 @@ class MemoryScannerUI(QMainWindow):
         self.saved_table_action.setChecked(True)
         self.view_menu.addAction(self.saved_table_action)
 
+        self.search_pointer_action = QAction('Pointer Scan Table', self)
+        self.search_pointer_action.triggered.connect(
+            lambda: self.search_pointer_dock.setVisible(self.search_pointer_action.isChecked()))
+        self.search_pointer_action.setCheckable(True)
+        self.search_pointer_action.setChecked(True)
+        self.view_menu.addAction(self.search_pointer_action)
+
         self.help_menu = self.menu_bar.addMenu("Help")
         self.help_menu.setFont(secondary_font)
         about_action = QAction("About", self)
@@ -214,6 +230,7 @@ class MemoryScannerUI(QMainWindow):
         self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.saved_table_action)
+        self.fix_dock_close_event(self.search_pointer_dock, self.search_pointer_action)
 
         self.search_input.textChanged.connect(self.validate_input)
         self.typeCombo.currentTextChanged.connect(self.validate_input)

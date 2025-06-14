@@ -68,7 +68,6 @@ class MemoryParserProcess(Process):
     def _handle_message(self, msg: Message) -> None:
         typ = msg.message_type
         data = msg.message
-
         if typ == MessageType.SET_PROCESS:
             self._cancel_scan()
             pid = data[0]

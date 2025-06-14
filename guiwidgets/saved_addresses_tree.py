@@ -281,7 +281,8 @@ class AddressTreeView(QTreeView):
             # update display instantly
             new_name = name_edit.text()
             if data:
-                self.freezeSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32), True)
+                value = convert_to_bytes(value_edit.text(), Type.UInt32) if value_edit.text() else b''
+                self.freezeSignal.emit(int(addr_item.text(), 16), value, True)
                 name_item.setText(f"{new_name} 🔒")
                 value_item.setText(value_edit.text())
                 print(f"Freezing {new_name} at value {value_edit.text()}")

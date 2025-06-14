@@ -24,6 +24,7 @@ class MessageType(Enum):
     SAVED_VALUE_CHANGED = auto()
     SAVE_ADDRESS = auto()
     UNSAVE_ADDRESS = auto()
+    INVALID_ADDRESS = auto()
     # scanner messages
     INIT_SCANNER = auto()
     START_SCAN = auto()
