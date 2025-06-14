@@ -11,7 +11,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QStandardItem, QAction, QFont, QIcon
 from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, QSize
 
-from guiwidgets.utils import SavedTreeTypes
+from guiwidgets.utils import SavedTreeTypes, emoji_icon
 from utils import convert_to_bytes, Type
 from utils.types import convert_from_bytes
 from models import SavedTreeModel
@@ -121,6 +121,7 @@ class AddressTreeView(QTreeView):
         # font.setBold(True)
         # group.setFont(font)
         group.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
+        # group.setIcon(emoji_icon('📁'))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled
         group.setFlags(flags | Qt.ItemFlag.ItemIsEditable)
         desc = QStandardItem("")
@@ -143,7 +144,7 @@ class AddressTreeView(QTreeView):
         """
 
         item = QStandardItem(label.strip())
-        item.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        # item.setIcon(emoji_icon('📍', 20))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         item.setFlags(flags)
         desc = QStandardItem("")
@@ -174,12 +175,20 @@ class AddressTreeView(QTreeView):
 
     def _insert_pointer(self, payload, index):
         name_item = QStandardItem(payload[0])
-        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_CommandLink)
-        ghost_pix = icon.pixmap(QSize(16, 16), QIcon.Mode.Normal)
-        name_item.setIcon(QIcon(ghost_pix))
+        font = QFont()
+        font.setPointSize(14)
+        name_item.setFont(font)
+        # icon = self.style().standardIcon(QStyle.StandardPixmap.SP_CommandLink)
+
+        # ghost_pix = icon.pixmap(QSize(16, 16), QIcon.Mode.Normal)
+        # ghost_pix = emoji_icon('🔗')
+        # name_item.setIcon(ghost_pix)
         desc_item = QStandardItem("Pointer")
+        desc_item.setFont(font)
         addr_item = QStandardItem(hex(payload[-2]))
+        addr_item.setFont(font)
         val_item = QStandardItem(str(payload[-1]))
+        val_item.setFont(font)
         name_item.setData(SavedTreeTypes.POINTER, Qt.ItemDataRole.UserRole)
         name_item.setData(payload, Qt.ItemDataRole.UserRole + 1)
         for it in (name_item, desc_item, addr_item, val_item):
@@ -229,7 +238,7 @@ class AddressTreeView(QTreeView):
             # re‐stash the new payload
             new_payload = (name, typ, base_hex, offsets, final_addr, final_val)
             self.model.setData(flag_idx,
-                               'POINTER',
+                               SavedTreeTypes.POINTER,
                                role=Qt.ItemDataRole.UserRole)
             self.model.setData(flag_idx,
                           new_payload,
