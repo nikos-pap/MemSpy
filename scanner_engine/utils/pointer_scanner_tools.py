@@ -101,8 +101,6 @@ def dfs_indexed(pointer_data, start_x, max_depth, offset_range, negatives, rando
     pop_path = path.pop
     results_append = results.append
     local_find_candidates = find_candidates
-    local_sorted_bs = sorted_bs
-    local_b_map = b_map
 
     def backtrack(current_x, depth):
         if current_x in dead_ends:
@@ -111,7 +109,7 @@ def dfs_indexed(pointer_data, start_x, max_depth, offset_range, negatives, rando
         if depth >= max_depth:
             return False  # Hit depth limit, no valid path
 
-        candidates = local_find_candidates(local_sorted_bs, local_b_map, current_x, offset_range, negatives)
+        candidates = local_find_candidates(sorted_bs, b_map, current_x, offset_range, negatives)
         if not candidates:
             dead_ends.add(current_x)
             return False  # No options, mark as dead end
@@ -119,7 +117,7 @@ def dfs_indexed(pointer_data, start_x, max_depth, offset_range, negatives, rando
         found_valid = False
 
         for A, C, B, offset in candidates:
-            if randomness > 0 and np.random.uniform(0, 1) < randomness:
+            if randomness > 0 and np.random.uniform() < randomness:
                 continue  # Randomly skip this candidate
 
             append_path((B, int(offset)))
