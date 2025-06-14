@@ -75,8 +75,12 @@ class MemoryViewProcess(Process):
             self._reset_all()
             if not self.process_reader:
                 self.process_reader = MemoryScanner()
-            self.process_reader.change_process(pid)
-            print(f'[MemoryView] Process set to {pid}')
+            if pid == -1:
+                self.process_reader.close()
+                print(f'[MemoryView] Process detached')
+            else:
+                self.process_reader.change_process(pid)
+                print(f'[MemoryView] Process set to {pid}')
         elif typ == MessageType.ADD_ADDRESS:
             self.selected_addresses.extend(data)
             self._update_stats()
@@ -137,7 +141,8 @@ class MemoryViewProcess(Process):
             if index == end:
                 break
             value = self.process_reader.read_bytes(addr, 4)
-            self.out_queue.put(Message(MessageType.VALUE_CHANGED, [addr, value, int(val).to_bytes(4, 'little')]))
+            if value is not None:
+                self.out_queue.put(Message(MessageType.VALUE_CHANGED, [addr, value, int(val).to_bytes(4, 'little')]))
 
     def _change_page(self, step: int) -> None:
         max_page = self._last_filter_count // self.page_size

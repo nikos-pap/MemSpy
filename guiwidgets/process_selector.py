@@ -1,34 +1,37 @@
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QComboBox
-from typing import Callable
 
 
-class DynamicComboBox(QComboBox):
-    def __init__(self, refresh_callable: Callable[[], None], selection_callable: Callable):
+class ProcessSelectorBox(QComboBox):
+    selectionSignal = pyqtSignal([int, QIcon], [int])
+    updateSignal = pyqtSignal()
+
+    def __init__(self):
         super().__init__()
-        self.refresh_command = refresh_callable
-        self.on_selection_command = selection_callable
-        self.current = None  # Track selected value by text
-        # noinspection PyUnresolvedReferences
+        self.current_pid = -1  # Track selected value by text
         self.currentIndexChanged.connect(self._on_index_changed)
 
     def showPopup(self):
-        self.current = self.currentText()  # Save current selection before refresh
-        self.refresh_items()
+        self.current_pid = self.currentData()  # Save current selection before refresh
+        self.updateSignal.emit()
         super().showPopup()
 
     def _on_index_changed(self, index):
-        selection = self.itemText(index)
-        if selection != self.current:
-            self.current = index
-            proc_id = self.itemData(index)
-            icon = self.itemIcon(index)
-            self.on_selection_command(icon, proc_id)
+        proc_id = self.itemData(index)
+        if index == -1 or proc_id is None or proc_id == self.current_pid:
+            return
+        icon = self.itemIcon(index)
+        # if index > 0:
+        #     if icon:
+        #         self.selectionSignal.emit(proc_id, icon)
+        #     else:
+        #         self.selectionSignal.emit(proc_id)
+        self.selectionSignal.emit(proc_id, icon)
+        self.current_pid = proc_id
 
     def refresh_items(self):
-        self.blockSignals(True)
-        self.refresh_command()
-        self.blockSignals(False)
-        index = self.findText(self.current)
+        index = self.findData(self.current_pid)
         # Restore selection if possible
-        if index != -1:
+        if index > 0:
             self.setCurrentIndex(index)

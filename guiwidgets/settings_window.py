@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QTabWidget
 )
 from PyQt6.QtCore import QSize, QSettings
-from guiwidgets.device_handler import list_devices
+from guiwidgets.utils import list_devices
 from utils.types import PointerSettingsType
 
 

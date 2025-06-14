@@ -1,9 +1,8 @@
 from PIL import Image
 from PyQt6.QtCore import QObject, pyqtSignal, QThread
 from multiprocessing import Queue
-from typing import List, Tuple, NamedTuple
+from typing import List, NamedTuple
 import psutil
-import os
 
 from backend.memoryview import MemoryViewProcess
 from scanner_engine.memory_parser import MemoryParserProcess

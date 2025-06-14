@@ -1,28 +1,26 @@
+import pickle
+import random
 import re
 from random import randint
 
 from PyQt6.QtWidgets import (
     QWidget, QTreeView, QMenu, QInputDialog,
     QPushButton, QHBoxLayout, QVBoxLayout, QStyle, QDialog,
-    QLineEdit, QFormLayout, QHeaderView
+    QLineEdit, QFormLayout, QHeaderView, QComboBox, QLabel, QDialogButtonBox, QAbstractItemView
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction, QFont
-from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
+from PyQt6.QtGui import QStandardItem, QAction, QFont, QIcon
+from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, QSize
 
+from guiwidgets.utils import SavedTreeTypes
 from utils import convert_to_bytes, Type
 from utils.types import convert_from_bytes
+from models import SavedTreeModel
+from guiwidgets.pointer_dialog import PointerDialog
 
-# Custom data role for frozen state
-FREEZE_ROLE = Qt.ItemDataRole.UserRole + 1
-
-
-class TreeModel(QStandardItemModel):
-    def dropMimeData(self, data, action, row, column, parent_index):
-        if parent_index.isValid():
-            parent_item = self.itemFromIndex(parent_index)
-            if not (parent_item.flags() & Qt.ItemFlag.ItemIsDropEnabled):
-                return False
-        return super().dropMimeData(data, action, row, column, parent_index)
+# Custom data roles
+TYPE_ROLE = Qt.ItemDataRole.UserRole
+DATA_ROLE = Qt.ItemDataRole.UserRole + 1
+FREEZE_ROLE = Qt.ItemDataRole.UserRole + 2
 
 
 class AddressTreeView(QTreeView):
@@ -31,6 +29,7 @@ class AddressTreeView(QTreeView):
     addAddressSignal = pyqtSignal('quint64')
     removeAddressSignal = pyqtSignal('quint64')
     pointerScanSignal = pyqtSignal('quint64')
+    pointerRequested = pyqtSignal(str, str, bool, str, object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -38,6 +37,7 @@ class AddressTreeView(QTreeView):
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         self.setDragDropMode(QTreeView.DragDropMode.InternalMove)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context)
         self.doubleClicked.connect(self._edit_parameters)
@@ -45,7 +45,7 @@ class AddressTreeView(QTreeView):
         font = QFont()
         font.setPointSize(12)
 
-        self.model = TreeModel()
+        self.model = SavedTreeModel(self)
         self.setFont(font)
         self.model.setHorizontalHeaderLabels(["Name", "Description", "Address", "Value"])
         self.setModel(self.model)
@@ -81,6 +81,9 @@ class AddressTreeView(QTreeView):
             menu.addAction(delete_action)
             menu.addAction(freeze_action)
             # print()
+        add_pointer = QAction("Add Pointer", self)
+        add_pointer.triggered.connect(lambda: self._on_add_pointer(index))
+        menu.addAction(add_pointer)
         menu.addAction(add_group)
         menu.addAction(add_address)
         menu.exec(self.viewport().mapToGlobal(pos))
@@ -114,9 +117,9 @@ class AddressTreeView(QTreeView):
         if not (ok and name):
             return
         group = QStandardItem(name)
-        font = group.font()
-        font.setBold(True)
-        group.setFont(font)
+        # font = group.font()
+        # font.setBold(True)
+        # group.setFont(font)
         group.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DirIcon))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled
         group.setFlags(flags | Qt.ItemFlag.ItemIsEditable)
@@ -126,6 +129,7 @@ class AddressTreeView(QTreeView):
         addr.setFlags(flags)
         value = QStandardItem("")
         value.setFlags(flags)
+        group.setData('GROUP', Qt.ItemDataRole.UserRole)
         parent_item = self.model.itemFromIndex(index) if index.isValid() else None
         if parent_item and parent_item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
             parent_item.appendRow([group, desc, addr, value])
@@ -168,7 +172,70 @@ class AddressTreeView(QTreeView):
             return
         self.add_address(label, address_str, index)
 
-    def _edit_parameters(self, index: QModelIndex):
+    def _insert_pointer(self, payload, index):
+        name_item = QStandardItem(payload[0])
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_CommandLink)
+        ghost_pix = icon.pixmap(QSize(16, 16), QIcon.Mode.Normal)
+        name_item.setIcon(QIcon(ghost_pix))
+        desc_item = QStandardItem("Pointer")
+        addr_item = QStandardItem(hex(payload[-2]))
+        val_item = QStandardItem(str(payload[-1]))
+        name_item.setData(SavedTreeTypes.POINTER, Qt.ItemDataRole.UserRole)
+        name_item.setData(payload, Qt.ItemDataRole.UserRole + 1)
+        for it in (name_item, desc_item, addr_item, val_item):
+            it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled)
+        parent = self.model.itemFromIndex(index) if index.isValid() else None
+        if parent and parent.flags() & Qt.ItemFlag.ItemIsDropEnabled:
+            parent.appendRow([name_item, desc_item, addr_item, val_item])
+        else:
+            self.model.appendRow([name_item, desc_item, addr_item, val_item])
+        self.expandAll()
+
+    def _on_add_pointer(self, index):
+        dlg = PointerDialog(self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        payload = dlg.get_result()
+        self._insert_pointer(payload, index)
+
+    def _edit_parameters(self, index):
+        # always look at column 0’s UserRole to see if it’s a pointer row
+        flag_idx = index.siblingAtColumn(0)
+        kind = flag_idx.data(Qt.ItemDataRole.UserRole)
+        print(kind)
+        if kind == SavedTreeTypes.POINTER:
+            self._edit_pointer(index)
+        elif kind == SavedTreeTypes.ADDRESS:
+            self._edit_address(index)
+
+    def _edit_pointer(self, index):
+        # always look at column 0’s UserRole to see if it’s a pointer row
+        flag_idx = index.siblingAtColumn(0)
+        kind = flag_idx.data(Qt.ItemDataRole.UserRole)
+        # pull out the saved payload
+        payload = flag_idx.data(Qt.ItemDataRole.UserRole + 1)
+        name, typ, base_hex, offsets, _, _ = payload
+
+        # open your special PointerDialog
+        dlg = PointerDialog(self)
+        dlg.load_from_data(name, typ, base_hex, offsets)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            # grab updated results
+            name, typ, base_hex, offsets, final_addr, final_val = dlg.get_result()
+            # update your model in place
+            self.model.setData(flag_idx, name)
+            self.model.setData(flag_idx.siblingAtColumn(2), hex(final_addr))
+            self.model.setData(flag_idx.siblingAtColumn(3), str(final_val))
+            # re‐stash the new payload
+            new_payload = (name, typ, base_hex, offsets, final_addr, final_val)
+            self.model.setData(flag_idx,
+                               'POINTER',
+                               role=Qt.ItemDataRole.UserRole)
+            self.model.setData(flag_idx,
+                          new_payload,
+                          role=Qt.ItemDataRole.UserRole + 1)
+
+    def _edit_address(self, index: QModelIndex):
         # skip groups
         item = self.model.itemFromIndex(self.model.index(index.row(), 0, index.parent()))
         if item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
@@ -307,8 +374,13 @@ class AddressTreeView(QTreeView):
         self.model.setHorizontalHeaderLabels(["Name", "Description", "Address", "Value"])
         self.expandAll()
 
-
-
+    def read_memory(self, address: int, type_str: str) -> int:
+        """
+        Hook this up to your actual process‐memory reader.
+        Must return the integer value read at `address` of size/type `type_str`.
+        """
+        # e.g. return self.model.process.read(address, type_str)
+        return 0  # stub
 
 class AddressTreeContainer(QWidget):
 

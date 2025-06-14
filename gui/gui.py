@@ -7,11 +7,11 @@ from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QComboBox, QLineEdit, QDockWidget, QStatusBar,
-    QProgressBar, QMessageBox, QHeaderView
+    QProgressBar, QMessageBox, QHeaderView, QStyle
 )
 
 from backend.backend import Backend
-from guiwidgets import DynamicComboBox, AddressTreeContainer
+from guiwidgets import ProcessSelectorBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
 from utils import Type, TYPE_RANGES, convert_to_bytes
@@ -42,15 +42,15 @@ class MemoryScannerUI(QMainWindow):
         screen = QApplication.primaryScreen().availableGeometry()
         x = (screen.width() - width) // 2
         y = (screen.height() - height) // 2
+        icon = self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarMenuButton)
+        self.setWindowIcon(icon)
         self.setGeometry(x, y, width, height)
         self.setStyleSheet("QPushButton { padding: 5px; }")
 
     def _create_widgets(self):
         self.settings_manager = SettingsManager()
         # Process selection
-        self.process_box = DynamicComboBox(
-            self.update_process_list_command, self.process_selection_handle
-        )
+        self.process_box = ProcessSelectorBox()
         font = QFont()
         font.setPointSize(16)
         self.process_box.setFont(font)
@@ -203,6 +203,8 @@ class MemoryScannerUI(QMainWindow):
         listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
+        self.process_box.selectionSignal.connect(self.process_selection_handle)
+        self.process_box.updateSignal.connect(self.update_process_list_command)
 
         self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
         self.search_address_table.previousPageSignal.connect(
@@ -224,6 +226,7 @@ class MemoryScannerUI(QMainWindow):
         self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
         self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
         self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
+        self.saved_address_tree.tree_view.pointerRequested.connect(self.on_pointer_command)
 
     @staticmethod
     def fix_dock_close_event(dock: QDockWidget,
@@ -274,8 +277,9 @@ class MemoryScannerUI(QMainWindow):
                 text = text[:max_len - 4] + "...."
             return f"{text} ({proc_id})"
 
+        self.process_box.blockSignals(True)
         self.process_box.clear()
-        self.process_box.insertItem(0, "-- Select Process --", None)
+        self.process_box.insertItem(0, "-- Select Process --", -1)
         processes = self.backend.get_running_processes()
 
         for name, pid, image in processes:
@@ -298,6 +302,8 @@ class MemoryScannerUI(QMainWindow):
                     self.process_box.addItem(label)
             else:
                 self.process_box.addItem(label)
+        self.process_box.refresh_items()
+        self.process_box.blockSignals(False)
         print(f"[MemoryScannerUI] Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
 
     def condition_changed_command(self, _):
@@ -415,17 +421,26 @@ class MemoryScannerUI(QMainWindow):
         self.condition_combo.setDisabled(False)
         self.filter_btn.setDisabled(False)
 
-    def process_selection_handle(self, icon, proc_id):
-        self.isAttached = bool(proc_id)
-        if not self.isAttached:
+    def process_selection_handle(self, proc_id: int | None, icon: QIcon | None):
+        if proc_id == -1:
+            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarMenuButton)
+            self.setWindowIcon(icon)
+            self.backend.init_process_reader(-1)
+            self.setWindowTitle("Memory Scanner")
+            self.isAttached = False
             return
+        self.isAttached = True
         self.setWindowTitle(f'Mem Scanner - {proc_id}')
         start = time.time()
         self.backend.init_process_reader(proc_id)
-        print(f'Attached in {time.time() - start:.2f}s')
+        print(f'Attached ({proc_id}) in {time.time() - start:.2f}s')
         self.setWindowIcon(icon or QIcon())
         self.initialise_scan_navigation()
         self.saved_address_tree.clear_tree()
+
+    def on_pointer_command(self, name, typ, isPtr, baseHex, offsets):
+        print("Pointer requested:", name, typ, isPtr, baseHex, offsets)
+        # … fire off your utility, read mem, insert into tree, etc. …
 
     def set_message(self, message: str):
         self.status.showMessage(message)

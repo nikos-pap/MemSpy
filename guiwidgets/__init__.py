@@ -1,2 +1,2 @@
-from guiwidgets.process_selector import DynamicComboBox
+from guiwidgets.process_selector import ProcessSelectorBox
 from guiwidgets.saved_addresses_tree import AddressTreeContainer

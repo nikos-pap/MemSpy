@@ -81,6 +81,8 @@ class PaginatedTable(QWidget):
 
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
+        self.prev_button.setDisabled(True)
+        self.next_button.setDisabled(True)
 
         self.table.doubleClicked.connect(self._forward_double_click)
 
@@ -176,62 +178,14 @@ class PaginatedTable(QWidget):
         start = self.page_start
         end = self.page_end
         text = f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)" if self.total else ''
+        self.next_button.setDisabled(end == self.filtered)
+        self.prev_button.setDisabled(start == 0)
         self.info_label.setText(text)
 
     def fill_data(self, address_list):
         self.filter_input.setText('')
         self.filtered_data = address_list
         self.current_page = 0
-
-    # def on_checkbox_state_changed(self, address: str, state: Any):
-    #     self.filtered_data[address].isFrozen = state == Qt.CheckState.Checked.value
-    #     self.freeze_command(address)
-
-    # def on_item_changed(self, item: QTableWidgetItem):
-    #     if item.column() != 2:
-    #         return  # Only process value column here
-    #
-    #     # row = item.row()
-    #     # global_index = self.filtered_data[self.current_page * self.page_size + row]
-    #     new_value = item.text()
-    #     address = item.data(Qt.ItemDataRole.UserRole)
-    #     entry = self.filtered_data[address]
-    #     entry.new_value = convert_to_bytes(new_value, entry.data_type)
-    #
-    #     color = 'white'
-    #     n_val = convert_from_bytes(entry.new_value, Type.UInt32)
-    #     o_val = convert_from_bytes(entry.value, Type.UInt32)
-    #     if n_val > o_val:
-    #         color = 'limegreen'
-    #     elif n_val < o_val:
-    #         color = 'red'
-    #
-    #     item.setForeground(QBrush(QColor(color)))
-    #
-    #     self.change_value_command(address, entry.new_value)
-
-    # def setValue(self, address: str, value: bytes) -> None:
-    #     self.table.blockSignals(True)
-    #     entry = self.filtered_data.get(address)
-    #     if not entry:
-    #         self.table.blockSignals(False)
-    #         return
-    #     index = list(self.filtered_data.keys()).index(address)
-    #     if self.start <= index + 1 <= self.end:
-    #         item = QTableWidgetItem(str(convert_from_bytes(value, entry.data_type)))
-    #         item.setFont(self.font)
-    #         item.setData(Qt.ItemDataRole.UserRole, address)
-    #         self.table.setItem(index, 2, item)
-    #         n_val = int.from_bytes(entry.new_value, 'little')
-    #         o_val = int.from_bytes(entry.value, 'little')
-    #         if n_val > o_val:
-    #             color = 'limegreen'
-    #         elif n_val < o_val:
-    #             color = 'red'
-    #         else:
-    #             color = 'deepskyblue'
-    #         item.setForeground(QBrush(QColor(color)))
-    #     self.table.blockSignals(False)
 
     def setPageRanges(self, start: int):
         self.page_start = start
@@ -276,6 +230,11 @@ class PaginatedTable(QWidget):
 
     def clear(self):
         self.filter_input.setText('')
+        self.prev_button.setDisabled(True)
+        self.next_button.setDisabled(True)
+        self.model.current_page = 0
+        self.page_start = 0
+        self.page_end = 0
         self.clear_table()
 
     def next_page(self):

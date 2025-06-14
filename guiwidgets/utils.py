@@ -3,6 +3,7 @@ from numba.cuda.cudadrv.driver import CudaAPIError
 from numba.cuda.cudadrv.error import CudaDriverError
 import pywintypes
 import wmi
+from enum import Enum, auto
 
 
 def _list_cpus() -> list[str]:
@@ -63,3 +64,9 @@ def list_devices() -> list[dict[str, str | int]]:
         for dev in devices:
             print(f"  [{dev['type']} {dev['index']}] {dev['name']}")
     return devices
+
+
+class SavedTreeTypes(Enum):
+    POINTER = auto()
+    GROUP = auto()
+    ADDRESS = auto()

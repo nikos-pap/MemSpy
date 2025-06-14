@@ -1,9 +1,8 @@
 import time
 from multiprocessing import Process, Queue
-from typing import Optional, Iterator, Union
+from typing import Optional, Iterator
 
 import numpy as np
-from backend.utils import ProcessInspector
 from utils.message import Message, MessageType
 from utils.types import Condition
 from scanner_engine.process_reader import MemoryScanner as NewMemoryScanner
@@ -26,15 +25,13 @@ class MemoryParserProcess(Process):
         scanner_queue: Queue,
         results_queue: Queue,
         progress_queue: Queue,
-        use_inspector: bool = False,
         **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self.queue_in: Queue = scanner_queue
         self.queue_out: Queue = results_queue
         self.queue_progress: Queue = progress_queue
-        self.use_inspector: bool = use_inspector
-        self.scanner: Optional[Union[NewMemoryScanner, ProcessInspector]] = None
+        self.scanner: Optional[NewMemoryScanner] = None
         self.pointer_scanner: Optional[PointerScanner] = None
         self._current_scan: Optional[Iterator] = None
         self._scanning: bool = False
@@ -76,17 +73,18 @@ class MemoryParserProcess(Process):
             self._cancel_scan()
             pid = data[0]
             backend = ''
-            if self.use_inspector and not self.scanner:
-                self.scanner = ProcessInspector()
-                backend = 'ProcessInspector'
-            elif not self.scanner:
+            if not self.scanner:
                 self.scanner = NewMemoryScanner()
                 backend = 'NewMemoryScanner'
-            self.scanner.change_process(pid)
+            if pid == -1:
+                self.scanner.close()
+                print(f'[MemoryParserProcess] Process detached using {backend}')
+            else:
+                self.scanner.change_process(pid)
+                print(f'[MemoryParserProcess] Process set to {pid} using {backend}')
             while not self.queue_out.empty():
                 self.queue_out.get_nowait()
             self.queue_out.put(Message(MessageType.RESET))
-            print(f'[MemoryParserProcess] Process set to {pid} using {backend}')
 
         elif typ == MessageType.START_SCAN:
             if not self.scanner:
