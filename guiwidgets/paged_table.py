@@ -18,7 +18,7 @@ class PaginatedTable(QWidget):
     freezeSignal = pyqtSignal(int)
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
-    addressActivated = pyqtSignal(str)
+    addressActivated = pyqtSignal(dict)
 
     def __init__(self, *args):
         super().__init__()
@@ -225,7 +225,7 @@ class PaginatedTable(QWidget):
             if model.headerData(col, Qt.Orientation.Horizontal) == "Address":
                 addr_str = model.data(model.index(index.row(), col), Qt.ItemDataRole.DisplayRole)
                 if addr_str:
-                    self.addressActivated.emit(addr_str)
+                    self.addressActivated.emit({'addr': int(addr_str, 16), 'value': '', 'desc': '', 'frozen': False})
                 break
 
     def clear(self):

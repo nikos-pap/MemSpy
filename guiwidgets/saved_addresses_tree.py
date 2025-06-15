@@ -1,17 +1,16 @@
-import pickle
-import random
 import re
-from random import randint
+from typing import Any
 
 from PyQt6.QtWidgets import (
     QWidget, QTreeView, QMenu, QInputDialog,
     QPushButton, QHBoxLayout, QVBoxLayout, QStyle, QDialog,
-    QLineEdit, QFormLayout, QHeaderView, QComboBox, QLabel, QDialogButtonBox, QAbstractItemView
+    QLineEdit, QFormLayout, QHeaderView, QAbstractItemView, QCheckBox
 )
-from PyQt6.QtGui import QStandardItem, QAction, QFont, QIcon
-from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, QSize
+from PyQt6.QtGui import QStandardItem, QAction, QFont
+from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
 
-from guiwidgets.utils import SavedTreeTypes, emoji_icon
+from guiwidgets.address_dialog import EditAddressDialog
+from guiwidgets.utils import SavedTreeTypes
 from utils import convert_to_bytes, Type
 from utils.types import convert_from_bytes
 from models import SavedTreeModel
@@ -138,53 +137,55 @@ class AddressTreeView(QTreeView):
             self.model.appendRow([group, desc, addr, value])
         self.expandAll()
 
-    def add_address(self, label: str, address_str: str, index: QModelIndex = QModelIndex()):
+    def add_address(self, data: dict[str, Any], index: QModelIndex = QModelIndex()):
         """
         Programmatically add an address entry under given index (or root if invalid).
         """
+        label = data['name']
+        address = data['addr']
+        value = data['value']
+        frozen = data['frozen']
+        description = data['desc']
 
-        item = QStandardItem(label.strip())
-        # item.setIcon(emoji_icon('📍', 20))
+        item = QStandardItem(label + (' 🔒' if frozen else ''))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         item.setFlags(flags)
         item.setData(SavedTreeTypes.ADDRESS, TYPE_ROLE)
-        item.setData(False, FREEZE_ROLE)
-        desc = QStandardItem("")
+        item.setData(frozen, FREEZE_ROLE)
+        desc = QStandardItem(description)
         desc.setFlags(flags)
-        addr_item = QStandardItem(address_str.strip())
+        addr_item = QStandardItem(hex(address))
         addr_item.setFlags(flags)
-        value = QStandardItem("")
-        value.setFlags(flags)
-        self.addAddressSignal.emit(int(address_str, 16))
+        value_item = QStandardItem(value)
+        value_item.setFlags(flags)
+        self.addAddressSignal.emit(address)
+
+        if frozen:
+            self.freezeSignal.emit(address, convert_to_bytes(value, Type.UInt32), frozen)
+        elif len(value) > 0:
+            self.setValueSignal.emit(address, convert_to_bytes(value, Type.UInt32))
         parent_item = self.model.itemFromIndex(index) if index.isValid() else None
         if parent_item and parent_item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
-            parent_item.appendRow([item, desc, addr_item, value])
+            parent_item.appendRow([item, desc, addr_item, value_item])
         else:
-            self.model.appendRow([item, desc, addr_item, value])
+            self.model.appendRow([item, desc, addr_item, value_item])
         self.expandAll()
 
     def add_address_dialog(self, index: QModelIndex = QModelIndex()):
         """
         Interactive dialog to input label and address, then calls add_address().
         """
-        label, ok = QInputDialog.getText(self, "New Address", "Address label:")
-        if not (ok and label):
+        dialog = EditAddressDialog(self)
+        if not dialog.exec():
             return
-        address_str, ok2 = QInputDialog.getText(self, "Address Details", "Enter address:")
-        if not ok2:
-            return
-        self.add_address(label, address_str, index)
+        payload = dialog.get_data()
+        self.add_address(payload, index)
 
     def _insert_pointer(self, payload, index):
         name_item = QStandardItem(payload[0])
         font = QFont()
         font.setPointSize(14)
         name_item.setFont(font)
-        # icon = self.style().standardIcon(QStyle.StandardPixmap.SP_CommandLink)
-
-        # ghost_pix = icon.pixmap(QSize(16, 16), QIcon.Mode.Normal)
-        # ghost_pix = emoji_icon('🔗')
-        # name_item.setIcon(ghost_pix)
         desc_item = QStandardItem("Pointer")
         desc_item.setFont(font)
         addr_item = QStandardItem(hex(payload[-2]))
@@ -255,76 +256,37 @@ class AddressTreeView(QTreeView):
         desc_item = self.model.itemFromIndex(index.siblingAtColumn(1))
         addr_item = self.model.itemFromIndex(index.siblingAtColumn(2))
         value_item = self.model.itemFromIndex(index.siblingAtColumn(3))
+        frozen = name_item.data(FREEZE_ROLE)
+        previous_value = value_item.text()
 
         # locked state from data role
         raw_name = name_item.text()
-        if name_item.data(FREEZE_ROLE):
+        if frozen:
             raw_name = raw_name.rstrip(' 🔒')
 
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Edit Parameters")
-        form = QFormLayout(dlg)
-        name_edit = QLineEdit(raw_name)
-        form.addRow("Name:", name_edit)
-        desc_edit = QLineEdit(desc_item.text())
-        form.addRow("Description:", desc_edit)
-        addr_edit = QLineEdit(addr_item.text())
-        form.addRow("Address:", addr_edit)
+        dlg = EditAddressDialog(
+            self,
+            name=raw_name,
+            desc=desc_item.text(),
+            addr=addr_item.text(),
+            value=value_item.text(),
+            frozen=name_item.data(FREEZE_ROLE)
+        )
+        if dlg.exec():
+            data = dlg.get_data()
+            name_text = data['name'] + (' 🔒' if data['frozen'] else '')
+            name_item.setText(name_text)
+            name_item.setData(data['frozen'], FREEZE_ROLE)
+            address = int(addr_item.text(), 16)
+            if frozen != data['frozen']:
+                self.freezeSignal.emit(address, convert_to_bytes(data['value'], Type.UInt32), data['frozen'])
+            if previous_value != data['value']:
+                self.setValueSignal.emit(address, convert_to_bytes(data['value'], Type.UInt32))
+            addr_item.setText(hex(data['addr']))
+            value_item.setText(data['value'])
+            print(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
 
-        # Value + Freeze
-        value_edit = QLineEdit(value_item.text())
-        freeze_btn = QPushButton("Freeze")
 
-        def on_freeze():
-            data = not name_item.data(FREEZE_ROLE)
-            name_item.setData(data, FREEZE_ROLE)
-            # update display instantly
-            new_name = name_edit.text()
-            if data:
-                value = convert_to_bytes(value_edit.text(), Type.UInt32) if value_edit.text() else b''
-                self.freezeSignal.emit(int(addr_item.text(), 16), value, True)
-                name_item.setText(f"{new_name} 🔒")
-                value_item.setText(value_edit.text())
-                print(f"Freezing {new_name} at value {value_edit.text()}")
-            else:
-                self.freezeSignal.emit(int(addr_item.text(), 16), b'', False)
-                name_item.setText(new_name.rstrip(' 🔒'))
-                print(f"Attempting to Freeze {new_name} at value {value_edit.text()}")
-
-        freeze_btn.clicked.connect(on_freeze)
-        btn_layout = QHBoxLayout()
-        btn_layout.addWidget(value_edit)
-        btn_layout.addWidget(freeze_btn)
-        container = QWidget()
-        container.setLayout(btn_layout)
-        form.addRow("Value:", container)
-
-        # Dialog buttons
-        def apply_changes():
-            new_name = name_edit.text()
-            if name_item.data(FREEZE_ROLE):
-                name_item.setText(f"{new_name} 🔒")
-            else:
-                name_item.setText(new_name)
-            desc_item.setText(desc_edit.text())
-            addr_item.setText(addr_edit.text())
-            value_item.setText(value_edit.text())
-            if addr_item.text() and value_edit.text():
-                self.setValueSignal.emit(int(addr_item.text(), 16), convert_to_bytes(value_edit.text(), Type.UInt32))
-            print(name_item.data(FREEZE_ROLE))
-        ok_btn = QPushButton("OK")
-        apply_btn = QPushButton("Apply")
-        cancel_btn = QPushButton("Cancel")
-        ok_btn.clicked.connect(lambda: (apply_changes(), dlg.accept()))
-        apply_btn.clicked.connect(apply_changes)
-        cancel_btn.clicked.connect(dlg.reject)
-        action_layout = QHBoxLayout()
-        action_layout.addWidget(apply_btn)
-        action_layout.addWidget(ok_btn)
-        action_layout.addWidget(cancel_btn)
-        form.addRow(action_layout)
-
-        dlg.exec()
 
     def update_saved_addresses(self, name: int, new_val: bytes):
         root = self.model.invisibleRootItem()
@@ -411,8 +373,9 @@ class AddressTreeContainer(QWidget):
 
         self.setLayout(main_layout)
 
-    def add_address(self, address: str):
-        self.tree_view.add_address(self.tree_view.next_temp_label(), address)
+    def add_address(self, data: dict):
+        data['name'] = self.tree_view.next_temp_label()
+        self.tree_view.add_address(data)
 
     def import_data(self): pass
     def export_data(self): pass

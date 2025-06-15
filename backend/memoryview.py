@@ -178,10 +178,6 @@ class MemoryViewProcess(Process):
 
     def unfreeze_address(self, address: int) -> None:
         self.frozen_addresses.pop(address, None)
-        # for index, addr in enumerate(self.frozen_addresses):
-        #     if addr[0] == address:
-        #         self.frozen_addresses.pop(index)
-        #         break
 
     def add_saved_address(self, address: int) -> None:
         if self.process_reader and self.process_reader.read_bytes(address, 4) is not None:
@@ -190,7 +186,8 @@ class MemoryViewProcess(Process):
             self.out_queue.put(Message(MessageType.INVALID_ADDRESS, [address]))
 
     def remove_saved_address(self, address: int) -> None:
-        self.saved_addresses.remove(address)
+        if address in self.saved_addresses:
+            self.saved_addresses.remove(address)
         self.unfreeze_address(address)
 
     def delete_address(self, index: int) -> None:
@@ -199,8 +196,10 @@ class MemoryViewProcess(Process):
             self.frozen_addresses.pop(addr[0], None)
 
     def set_value(self, address: int, value: bytes) -> None:
-        self.process_reader.write_bytes(address, value)
-        self.frozen_addresses[address] = value
+        if address in self.frozen_addresses:
+            self.frozen_addresses[address] = value
+        elif not self.process_reader.write_bytes(address, value):
+            print(f'[Memoryview] Address {address} not saved.')
 
     def _address_filter(self, address: tuple[int, bytes]) -> bool:
         """Filter by substring in hex representation."""

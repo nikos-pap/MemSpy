@@ -74,6 +74,7 @@ class MemoryScannerUI(QMainWindow):
 
         self.new_scan_btn = QPushButton("New Scan")
         self.new_scan_btn.setFont(font)
+        self.new_scan_btn.setEnabled(False)
 
         self.filter_btn = QPushButton("Filter Scan")
         self.filter_btn.setFont(font)
@@ -421,6 +422,7 @@ class MemoryScannerUI(QMainWindow):
     def initialise_scan_navigation(self):
         if self.new_scan_btn.text() == 'Cancel Scan':
             self.toggle_scan_button()
+        self.new_scan_btn.setDisabled(False)
         self.typeCombo.setDisabled(False)
         self.search_input.setDisabled(False)
         self.condition_combo.setDisabled(False)

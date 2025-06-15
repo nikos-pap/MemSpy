@@ -307,7 +307,7 @@ class MemoryScanner(AbstractMemoryScanner):
         # Return the raw bytes read
         return buffer.raw[:bytes_read.value]
 
-    def write_bytes(self, address: int, value: bytes) -> None:
+    def write_bytes(self, address: int, value: bytes) -> bool:
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
 
@@ -325,8 +325,9 @@ class MemoryScanner(AbstractMemoryScanner):
         )
 
         if not success:
-            raise ctypes.WinError(ctypes.get_last_error())
+            return False
 
         # Optionally, ensure all bytes were written
         if bytes_written.value != len(value):
             raise RuntimeError(f"Only wrote {bytes_written.value} out of {len(value)} bytes.")
+        return True
