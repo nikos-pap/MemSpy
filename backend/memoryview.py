@@ -2,10 +2,10 @@ from typing import Optional
 from multiprocessing import Process, Queue
 import time
 
-from backend.pointer import Pointer
+from utils.pointer import Pointer
 from scanner_engine.process_reader import MemoryScanner
 from utils.message import Message, MessageType
-from utils.types import Condition, filter_cases
+from utils.types import filter_cases
 
 
 class MemoryViewProcess(Process):
