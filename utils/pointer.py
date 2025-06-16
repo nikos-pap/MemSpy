@@ -5,6 +5,6 @@ from dataclasses import dataclass, field
 class Pointer:
     module_name: str
     start: int
-    value: bytes
     offsets: list[int] = field(default_factory=list)
+    value: bytes | None = None
 

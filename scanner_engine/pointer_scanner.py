@@ -6,6 +6,7 @@ from numba.core.errors import NumbaWarning
 from scanner_engine.process_reader import MemoryScanner
 from typing import Optional
 import scanner_engine.utils.pointer_scanner_tools as pst
+from utils.pointer import Pointer
 
 warnings.simplefilter("ignore", category=NumbaWarning)
 
@@ -22,43 +23,46 @@ class PointerScanner:
 
     def read_pointer_chain(self, base_addr: int, offsets: list, size: int):
         addr = base_addr
-        for offset in offsets:
-            data = self.scanner.read_bytes(addr, 8)
+        for offset in offsets[:-1]:
+            data = self.scanner.read_bytes(addr+offset, 8)
             if data is None:
                 return addr, None
-            addr = int(np.frombuffer(data, dtype='<u8')[0]) + offset
-        value = self.scanner.read_bytes(addr, size)
+            addr = int(np.frombuffer(data, dtype='<u8')[0])
+        value = self.scanner.read_bytes(addr+offsets[-1], size)
         if value is None:
             return addr, None
-        return addr, int(np.frombuffer(value, dtype=f'<u{size}')[0])
+        return int(np.frombuffer(value, dtype=f'<u{size}')[0])
 
     def make_pointers_list(self, results):
         self.chain = []
         for base_address, chain in results:
             base_address_name = None
             base_address_offset = 0
+            module_address = None
             for region in self.regions:
                 if region.base_address <= base_address <= region.base_address + region.size:
                     base_address_name = region.name
-                    base_address_offset = int(base_address - self.modules[base_address_name])
+                    module_address = self.modules[base_address_name]
+                    base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
-            self.chain.append([base_address_name, base_address_offset, offsets])
+            self.chain.append(Pointer(base_address_name, module_address, [base_address_offset]+offsets))
         return self.chain
+
+    def update(self):
+        for pointer in self.chain:
+            pointer.value = self.read_pointer_chain(pointer.start, pointer.offsets, 4)
 
     def get_pointers_list_results(self, value: bytes):
         pointer_map = []
         new_chain = []
-        for pointer_chain in self.chain:
-            region_name = pointer_chain[0]
-            base_address_offset = pointer_chain[1]
-            offsets = pointer_chain[2]
-            base_address = self.modules[region_name] + base_address_offset
-            last_address, read_value = self.read_pointer_chain(base_address, offsets, 4)
-            if value is None or value == read_value:
+        for pointer in self.chain:
+            offsets = pointer.offsets
+            pointer.value = self.read_pointer_chain(pointer.start, offsets, 4)
+            if value is None or value == pointer.value:
                 pointer_map.append(
-                    f"{region_name} + {hex(base_address_offset)}, {[hex(p) for p in offsets]}, {read_value}, {hex(last_address)}")
-                new_chain.append(pointer_chain)
+                    f"{pointer.module_name} + {hex(offsets[0])}, {[hex(p) for p in offsets[1:]]}, {pointer.value}")
+                new_chain.append(pointer)
         return pointer_map, new_chain
 
     def preprocess_pointers(self):
