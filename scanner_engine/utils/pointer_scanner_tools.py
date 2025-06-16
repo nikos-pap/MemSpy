@@ -178,3 +178,4 @@ def filter_addresses_by_regions(addresses, reachable_regions):
     b_col = addresses[:, 3]
     mask = np.isin(a_col, list(valid_regions)) & np.isin(b_col, list(valid_regions))
     return addresses[mask]
+

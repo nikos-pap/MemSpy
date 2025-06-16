@@ -145,7 +145,10 @@ class MemoryParserProcess(Process):
         print(address, depth, max_offset, negative_offsets_enabled, use_gpu)
         self.pointer_scanner = PointerScanner(address, self.scanner, use_gpu)
         self.pointer_scanner.get_pointer_map()
-        chain = self.pointer_scanner.pointer_scan(depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.6)
-        pntr_map, updated_chain = self.pointer_scanner.get_pointers_list_results(None)
-        for i in pntr_map[:100]:
-            print(i)
+        chain = self.pointer_scanner.pointer_scan(depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.0)
+        for i in range(100):
+            p = next(chain)
+            print(p.module_name, p.offsets)
+        # pntr_map, updated_chain = self.pointer_scanner.get_pointers_list_results(None)
+        # for i in pntr_map[:100]:
+        #     print(i)

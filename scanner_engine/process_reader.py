@@ -3,6 +3,7 @@ import os
 import time
 import sys
 from ctypes import wintypes
+from typing import Any, Generator
 
 import numpy as np
 from numba import cuda
@@ -66,12 +67,11 @@ Module32Next.restype = ctypes.wintypes.BOOL
 Module32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(MODULEENTRY32)]
 
 class Region:
-    def __init__(self, base_address: int = 0, size: int = 0, name: str = '', data: bytes = b'', id: int = 0):
+    def __init__(self, base_address: int = 0, size: int = 0, name: str = '', data: int | bytes | memoryview = b'', id: int = 0):
         self.base_address = base_address
         self.size = size
         self.name = name
         self.static = 1 if name else 0
-        # self.data = np.frombuffer(data, dtype=np.uint8)
         self.data = data
         self.pointers = np.array([])
         self.id = id
@@ -222,10 +222,10 @@ class MemoryScanner(AbstractMemoryScanner):
                     break
         return modules
 
-    def get_regions(self, chunk_size=2**25, element_size=4) -> None:
+    def get_regions(self, chunk_size=2**25, element_size=4) -> Generator[Region, Any, None]:
         if not self.handle:
             print("Failed to open process. Try running as Administrator.")
-            return
+            return None
 
         memory_info = MEMORY_BASIC_INFORMATION()
         address = 0
