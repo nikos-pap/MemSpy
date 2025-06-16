@@ -1,21 +1,18 @@
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTreeView, QDialog, QFormLayout,
-    QLineEdit, QCheckBox, QPushButton, QHBoxLayout, QWidget, QMenu
+    QLineEdit, QCheckBox, QPushButton, QHBoxLayout, QWidget, QMenu, QLabel, QComboBox
 )
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
 from PyQt6.QtCore import Qt, QModelIndex, QPoint
 import sys
 
 from guiwidgets.utils import is_uint64_hex
+from utils import Type
+from utils.types import is_valid_type
 
 # Custom role for freeze state
 define_freeze_role = Qt.ItemDataRole.UserRole + 1
 FREEZE_ROLE = define_freeze_role
-
-
-def convert_to_bytes(text: str, _type) -> bytes:
-    # Placeholder conversion function
-    return int(text).to_bytes(4, byteorder='little')
 
 
 class EditAddressDialog(QDialog):
@@ -30,18 +27,22 @@ class EditAddressDialog(QDialog):
         self.value_edit = QLineEdit(value)
         self.freeze_checkbox = QCheckBox("Freeze")
         self.freeze_checkbox.setChecked(frozen)
-
+        self.type_combobox = QComboBox()
+        for t in Type:
+            self.type_combobox.addItem(t.value, t)
+        self.type_combobox.setCurrentText(Type.UInt32.value)
         # Layout
         form = QFormLayout(self)
         form.addRow("Name:", self.name_edit)
         form.addRow("Description:", self.desc_edit)
         form.addRow("Address:", self.addr_edit)
-
+        form.addRow('Type:', self.type_combobox)
         # Value + Freeze in one row
         container = QWidget()
         btn_layout = QHBoxLayout(container)
         btn_layout.addWidget(self.value_edit)
         btn_layout.addWidget(self.freeze_checkbox)
+        container.layout().setContentsMargins(0, 0, 0, 0)
         form.addRow("Value:", container)
 
         # Dialog buttons
@@ -60,6 +61,7 @@ class EditAddressDialog(QDialog):
         # Validate only name and address
         self.name_edit.textChanged.connect(self._validate)
         self.addr_edit.textChanged.connect(self._validate)
+        self.value_edit.textChanged.connect(self._validate)
         self._validate()
 
     def _validate(self):
@@ -67,7 +69,20 @@ class EditAddressDialog(QDialog):
         name_filled = bool(self.name_edit.text().strip())
         addr_filled = bool(self.addr_edit.text().strip())
         addr_filled &= is_uint64_hex(self.addr_edit.text().strip())
-        enabled = name_filled and addr_filled
+        value_filter = is_valid_type(self.type_combobox.currentData(), self.value_edit.text().strip())
+        value_filter |= self.value_edit.text().strip() == ''
+        enabled = name_filled and addr_filled and value_filter
+
+        def mark(w, ok):
+            if ok:
+                w.setStyleSheet("")  # reset to default
+            else:
+                w.setStyleSheet("background-color: #f6989d;")  # light red
+
+        mark(self.name_edit, name_filled)
+        mark(self.addr_edit, addr_filled)
+        mark(self.value_edit, value_filter)
+
         self.ok_btn.setEnabled(enabled)
 
     def _on_apply(self):
@@ -86,7 +101,8 @@ class EditAddressDialog(QDialog):
             'desc': self.desc_edit.text().strip(),
             'addr': int(self.addr_edit.text().strip(), 16),
             'value': self.value_edit.text().strip(),
-            'frozen': self.freeze_checkbox.isChecked()
+            'frozen': self.freeze_checkbox.isChecked(),
+            'type': self.type_combobox.currentData()
         }
 
 

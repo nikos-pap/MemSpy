@@ -7,6 +7,9 @@ import sys
 import csv
 import struct
 
+from utils import Type
+from utils.types import is_valid_type, convert_from_bytes, convert_to_bytes
+
 
 def parse_raw_bytes(rawHex: str) -> bytes:
     # strip prefix and convert hex string to bytes
@@ -42,7 +45,7 @@ class PointerScanTableModel(QAbstractTableModel):
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
         self._raw = data or []  # list of tuples
-        self.value_type = "Integer"
+        self.value_type = Type.UInt32
         self._update_structure()
 
     def _update_structure(self):
@@ -89,29 +92,26 @@ class PointerScanTableModel(QAbstractTableModel):
             return self.headers[section]
         return str(section + 1)
 
-    def _format_value(self, raw_bytes):
-        if not isinstance(raw_bytes, (bytes, bytearray)):
-            return str(raw_bytes)
-        try:
-            if self.value_type == "Integer":
-                num = int.from_bytes(raw_bytes, byteorder='little', signed=False)
-                return str(num)
-            fmt = '<f' if self.value_type == "Float" else '<d'
-            size = 4 if self.value_type == "Float" else 8
-            b = raw_bytes.ljust(size, b'\x00')[:size]
-            return struct.unpack(fmt, b)[0]
-        except Exception:
-            return str(raw_bytes)
+    def _format_value(self, raw_bytes: bytes) -> str:
+        return str(convert_from_bytes(raw_bytes, self.value_type))
 
-    def setValueType(self, vtype: str):
-        if vtype not in ("Integer", "Float", "Double"):
-            return
+    def setValueType(self, vtype: Type) -> None:
+        # if vtype not in ("Integer", "Float", "Double"):
+        #     return
+        # self.value_type = vtype
+        for row in range(self.rowCount()):
+            index = self.index(row, 3)
+            val = convert_to_bytes(self.data(index, Qt.ItemDataRole.DisplayRole), self.value_type)
+            self._raw[row][3] = str(convert_from_bytes(val, vtype))
+        top = self.index(0, 3)
+        bottom = self.index(self.rowCount() - 1, 3)
+        self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
         self.value_type = vtype
-        if self.rowCount() > 0:
-            col = self.offset_count + 2
-            top = self.index(0, col);
-            bottom = self.index(self.rowCount() - 1, col)
-            self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
+        # if self.rowCount() > 0:
+        #     col = self.offset_count + 2
+        #     top = self.index(0, col)
+        #     bottom = self.index(self.rowCount() - 1, col)
+            # self.dataChanged.emit(top, bottom, [Qt.ItemDataRole.DisplayRole])
 
     def updateData(self, data):
         self.beginResetModel()
@@ -146,7 +146,9 @@ class PointerScanTable(QWidget):
         ctrl.addStretch()
         ctrl.addWidget(QLabel("Display As:"))
         self.type_combo = QComboBox()
-        self.type_combo.addItems(["Integer", "Float", "Double"])
+        for t in Type:
+            self.type_combo.addItem(t.name, t)
+        self.type_combo.setCurrentText(Type.UInt32.name)
         self.type_combo.currentTextChanged.connect(lambda t: self.model.setValueType(t))
         ctrl.addWidget(self.type_combo)
         layout.addLayout(ctrl)

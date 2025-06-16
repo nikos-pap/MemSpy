@@ -19,7 +19,8 @@ from guiwidgets.pointer_dialog import PointerDialog
 # Custom data roles
 TYPE_ROLE = Qt.ItemDataRole.UserRole
 DATA_ROLE = Qt.ItemDataRole.UserRole + 1
-FREEZE_ROLE = Qt.ItemDataRole.UserRole + 2
+DATA_TYPE_ROLE = Qt.ItemDataRole.UserRole + 2
+FREEZE_ROLE = Qt.ItemDataRole.UserRole + 3
 
 
 class AddressTreeView(QTreeView):
@@ -63,6 +64,8 @@ class AddressTreeView(QTreeView):
         add_address.triggered.connect(lambda: self.add_address_dialog(index))
 
         if index.isValid():
+            name_item = self.model.itemFromIndex(index.siblingAtColumn(0))
+            frozen = name_item.data(FREEZE_ROLE) or False
             parent = index.parent()
             cols = self.model.columnCount(parent)
             row = index.row()
@@ -72,10 +75,10 @@ class AddressTreeView(QTreeView):
             ]
             scan_action = QAction('Pointer Scan', self)
             delete_action = QAction("Delete", self)
-            freeze_action = QAction("Freeze", self)
+            freeze_action = QAction('Freeze' if not frozen else 'Unfreeze', self)
             scan_action.triggered.connect(lambda: self.pointer_scan(index, row_items))
             delete_action.triggered.connect(lambda: self.delete_address(index, row_items))
-            freeze_action.triggered.connect(lambda: self.freeze_address(index, row_items))
+            freeze_action.triggered.connect(lambda: self.freeze_address(index))
             menu.addAction(scan_action)
             menu.addAction(delete_action)
             menu.addAction(freeze_action)
@@ -92,20 +95,20 @@ class AddressTreeView(QTreeView):
         print(f'Deleting {row_items[2]}')
         self.model.removeRow(index.row(), index.parent())
 
-    def freeze_address(self, index, row_items):
-        row = index.row()
-        parent = index.parent()
-        name_item = self.model.itemFromIndex(self.model.index(row, 0, parent))
+    def freeze_address(self, index):
+        name_item = self.model.itemFromIndex(index.siblingAtColumn(0))
+        address_text = self.model.itemFromIndex(index.siblingAtColumn(2)).text()
+        value_text = self.model.itemFromIndex(index.siblingAtColumn(3)).text()
         frozen = name_item.data(FREEZE_ROLE)
+        data_type = name_item.data(DATA_TYPE_ROLE)
         new_name = name_item.text()
         if frozen:
             name_item.setText(new_name.rstrip(' 🔒'))
         else:
             name_item.setText(f"{new_name} 🔒")
         name_item.setData(not frozen, FREEZE_ROLE)
-        print(f'Freezing {row_items[3]}, {row_items}')
-        self.freezeSignal.emit(int(row_items[2], 16), convert_to_bytes(row_items[3], Type.UInt32), not frozen)
-        # self.model.removeRow(index.row(), parent)
+        print(f'Freezing {address_text}, {value_text}')
+        self.freezeSignal.emit(int(address_text, 16), convert_to_bytes(value_text, data_type), not frozen)
 
     def pointer_scan(self, index, row_items):
         address = int(row_items[2], 16)
@@ -146,11 +149,13 @@ class AddressTreeView(QTreeView):
         value = data['value']
         frozen = data['frozen']
         description = data['desc']
+        data_type = data.get('type', Type.UInt32)
 
         item = QStandardItem(label + (' 🔒' if frozen else ''))
         flags = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsDragEnabled
         item.setFlags(flags)
         item.setData(SavedTreeTypes.ADDRESS, TYPE_ROLE)
+        item.setData(data_type, DATA_TYPE_ROLE)
         item.setData(frozen, FREEZE_ROLE)
         desc = QStandardItem(description)
         desc.setFlags(flags)
@@ -161,9 +166,9 @@ class AddressTreeView(QTreeView):
         self.addAddressSignal.emit(address)
 
         if frozen:
-            self.freezeSignal.emit(address, convert_to_bytes(value, Type.UInt32), frozen)
+            self.freezeSignal.emit(address, convert_to_bytes(value, data_type), frozen)
         elif len(value) > 0:
-            self.setValueSignal.emit(address, convert_to_bytes(value, Type.UInt32))
+            self.setValueSignal.emit(address, convert_to_bytes(value, data_type))
         parent_item = self.model.itemFromIndex(index) if index.isValid() else None
         if parent_item and parent_item.flags() & Qt.ItemFlag.ItemIsDropEnabled:
             parent_item.appendRow([item, desc, addr_item, value_item])
@@ -278,31 +283,33 @@ class AddressTreeView(QTreeView):
             name_item.setText(name_text)
             name_item.setData(data['frozen'], FREEZE_ROLE)
             address = int(addr_item.text(), 16)
+            data_type = data.get('type', Type.UInt32)
             if frozen != data['frozen']:
-                self.freezeSignal.emit(address, convert_to_bytes(data['value'], Type.UInt32), data['frozen'])
+                self.freezeSignal.emit(address, convert_to_bytes(data['value'], data_type), data['frozen'])
             if previous_value != data['value']:
-                self.setValueSignal.emit(address, convert_to_bytes(data['value'], Type.UInt32))
+                self.setValueSignal.emit(address, convert_to_bytes(data['value'], data_type))
             addr_item.setText(hex(data['addr']))
             value_item.setText(data['value'])
             print(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
-
-
 
     def update_saved_addresses(self, name: int, new_val: bytes):
         root = self.model.invisibleRootItem()
         row_count = root.rowCount()
         name = hex(name)
-        new_val = str(convert_from_bytes(new_val, Type.UInt32))
+
         for row in range(row_count):
-            name_item = root.child(row, 2)
-            if name_item.text() == name:
-                # get the item in column 2 and update it
+            name_item = root.child(row, 0)
+            address_item = root.child(row, 2)
+            if address_item.text() == name:
+                data_type = name_item.data(DATA_TYPE_ROLE)
+                # new_val = str(convert_from_bytes(new_val, data_type))
+                # get the item in column 3 and update it
                 target_item = root.child(row, 3)
                 if target_item is None:
                     # if it doesn’t exist yet, create it
                     target_item = QStandardItem()
                     root.setChild(row, 3, target_item)
-                target_item.setText(new_val)
+                target_item.setText(str(convert_from_bytes(new_val, data_type)))
                 break
 
     def next_temp_label(self) -> str:

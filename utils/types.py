@@ -1,3 +1,4 @@
+import math
 from sys import byteorder
 from enum import Enum, auto
 import struct
@@ -81,18 +82,18 @@ TYPE_RANGES = {
 }
 
 
-def convert_from_bytes(value: bytes, value_type: Type):
-    if Type.String == value_type:
+def convert_from_bytes(value: bytes, value_type: Type) -> str | int | float:
+    if Type.String is value_type:
         return value.decode('unicode_escape')
-    if value_type in [Type.Int8, Type.Int16, Type.Int32, Type.Int64]:
+    if value_type in {Type.Int8, Type.Int16, Type.Int32, Type.Int64}:
         return int.from_bytes(value, byteorder, signed=True)
-    if value_type in [Type.UInt8, Type.UInt16, Type.UInt32, Type.UInt64]:
+    if value_type in {Type.UInt8, Type.UInt16, Type.UInt32, Type.UInt64}:
         return int.from_bytes(value, byteorder, signed=False)
-    if Type.Float == value_type:
-        return struct.unpack('=f', value)
-    if Type.Double == value_type:
-        return struct.unpack('=d', value)
-    raise Exception('Wrong Type:', value_type)
+    if value_type is Type.Float:
+        return struct.unpack('=f', value)[0]
+    if value_type is Type.Double:
+        return struct.unpack('=d', value)[0]
+    raise ValueError(f"Unsupported Type: {value_type}")
 
 
 class PointerSettingsType(Enum):
@@ -101,3 +102,50 @@ class PointerSettingsType(Enum):
     DEPTH = auto()
     MAX_OFFSET = auto()
     RANDOM_SCAN = auto()
+
+
+def is_valid_type(t: Type, s: str) -> bool:
+    """
+    Return True if `s` is a valid literal for the given Type `t`.
+    """
+
+    # Strings are always “valid.”
+    if t is Type.String:
+        return True
+    name = t.name
+    s = s.strip()
+    # Signed integers: IntN
+    if name.startswith('Int'):
+        try:
+            v = int(s, 0)  # allow decimal, hex (0x…), etc.
+        except ValueError:
+            return False
+        bits = int(name[3:])
+        min_val = -(1 << (bits - 1))
+        max_val = (1 << (bits - 1)) - 1
+        return min_val <= v <= max_val
+
+    # Unsigned integers: UIntN
+    elif name.startswith('UInt'):
+        try:
+            v = int(s, 0)
+        except ValueError:
+            return False
+        bits = int(name[4:])
+        return 0 <= v <= (1 << bits) - 1
+
+    # Floating point (32-bit or 64-bit)
+    elif t is Type.Float or t is Type.Double:
+        try:
+            v = float(s)
+        except ValueError:
+            return False
+
+        # If you want to enforce 32-bit range for Type.Float:
+        if t is Type.Float:
+            # IEEE-754 single precision max ≈3.4028235e38
+            return math.isfinite(v) and abs(v) <= 3.4028235e38
+        return True
+
+    # Unknown type
+    return False

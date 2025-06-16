@@ -122,6 +122,7 @@ class SearchBox(QWidget):
 
     def validate_input(self, text):
         t = self.combo.currentData()
+
         self.message_command('')
 
         if t == Type.String:

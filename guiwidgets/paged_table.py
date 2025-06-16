@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QSize, pyqtSlot, pyqtSignal, QModelIndex
 
 from models.search_table_model import SortedPagedTableModel
-from utils.types import convert_from_bytes, convert_to_bytes
+from utils.types import convert_from_bytes, convert_to_bytes, Type
 
 
 class PaginatedTable(QWidget):
@@ -225,7 +225,7 @@ class PaginatedTable(QWidget):
             if model.headerData(col, Qt.Orientation.Horizontal) == "Address":
                 addr_str = model.data(model.index(index.row(), col), Qt.ItemDataRole.DisplayRole)
                 if addr_str:
-                    self.addressActivated.emit({'addr': int(addr_str, 16), 'value': '', 'desc': '', 'frozen': False})
+                    self.addressActivated.emit({'addr': int(addr_str, 16), 'value': '', 'desc': '', 'frozen': False, 'type': Type.UInt32})
                 break
 
     def clear(self):

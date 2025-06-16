@@ -2,6 +2,7 @@ from typing import Optional
 from multiprocessing import Process, Queue
 import time
 
+from backend.pointer import Pointer
 from scanner_engine.process_reader import MemoryScanner
 from utils.message import Message, MessageType
 from utils.types import Condition, filter_cases
@@ -31,6 +32,7 @@ class MemoryViewProcess(Process):
         self.selected_addresses: list[tuple[int, bytes]] = []
         self.frozen_addresses: dict[int, bytes] = {}
         self.saved_addresses: list[int] = []
+        self.selected_pointers: list[Pointer] = []
 
         # Paging and filtering
         self.page_size: int = page_size
