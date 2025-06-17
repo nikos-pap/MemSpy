@@ -10,6 +10,7 @@ from utils.pointer import Pointer
 
 warnings.simplefilter("ignore", category=NumbaWarning)
 
+
 class PointerScanner:
     def __init__(self, target_address: int = 0, scanner: Optional['MemoryScanner'] = None, use_gpu: int = 0):
         self.target_address = target_address

@@ -107,6 +107,7 @@ class AbstractMemoryScanner(ABC):
         # clean up previous handle
         if getattr(self, 'handle', None):
             CloseHandle(self.handle)
+            self.handle = None
         # open new handle
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
         self.hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
@@ -118,6 +119,8 @@ class AbstractMemoryScanner(ABC):
             raise ctypes.WinError(ctypes.get_last_error())
         return cnt.WorkingSetSize
 
+    def hasHandle(self) -> bool:
+        return self.handle is not None
     @abstractmethod
     def scan_value(self, value: bytes) -> tuple[int, int]:
         pass

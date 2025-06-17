@@ -46,6 +46,11 @@ def find_matches(bytestream: bytes | None = None, base_address:int = 0, mode: Co
     else:
         return []
 
-    flat_vals = arr.ravel()[indices]
-    pairs = np.column_stack((indices+base_address, flat_vals)).astype('uint64')
-    return pairs
+    flat_vals = arr.ravel()[indices].astype(f'V{element_size}')
+    dt = np.dtype([
+        ("num", np.uint64),
+        ("bytes", f"V{element_size}")
+    ])
+    # pairs = np.column_stack((indices+base_address, flat_vals), dtype=dt)
+    result = np.fromiter(((u, b) for u, b in zip(indices + base_address, flat_vals)), dtype=dt)
+    return result

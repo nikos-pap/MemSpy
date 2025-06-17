@@ -16,7 +16,7 @@ from guiwidgets.paged_table import PaginatedTable
 from guiwidgets.pointer_table import PointerScanTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
 from utils import Type, TYPE_RANGES, convert_to_bytes
-from utils.types import Condition, PointerSettingsType
+from utils.types import Condition, PointerSettingsType, is_valid_type
 
 
 class MemoryScannerUI(QMainWindow):
@@ -278,7 +278,7 @@ class MemoryScannerUI(QMainWindow):
 
     def initialise(self):
         for t in Type:
-            self.typeCombo.addItem(t.value, t)
+            self.typeCombo.addItem(t.name, t)
         for c in Condition:
             self.condition_combo.addItem(c.name, c)
         self.typeCombo.setCurrentIndex(6)
@@ -467,41 +467,45 @@ class MemoryScannerUI(QMainWindow):
     def validate_input(self):
         text = self.search_input.text()
         t = self.typeCombo.currentData()
-        self.set_message('')
-
-        if t == Type.String:
-            self.search_input.setStyleSheet("color: limegreen;")
-            self.valid_input = True
-            return
-
-        if not text.strip():
-            self.valid_input = False
-            self.set_message('⚠️ Empty input.')
-            self.search_input.setStyleSheet("color: white;")
-            return
-
-        try:
-            if "Float" in t.name or "Double" in t.name:
-                value = float(text)
-            else:
-                if "." in text:
-                    raise ValueError("Integer type cannot contain a decimal point.")
-                value = int(text)
-
-            min_val, max_val = TYPE_RANGES[t]
-            if min_val <= value <= max_val:
-                self.search_input.setStyleSheet("color: white;")
-                self.valid_input = True
-            else:
-                self.search_input.setStyleSheet("color: #B22222;")
-                self.set_message(
-                    f'❌ Out of range for {t.value} ({min_val} to {max_val}).'
-                )
-                self.valid_input = False
-        except ValueError as e:
-            self.search_input.setStyleSheet("color: #B22222;")
-            self.set_message(f'❌ Invalid input: {e}')
-            self.valid_input = False
+        self.valid_input = is_valid_type(t, text) or text == ''
+        # self.set_message('')
+        if not self.valid_input:
+            self.search_input.setStyleSheet('background-color: #f6989d;')
+        else:
+            self.search_input.setStyleSheet('')
+        # if t == Type.String:
+        #     self.search_input.setStyleSheet("color: limegreen;")
+        #     self.valid_input = True
+        #     return
+        #
+        # if not text.strip():
+        #     self.valid_input = False
+        #     self.set_message('⚠️ Empty input.')
+        #     self.search_input.setStyleSheet("color: white;")
+        #     return
+        #
+        # try:
+        #     if "Float" in t.name or "Double" in t.name:
+        #         value = float(text)
+        #     else:
+        #         if "." in text:
+        #             raise ValueError("Integer type cannot contain a decimal point.")
+        #         value = int(text)
+        #
+        #     min_val, max_val = TYPE_RANGES[t]
+        #     if min_val <= value <= max_val:
+        #         self.search_input.setStyleSheet("color: white;")
+        #         self.valid_input = True
+        #     else:
+        #         self.search_input.setStyleSheet("color: #B22222;")
+        #         self.set_message(
+        #             f'❌ Out of range for {t.value} ({min_val} to {max_val}).'
+        #         )
+        #         self.valid_input = False
+        # except ValueError as e:
+        #     self.search_input.setStyleSheet("color: #B22222;")
+        #     self.set_message(f'❌ Invalid input: {e}')
+        #     self.valid_input = False
 
     def closeEvent(self, event):
         self.backend.stop()
