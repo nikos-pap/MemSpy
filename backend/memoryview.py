@@ -97,7 +97,7 @@ class MemoryViewProcess(Process):
         elif typ == MessageType.EDIT_ADDRESS:
             self.set_value(data[0], data[1])
         elif typ == MessageType.FILTER_ADDRESSES:
-            self.filter_val = data[0]
+            self.address_manager.filter_addresses(data[0])
         elif typ == MessageType.SCAN_ADDRESS_LIST:
             self._filter_selected_addresses(data)
         elif typ == MessageType.GET_NEXT_PAGE:
