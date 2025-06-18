@@ -1,5 +1,4 @@
 import numpy as np
-import pickle
 from numba import cuda
 import warnings
 from numba.core.errors import NumbaWarning
@@ -12,10 +11,8 @@ warnings.simplefilter("ignore", category=NumbaWarning)
 
 
 class PointerScanner:
-    def __init__(self, target_address: int = 0, scanner: Optional['MemoryScanner'] = None, use_gpu: int = 0):
-        self.target_address = target_address
+    def __init__(self, scanner: Optional['MemoryScanner'] = None):
         self.scanner = scanner
-        self.cuda_available = cuda.is_available() and use_gpu
         self.regions = []
         self.ranges = []
 
@@ -63,7 +60,7 @@ class PointerScanner:
             addresses.extend(region.pointers)
         return np.array(addresses, dtype=np.uint64)
 
-    def get_pointer_map(self):
+    def get_pointer_map(self, use_gpu: bool):
         # for region in self.scanner.read_memory(element_size=8):
         #     self.regions.append(region)
         #     self.ranges.append([region.base_address, region.base_address + region.size, region.id])
@@ -72,6 +69,8 @@ class PointerScanner:
         #     region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
         #     region.pointers_annotate_regions(self.ranges, True)
         print("Getting process regions")
+        self.regions.clear()
+        self.ranges.clear()
         for region in self.scanner.get_regions(element_size=8):
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
@@ -79,15 +78,15 @@ class PointerScanner:
         for region in self.regions:
             self.scanner.read_memory_by_region(region)
             if region.data:
-                region.data2values(self.ranges, np.uint64, use_gpu = True, step_enable=True)
+                region.data2values(self.ranges, np.uint64, use_gpu=use_gpu and cuda.is_available(), step_enable=True)
 
         print("Preprocessing pointers")
         self.preprocess_pointers()
 
-    def pointer_scan(self, depth: int = 3, max_offset: int = 1024, negative_offsets_enabled: bool = False, randomness: float = 0):
+    def pointer_scan(self, target_address: int, depth: int = 3, max_offset: int = 1024, negative_offsets_enabled: bool = False, randomness: float = 0):
         sr = 0
         for region in self.regions:
-            if region.base_address <= self.target_address <= region.base_address + region.size:
+            if region.base_address <= target_address <= region.base_address + region.size:
                 sr = region.id
                 break
         print("Getting addresses")
@@ -101,7 +100,8 @@ class PointerScanner:
         print("Getting filtered addresses")
         filtered_addresses = pst.filter_addresses_by_regions(addresses, reachable_regions)
         print("Performing DFS")
-        results = pst.dfs_indexed(filtered_addresses, self.target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
+        results = pst.dfs_indexed(filtered_addresses, target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
         print("Finalize the pointers list")
         for pointer in self.make_pointers_list(results):
-            yield pointer
+            yield [pointer], 0
+        yield None

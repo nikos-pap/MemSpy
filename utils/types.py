@@ -18,6 +18,11 @@ class Type(Enum):
     String = 'String'
 
 
+class ScanType(Enum):
+    POINTER_SCAN = auto()
+    ADDRESS_SCAN = auto()
+
+
 class Condition(Enum):
     EQUAL = auto()
     GREATER_THAN = auto()

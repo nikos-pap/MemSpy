@@ -11,6 +11,7 @@ class MessageType(Enum):
     #  Memory View messages
     SCAN_ADDRESS_LIST = auto()
     ADD_ADDRESS = auto()
+    ADD_POINTER = auto()
     FILTER_ADDRESSES = auto()
     GET_NEXT_PAGE = auto()
     GET_PREV_PAGE = auto()

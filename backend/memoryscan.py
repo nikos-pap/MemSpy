@@ -1,11 +1,13 @@
 import time
 from multiprocessing import Process, Queue
-from typing import Optional, Iterator
+from typing import Iterator, Iterable
 
 import numpy as np
+
+from logger import create_logger
 from utils.message import Message, MessageType
-from utils.types import Condition
-from scanner_engine.process_reader import MemoryScanner as NewMemoryScanner
+from utils.types import Condition, ScanType
+from scanner_engine.process_reader import MemoryScanner
 from scanner_engine.pointer_scanner import PointerScanner
 
 
@@ -31,13 +33,17 @@ class MemoryParserProcess(Process):
         self.queue_in: Queue = scanner_queue
         self.queue_out: Queue = results_queue
         self.queue_progress: Queue = progress_queue
-        self.scanner: Optional[NewMemoryScanner] = None
-        self.pointer_scanner: Optional[PointerScanner] = None
-        self._current_scan: Optional[Iterator] = None
+
+        self.scanner: MemoryScanner = MemoryScanner()
+        self.pointer_scanner: PointerScanner = PointerScanner(self.scanner)
+        self._current_scan: Iterator | None = None
         self._scanning: bool = False
+        self.logger = None
+        self._scan_type: ScanType | None = None
         self._scan_start: float = 0.0
 
     def run(self) -> None:
+        self.logger = create_logger(self.__class__.__name__)
         total = 0
         """Main loop: process commands and stream scan results."""
         while True:
@@ -58,7 +64,7 @@ class MemoryParserProcess(Process):
 
                 if result is None:
                     self._finish_scan()
-                    print(f'Found: {total} addresses')
+                    self.logger.debug(f'Found: {total} addresses')
                     total = 0
                 elif result:
                     addresses, progress = result
@@ -73,21 +79,21 @@ class MemoryParserProcess(Process):
             pid = data[0]
             backend = ''
             if not self.scanner:
-                self.scanner = NewMemoryScanner()
+                self.scanner = MemoryScanner()
                 backend = 'NewMemoryScanner'
             if pid == -1:
                 self.scanner.close()
-                print(f'[MemoryParserProcess] Process detached using {backend}')
+                self.logger.debug('Process detached')
             else:
                 self.scanner.change_process(pid)
-                print(f'[MemoryParserProcess] Process set to {pid} using {backend}')
+                self.logger.debug(f'Process set to {pid}')
             while not self.queue_out.empty():
                 self.queue_out.get_nowait()
             self.queue_out.put(Message(MessageType.RESET))
 
         elif typ == MessageType.START_SCAN:
             if not self.scanner:
-                print('[MemoryParserProcess] Scanner not initialized!')
+                self.logger.debug('Scanner not initialized!')
                 return
             value, condition = data
             self._start_scan(value, condition)
@@ -99,7 +105,7 @@ class MemoryParserProcess(Process):
             self._start_pointer_scan(*data)
 
         elif typ == MessageType.EXIT:
-            print('[MemoryParserProcess] Exiting')
+            self.logger.debug('Exiting')
 
     def _start_scan(self, value: bytes, condition: Condition) -> None:
         """Initialize a new scan generator, note start time, and notify start."""
@@ -110,18 +116,17 @@ class MemoryParserProcess(Process):
             step_enable=False
         )
         self._scanning = True
+        self._scan_type = ScanType.ADDRESS_SCAN
         self._scan_start = time.time()
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
-        print('[MemoryParserProcess] Scan started')
+        self.logger.debug('Scan started')
 
-    def _emit_results(self, addresses: list[int] | np.ndarray | int, progress: int) -> None:
+    def _emit_results(self, data: list[int] | np.ndarray, progress: int) -> None:
         """Send addresses batch and periodic progress updates without conversion overhead."""
-        if isinstance(addresses, np.ndarray):
-            if addresses.size > 0:
-                self.queue_out.put(Message(MessageType.ADD_ADDRESS, addresses), False)
-        else:
-            if addresses:
-                self.queue_out.put(Message(MessageType.ADD_ADDRESS, [addresses]), False)
+        if self._scan_type == ScanType.ADDRESS_SCAN and len(data):
+            self.queue_out.put(Message(MessageType.ADD_ADDRESS, data), False)
+        elif self._scan_type == ScanType.POINTER_SCAN and len(data):
+            self.queue_out.put(Message(MessageType.ADD_POINTER, data), block=False)
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [progress]), False)
 
     def _finish_scan(self) -> None:
@@ -131,7 +136,7 @@ class MemoryParserProcess(Process):
         elapsed = time.time() - self._scan_start
         self.queue_progress.put(Message(MessageType.SCAN_COMPLETED), False)
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [100]), False)
-        print(f'[MemoryParserProcess] Scan finished in {elapsed:.3f} seconds')
+        self.logger.debug(f'Scan finished in {elapsed:.3f} seconds')
 
     def _cancel_scan(self) -> None:
         """Cancel ongoing scan immediately."""
@@ -139,16 +144,20 @@ class MemoryParserProcess(Process):
             self._scanning = False
             self._current_scan = None
             self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
-            print('[MemoryParserProcess] Scan cancelled')
+            self.logger.debug('Scan cancelled')
 
     def _start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: int) -> None:
-        print(address, depth, max_offset, negative_offsets_enabled, use_gpu)
-        self.pointer_scanner = PointerScanner(address, self.scanner, use_gpu)
-        self.pointer_scanner.get_pointer_map()
-        chain = self.pointer_scanner.pointer_scan(depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.0)
-        for i in range(100):
-            p = next(chain)
-            print(p.module_name, p.offsets)
+        if self._scanning:
+            self.logger.error('Cannot have two scans running together.')
+            return
+        self.pointer_scanner.get_pointer_map(bool(use_gpu))
+        self._current_scan = self.pointer_scanner.pointer_scan(target_address=address, depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.6)
+        self._scanning = True
+        self._scan_type = ScanType.POINTER_SCAN
+
+        # for i in range(100):
+        #     p = next(chain)
+        #     print(p.module_name, p.offsets)
         # pntr_map, updated_chain = self.pointer_scanner.get_pointers_list_results(None)
         # for i in pntr_map[:100]:
         #     print(i)

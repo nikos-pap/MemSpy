@@ -5,7 +5,7 @@ from typing import List, NamedTuple
 import psutil
 
 from backend.memoryview import MemoryViewProcess
-from scanner_engine.memory_parser import MemoryParserProcess
+from backend.memoryscan import MemoryParserProcess
 from utils import insort, image_extractor
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
