@@ -17,6 +17,23 @@ class Type(Enum):
     Double = 'Double'
     String = 'String'
 
+    def size(self) -> int | None:
+        """Returns the fixed byte-size of this type, or None if variable."""
+        sizes = {
+            Type.Int8: 1,
+            Type.Int16: 2,
+            Type.Int32: 4,
+            Type.Int64: 8,
+            Type.UInt8: 1,
+            Type.UInt16: 2,
+            Type.UInt32: 4,
+            Type.UInt64: 8,
+            Type.Float: 4,
+            Type.Double: 8,
+            Type.String: None,  # variable length
+        }
+        return sizes[self]
+
 
 class ScanType(Enum):
     POINTER_SCAN = auto()

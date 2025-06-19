@@ -22,6 +22,7 @@ class MessageType(Enum):
     UNFREEZE_ADDRESS = auto()
     EDIT_ADDRESS = auto()
     VALUE_CHANGED = auto()
+    POINTER_CHAIN_UPDATED = auto()
     SAVED_VALUE_CHANGED = auto()
     SAVE_ADDRESS = auto()
     UNSAVE_ADDRESS = auto()

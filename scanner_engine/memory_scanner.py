@@ -12,6 +12,7 @@ TOKEN_ADJUST_PRIVILEGES = 0x0020
 TOKEN_QUERY = 0x0008
 SE_PRIVILEGE_ENABLED = 0x00000002
 
+
 # ——— Structures ———
 class ProcessMemoryCountersEx(ctypes.Structure):
     _fields_ = [
@@ -27,6 +28,7 @@ class ProcessMemoryCountersEx(ctypes.Structure):
         ('PeakPagefileUsage', ctypes.c_size_t),
         ('PrivateUsage', ctypes.c_size_t),
     ]
+
 
 # ——— Load libraries ———
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -58,10 +60,10 @@ psapi.GetProcessMemoryInfo.argtypes = (
 psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
 
 
+CreateToolHelp32Snapshot = kernel32.CreateToolhelp32Snapshot
+CreateToolHelp32Snapshot.restype = ctypes.wintypes.HANDLE
+CreateToolHelp32Snapshot.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD]
 
-CreateToolhelp32Snapshot = kernel32.CreateToolhelp32Snapshot
-CreateToolhelp32Snapshot.restype = ctypes.wintypes.HANDLE
-CreateToolhelp32Snapshot.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD]
 
 # ——— Helper: enable SeDebugPrivilege ———
 def enable_debug_privilege():
@@ -110,7 +112,7 @@ class AbstractMemoryScanner(ABC):
             self.handle = None
         # open new handle
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
-        self.hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
+        self.hSnapshot = CreateToolHelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
 
     def get_working_memory_size(self) -> int:
         cnt = ProcessMemoryCountersEx()
@@ -121,6 +123,7 @@ class AbstractMemoryScanner(ABC):
 
     def hasHandle(self) -> bool:
         return self.handle is not None
+
     @abstractmethod
     def scan_value(self, value: bytes) -> tuple[int, int]:
         pass

@@ -1,6 +1,8 @@
 import math
 from typing import Iterator, Tuple
 import numpy as np
+
+from logger import get_logger
 from scanner_engine.process_reader import MemoryScanner
 from utils.types import Condition, filter_cases
 
@@ -22,7 +24,6 @@ class AddressManager:
         # how many slots in filter_array are valid for the current page
         self.valid_count: int = 0
 
-        # legacy behaviors
         self.frozen_addresses: dict[int, bytes] = {}
         self.saved_addresses: list[int] = []
 
@@ -226,7 +227,7 @@ class AddressManager:
         if address in self.frozen_addresses:
             self.frozen_addresses[address] = value
         elif not self.scanner.write_bytes(address, value):
-            print(f"[Memoryview] Address {address} not saved.")
+            get_logger('Memoryview').warning(f"Address {address} not saved.")
 
     def freeze_address(self, address: int, value: bytes) -> bool:
         data = self.scanner.read_bytes(address, len(value))

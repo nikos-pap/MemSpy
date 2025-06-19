@@ -5,7 +5,7 @@ from numba.core.errors import NumbaWarning
 from scanner_engine.process_reader import MemoryScanner
 from typing import Optional
 import scanner_engine.utils.pointer_scanner_tools as pst
-from utils.pointer import Pointer
+from utils.pointerchain import PointerChain
 
 warnings.simplefilter("ignore", category=NumbaWarning)
 
@@ -29,11 +29,11 @@ class PointerScanner:
                     base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
-            yield Pointer(base_address_name, module_address, [base_address_offset]+offsets)
+            yield PointerChain(base_address_name, module_address, -1, [base_address_offset] + offsets)
 
     def preprocess_pointers(self):
         regions = self.regions.copy()
-        ranges = self.ranges.copy()
+        ranges: np.ndarray | list = self.ranges.copy()
 
         f = True
         while f:
@@ -69,8 +69,8 @@ class PointerScanner:
         #     region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
         #     region.pointers_annotate_regions(self.ranges, True)
         print("Getting process regions")
-        self.regions.clear()
-        self.ranges.clear()
+        self.regions = []
+        self.ranges = []
         for region in self.scanner.get_regions(element_size=8):
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
@@ -103,5 +103,6 @@ class PointerScanner:
         results = pst.dfs_indexed(filtered_addresses, target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
         print("Finalize the pointers list")
         for pointer in self.make_pointers_list(results):
+            pointer.target = target_address
             yield [pointer], 0
         yield None

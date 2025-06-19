@@ -220,6 +220,7 @@ class MemoryScannerUI(QMainWindow):
         listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
+        listener.pointerUpdateSignal.connect(self.search_pointer_table.loadPointerData)
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)
 

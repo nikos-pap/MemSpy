@@ -7,7 +7,7 @@ import sys
 import csv
 import struct
 
-from utils import Type
+from utils import Type, PointerChain
 from utils.types import is_valid_type, convert_from_bytes, convert_to_bytes
 
 
@@ -44,20 +44,23 @@ class PointerScanTableModel(QAbstractTableModel):
     """
     def __init__(self, data=None, parent=None):
         super().__init__(parent)
-        self._raw = data or []  # list of tuples
+        self._raw: list[PointerChain] = data or []
         self.value_type = Type.UInt32
+        self.offset_count = 0
         self._update_structure()
 
     def _update_structure(self):
         # maximum offsets tuple length
         if not self._raw:
-            self.offset_count = 0
+            offset_count = 0
         else:
-            self.offset_count = max(len(r[3]) for r in self._raw)
+            offset_count = max(len(r.offsets) for r in self._raw) - 1
+        if offset_count != self.offset_count:
+            self.offset_count = offset_count
         self.headers = (
-            ["Base (module+off)"] +
-            [f"Offset {i}" for i in range(self.offset_count)] +
-            ["Target Address", "Value"]
+                ["Base (module+off)"] +
+                [f"Offset {i}" for i in range(self.offset_count)] +
+                ["Target Address", "Value"]
         )
 
     def rowCount(self, parent=QModelIndex()):
@@ -70,19 +73,22 @@ class PointerScanTableModel(QAbstractTableModel):
         if not index.isValid() or role != Qt.ItemDataRole.DisplayRole:
             return None
         row, col = index.row(), index.column()
-        module_name, module_addr, init_off, offsets, targ_addr, raw_bytes = self._raw[row]
+        # item = self.itemFromIndex(index.siblingAtColumn(0))
+        pointer = self._raw[row]
+        init_off = hex(pointer.offsets[0]).upper().replace("0X", "0x")
+        offsets = pointer.offsets[1:]
         # column mapping
         if col == 0:
-            return f"{module_name}+0x{init_off:X}"
+            return f'"{pointer.module_name}" + {init_off:}'
         if 1 <= col <= self.offset_count:
-            idx = col - 1
+            idx = col
             if idx < len(offsets):
-                return f"0x{offsets[idx]:X}"
+                return hex(offsets[idx]).upper().replace('0X', '0x')
             return ''
         if col == self.offset_count + 1:
-            return f"0x{targ_addr:X}"
+            return hex(pointer.target).upper().replace('0X', '0x')
         if col == self.offset_count + 2:
-            return self._format_value(raw_bytes)
+            return self._format_value(pointer.value)
         return None
 
     def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
@@ -93,7 +99,7 @@ class PointerScanTableModel(QAbstractTableModel):
         return str(section + 1)
 
     def _format_value(self, raw_bytes: bytes) -> str:
-        return str(convert_from_bytes(raw_bytes, self.value_type))
+        return str(convert_from_bytes(raw_bytes, self.value_type)) if raw_bytes is not None else 'None'
 
     def setValueType(self, vtype: Type) -> None:
         # if vtype not in ("Integer", "Float", "Double"):
@@ -115,6 +121,10 @@ class PointerScanTableModel(QAbstractTableModel):
 
     def updateData(self, data):
         self.beginResetModel()
+        # for pointer in data:
+        #     key = pointer.start + pointer.offsets[0]
+        #     if key not in self._raw:
+        #         self._raw[key] = pointer
         self._raw = data
         self._update_structure()
         self.endResetModel()
@@ -172,7 +182,7 @@ class PointerScanTable(QWidget):
         record = self.model.getData()[index.row()]
         print(record)
 
-    def loadPointerData(self, rows):
+    def loadPointerData(self, rows: list[PointerChain]):
         # rows: list of tuples as per input format
         self.model.updateData(rows)
 

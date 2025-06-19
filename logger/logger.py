@@ -45,24 +45,25 @@ def create_logger(class_name: str = None, level: int = logging.DEBUG) -> logging
     return logger
 
 
-def get_logger(class_name: str | None = None) -> logging.Logger:
-    if class_name is None:
-        display_name = None
-        for frame_info in inspect.stack()[1:]:  # skip current frame
-            local_self = frame_info.frame.f_locals.get('self')
-            if local_self:
-                display_name = local_self.__class__.__name__
-                break
-        if display_name is None:
-            # Fallback to calling module name
-            calling_frame = inspect.stack()[1]
-            module = inspect.getmodule(calling_frame.frame)
-            display_name = module.__name__ if module and module.__name__ else '<unknown>'
-    else:
-        display_name = class_name
+def get_logger(name: str) -> logging.Logger | None:
+    """
+    Return an existing logger by name, or None if no such logger has been created.
 
-    # Create or retrieve a logger with the chosen name
-    return logging.getLogger(display_name)
+    This function does NOT create a new logger. It inspects the internal
+    logging manager's dictionary of loggers and only returns those that
+    already exist.
+
+    :param name: The name of the logger to retrieve.
+    :return: The Logger instance if it exists, otherwise None.
+    """
+    # The root logger is always available
+    if not name or name == "root":
+        return logging.getLogger()
+
+    logger_obj = logging.root.manager.loggerDict.get(name)
+    if isinstance(logger_obj, logging.Logger):
+        return logger_obj
+    return None
 
 
 def list_all_loggers():

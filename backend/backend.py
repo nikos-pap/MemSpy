@@ -6,7 +6,7 @@ import psutil
 
 from backend.memoryview import MemoryViewProcess
 from backend.memoryscan import MemoryParserProcess
-from utils import insort, image_extractor
+from utils import insort, image_extractor, PointerChain
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
 from utils.types import Condition
@@ -21,6 +21,7 @@ class QueueWorker(QObject):
     pageRangeSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
     updateSavedSignal = pyqtSignal('quint64', bytes)
+    pointerUpdateSignal = pyqtSignal(list)
 
     def __init__(self, queue: Queue):
         super().__init__()
@@ -36,6 +37,9 @@ class QueueWorker(QObject):
                 elif msg.message_type == MessageType.VALUE_CHANGED:
                     address, raw, initial_value = msg.message
                     self.dataReady.emit(int(address), raw, initial_value)
+                elif msg.message_type == MessageType.POINTER_CHAIN_UPDATED:
+                    pointer = msg.message
+                    self.pointerUpdateSignal.emit(pointer)
                 elif msg.message_type == MessageType.SET_PROGRESS:
                     self.progressSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SET_PAGE_RANGE:

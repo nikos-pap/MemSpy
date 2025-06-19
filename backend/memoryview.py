@@ -46,11 +46,13 @@ class MemoryViewProcess(Process):
                     return
 
             self.address_manager.update()
+            self.pointer_manager.update_chains()
 
             # Every 0.5s, push stats and values
             if time.time() - last_cycle >= 0.5:
                 self._update_stats()
                 self._push_page_values()
+                self._push_pointer_values()
                 self._push_saved_addresses()
                 last_cycle = time.time()
 
@@ -111,6 +113,13 @@ class MemoryViewProcess(Process):
             return
         for address, new_value, value in self.address_manager.get_current_page():
             self.out_queue.put(Message(MessageType.VALUE_CHANGED, [address, new_value, value]))
+
+    def _push_pointer_values(self):
+        if not self.process_reader.hasHandle():
+            return
+        result = self.pointer_manager.get_chains()
+        if result:
+            self.out_queue.put(Message(MessageType.POINTER_CHAIN_UPDATED, result))
 
     def _push_saved_addresses(self):
         for address, value in self.address_manager.get_saved_addresses():
