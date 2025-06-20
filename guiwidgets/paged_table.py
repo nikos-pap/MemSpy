@@ -1,6 +1,3 @@
-from dataclasses import dataclass
-from typing import Any, Dict, Callable
-
 from PyQt6.QtGui import QFont, QBrush, QColor
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,

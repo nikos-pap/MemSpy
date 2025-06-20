@@ -143,6 +143,7 @@ class Region:
         if np.all(self.pointers[:, 3] == self.id):
             self.pointers = np.array([])
 
+
 class MemoryScanner(AbstractMemoryScanner):
     def __init__(self, enable_debug: bool = False):
         super().__init__(enable_debug=enable_debug)

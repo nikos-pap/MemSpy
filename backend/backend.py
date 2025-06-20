@@ -16,7 +16,7 @@ class QueueWorker(QObject):
     """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
     dataReady = pyqtSignal('quint64', bytes, bytes)
     progressSignal = pyqtSignal(int)
-    totalValuesSignal = pyqtSignal(int)
+    totalValuesSignal = pyqtSignal(int, int)
     filterValuesSignal = pyqtSignal(int)
     pageRangeSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
@@ -45,7 +45,7 @@ class QueueWorker(QObject):
                 elif msg.message_type == MessageType.SET_PAGE_RANGE:
                     self.pageRangeSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SET_TOTAL_VALUES:
-                    self.totalValuesSignal.emit(msg.message[0])
+                    self.totalValuesSignal.emit(msg.message[0], msg.message[1])
                 elif msg.message_type == MessageType.SAVED_VALUE_CHANGED:
                     self.updateSavedSignal.emit(msg.message[0], msg.message[1])
                 elif msg.message_type == MessageType.SET_FILTERED_VALUES:

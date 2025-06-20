@@ -104,9 +104,10 @@ class MemoryViewProcess(Process):
             pass
 
     def _update_stats(self) -> None:
-        total, filter_count = self.address_manager.get_stats()
-        self.out_queue.put(Message(MessageType.SET_TOTAL_VALUES, [total]))
-        self.out_queue.put(Message(MessageType.SET_FILTERED_VALUES, [filter_count]))
+        address_stats = self.address_manager.get_stats()
+        pointer_stats = self.pointer_manager.get_stats()
+        self.out_queue.put(Message(MessageType.SET_TOTAL_VALUES, [address_stats.total, pointer_stats.total]))
+        self.out_queue.put(Message(MessageType.SET_FILTERED_VALUES, [address_stats.filtered]))
 
     def _push_page_values(self) -> None:
         if not self.process_reader.hasHandle():

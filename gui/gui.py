@@ -2,7 +2,7 @@ import time
 from typing import Callable, Optional
 
 from PIL.ImageQt import ImageQt
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSlot
 from PyQt6.QtGui import QIcon, QPixmap, QFont, QAction
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -16,7 +16,7 @@ from guiwidgets.paged_table import PaginatedTable
 from guiwidgets.pointer_table import PointerScanTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
 from utils import Type, TYPE_RANGES, convert_to_bytes
-from utils.types import Condition, PointerSettingsType, is_valid_type
+from utils.types import Condition, PointerSettingsType, is_valid_type, ScanType
 
 
 class MemoryScannerUI(QMainWindow):
@@ -27,6 +27,7 @@ class MemoryScannerUI(QMainWindow):
         self.backend = Backend()
         self.isAttached = False
         self.valid_input = False
+        self.scan_type: ScanType | None = None
 
         self._setup_window()
         self._create_widgets()
@@ -220,7 +221,7 @@ class MemoryScannerUI(QMainWindow):
         listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
-        listener.pointerUpdateSignal.connect(self.search_pointer_table.loadPointerData)
+        listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)
 
@@ -363,6 +364,7 @@ class MemoryScannerUI(QMainWindow):
             value += b'\x00' * len(value)
         self.set_message('')
         self.disable_scan_navigation()
+        self.scan_type = ScanType.ADDRESS_SCAN
         self.backend.scan(value, condition)
         self.new_scan_btn.clicked.disconnect()
         self.new_scan_btn.setText('Cancel Scan')
@@ -391,6 +393,7 @@ class MemoryScannerUI(QMainWindow):
         self.backend.filter_scan(condition, values)
 
     def pointer_scan_command(self, address: int):
+        self.scan_type = ScanType.POINTER_SCAN
         options = self.settings_manager.get_pointer_scan_options()
         self.backend.pointer_scan(address,
                                   options[PointerSettingsType.DEPTH],
@@ -404,6 +407,7 @@ class MemoryScannerUI(QMainWindow):
         self.enable_scan_navigation()
 
     def finished_scan(self):
+        self.scan_type = None
         self.toggle_scan_button()
         self.enable_scan_navigation()
 
@@ -416,9 +420,12 @@ class MemoryScannerUI(QMainWindow):
             self.new_scan_btn.setText('Cancel Scan')
             self.new_scan_btn.clicked.connect(self.stop_scan_command)
 
-    def scan_progress(self, total: int):
-        self.search_address_table.setTotal(total)
+    @pyqtSlot(int, int)
+    def scan_progress(self, total_addresses: int, total_pointers: int):
+        self.search_address_table.setTotal(total_addresses)
         self.search_address_table.show_message()
+        self.search_pointer_table.setTotal(total_pointers)
+        self.search_pointer_table.show_message()
 
     def initialise_scan_navigation(self):
         if self.new_scan_btn.text() == 'Cancel Scan':

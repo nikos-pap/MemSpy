@@ -1,5 +1,7 @@
 import pickle
 import numpy as np
+
+from memory_manager_engine.manager_stats import Stat
 from scanner_engine.process_reader import MemoryScanner
 from utils import PointerChain
 
@@ -48,6 +50,9 @@ class PointerManager:
     def save_chains(self, name: str):
         with open(name, 'wb') as f:
             pickle.dump(self.chains, f)
+
+    def get_stats(self) -> Stat:
+        return Stat(len(self.chains))
 
     def load_chains(self, name: str):
         with open(name, 'rb') as f:

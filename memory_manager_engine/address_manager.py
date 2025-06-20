@@ -3,6 +3,7 @@ from typing import Iterator, Tuple
 import numpy as np
 
 from logger import get_logger
+from memory_manager_engine.manager_stats import Stat
 from scanner_engine.process_reader import MemoryScanner
 from utils.types import Condition, filter_cases
 
@@ -270,7 +271,7 @@ class AddressManager:
         self.frozen_addresses.clear()
         self.saved_addresses.clear()
 
-    def get_stats(self) -> Tuple[int, int]:
+    def get_stats(self) -> Stat:
         """Return (total_scanned, total_filtered_matches)."""
         total = len(self.addresses) if self.addresses is not None else 0
-        return total, self.total_matches
+        return Stat(total, self.total_matches)
