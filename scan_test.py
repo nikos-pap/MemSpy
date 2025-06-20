@@ -38,7 +38,6 @@ def memory_test():
 
     for d in m_scanner.scan_value((2049).to_bytes(4, 'little') + (2049).to_bytes(4, 'little'), True, Condition.EQUAL,False):
         pass
-
     # data = [d for d in m_scanner.read_memory_and_scan(value=[2049,2049]) if d.size != 0]
     su = 0
     # for region in data:

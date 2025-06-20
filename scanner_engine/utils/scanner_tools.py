@@ -4,23 +4,23 @@ from numpy.lib.stride_tricks import as_strided
 from utils.types import Condition
 
 
-def match_condition(arr_chunk, offset, mode, start, end=None):
+def match_condition(arr_chunk, offset, mode, start, end, dtype):
     if mode == Condition.EQUAL:
-        indices = np.flatnonzero(arr_chunk == start)
+        mask = (arr_chunk == start)
     elif mode == Condition.NOT_EQUAL:
-        indices = np.flatnonzero(arr_chunk != start)
+        mask = (arr_chunk != start)
     elif mode == Condition.LESS_THAN:
-        indices = np.flatnonzero(arr_chunk < start)
+        mask = (arr_chunk < start)
     elif mode == Condition.GREATER_THAN:
-        indices = np.flatnonzero(arr_chunk > start)
+        mask = (arr_chunk > start)
     elif mode == Condition.BETWEEN and end is not None:
-        indices = np.flatnonzero((arr_chunk >= start) & (arr_chunk <= end))
+        mask = (arr_chunk >= start) & (arr_chunk <= end)
     else:
-        return np.array([], dtype=np.uint64), np.array([], dtype=f'V{arr_chunk.itemsize}')
+        return np.empty(0, dtype=np.uint64), np.empty(0, dtype=dtype)
 
-    indices += offset
-    flat_vals = arr_chunk[indices - offset].astype(f'V{arr_chunk.itemsize}')
-    return indices, flat_vals
+    indices = np.nonzero(mask)[0] + offset
+    vals = arr_chunk[indices - offset].view(dtype)
+    return indices, vals
 
 def find_matches(bytestream: bytes | None = None, base_address: int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4, alignment: bool = False) -> np.ndarray | list | None:
     if bytestream is None or target is None:

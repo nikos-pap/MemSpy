@@ -57,7 +57,7 @@ class PointerScanTable(QWidget):
         for t in Type:
             self.type_combo.addItem(t.name, t)
         self.type_combo.setCurrentText(Type.UInt32.name)
-        self.type_combo.currentIndexChanged(lambda data_type: self.model.setValueType(self.type_combo.itemData(data_type)))
+        self.type_combo.currentIndexChanged.connect(lambda data_type: self.model.setValueType(self.type_combo.itemData(data_type)))
         # self.type_combo.currentTextChanged.connect(lambda data_type: self.model.setValueType(data_type))
         ctrl.addWidget(self.type_combo)
         layout.addLayout(ctrl)
