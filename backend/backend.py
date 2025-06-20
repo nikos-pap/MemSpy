@@ -21,7 +21,7 @@ class QueueWorker(QObject):
     pageRangeSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
     updateSavedSignal = pyqtSignal('quint64', bytes)
-    pointerUpdateSignal = pyqtSignal(list)
+    pointerUpdateSignal = pyqtSignal(PointerChain)
 
     def __init__(self, queue: Queue):
         super().__init__()
@@ -38,7 +38,7 @@ class QueueWorker(QObject):
                     address, raw, initial_value = msg.message
                     self.dataReady.emit(int(address), raw, initial_value)
                 elif msg.message_type == MessageType.POINTER_CHAIN_UPDATED:
-                    pointer = msg.message
+                    pointer = msg.message[0]
                     self.pointerUpdateSignal.emit(pointer)
                 elif msg.message_type == MessageType.SET_PROGRESS:
                     self.progressSignal.emit(msg.message[0])

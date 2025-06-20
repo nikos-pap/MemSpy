@@ -117,9 +117,9 @@ class MemoryViewProcess(Process):
     def _push_pointer_values(self):
         if not self.process_reader.hasHandle():
             return
-        result = self.pointer_manager.get_chains()
-        if result:
-            self.out_queue.put(Message(MessageType.POINTER_CHAIN_UPDATED, result))
+        # result = self.pointer_manager.get_chains()
+        for pointer in self.pointer_manager.get_chains():
+            self.out_queue.put(Message(MessageType.POINTER_CHAIN_UPDATED, [pointer]))
 
     def _push_saved_addresses(self):
         for address, value in self.address_manager.get_saved_addresses():
