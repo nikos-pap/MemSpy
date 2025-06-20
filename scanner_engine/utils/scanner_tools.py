@@ -1,33 +1,26 @@
-import numba
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-from numba import prange
 from numpy.lib.stride_tricks import as_strided
 from utils.types import Condition
 
-@numba.njit
-def match_condition_numba(arr, mode, start, end, base_address):
-    indices = []
-    values = []
 
-    for i in prange(arr.size):
-        val = arr[i]
-        cond = False
-        if mode == Condition.EQUAL:
-            cond = val == start
-        elif mode == Condition.NOT_EQUAL:
-            cond = val != start
-        elif mode == Condition.LESS_THAN:
-            cond = val < start
-        elif mode == Condition.GREATER_THAN:
-            cond = val > start
-        elif mode == Condition.BETWEEN and end is not None:
-            cond = (val >= start) and (val <= end)
+def match_condition(arr_chunk, offset, mode, start, end=None):
+    if mode == Condition.EQUAL:
+        indices = np.flatnonzero(arr_chunk == start)
+    elif mode == Condition.NOT_EQUAL:
+        indices = np.flatnonzero(arr_chunk != start)
+    elif mode == Condition.LESS_THAN:
+        indices = np.flatnonzero(arr_chunk < start)
+    elif mode == Condition.GREATER_THAN:
+        indices = np.flatnonzero(arr_chunk > start)
+    elif mode == Condition.BETWEEN and end is not None:
+        indices = np.flatnonzero((arr_chunk >= start) & (arr_chunk <= end))
+    else:
+        return np.array([], dtype=np.uint64), np.array([], dtype=f'V{arr_chunk.itemsize}')
 
-        if cond:
-            indices.append(i + base_address)
-            values.append(val)
-
-    return np.array(indices, dtype=np.uint64), np.array(values)
+    indices += offset
+    flat_vals = arr_chunk[indices - offset].astype(f'V{arr_chunk.itemsize}')
+    return indices, flat_vals
 
 
 def find_matches(bytestream: bytes | None = None, base_address: int = 0,
@@ -49,17 +42,31 @@ def find_matches(bytestream: bytes | None = None, base_address: int = 0,
     start = target[0]
     end = target[1] if len(target) > 1 else None
 
-    indices, vals = match_condition_numba(arr, mode, start, end, base_address)
+    num_threads = 8
+    chunk_size = (len(arr) + num_threads - 1) // num_threads
+    chunks = [(arr[i:i + chunk_size], i) for i in range(0, len(arr), chunk_size)]
 
-    if len(indices) == 0:
+    results = []
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(match_condition, chunk, offset, mode, start, end)
+                   for chunk, offset in chunks]
+        for future in futures:
+            indices, vals = future.result()
+            if len(indices):
+                results.append((indices, vals))
+
+    if not results:
         return []
+
+    all_indices = np.concatenate([r[0] for r in results])
+    all_vals = np.concatenate([r[1] for r in results])
 
     dt = np.dtype([
         ("num", np.uint64),
         ("bytes", f"V{element_size}")
     ])
-    result = np.empty(len(indices), dtype=dt)
-    result['num'] = indices
-    result['bytes'] = vals.view(f'V{element_size}')
+    result = np.empty(len(all_indices), dtype=dt)
+    result['num'] = all_indices + base_address
+    result['bytes'] = all_vals
 
     return result
