@@ -147,8 +147,8 @@ class Region:
 class MemoryScanner(AbstractMemoryScanner):
     def __init__(self, enable_debug: bool = False):
         super().__init__(enable_debug=enable_debug)
-
-    def read_memory(self, chunk_size=2**26, element_size=4):
+            
+    def read_memory(self, chunk_size=2**25, element_size=4):
         if not self.handle:
             print("Failed to open process. Try running as Administrator.")
             return
@@ -279,8 +279,7 @@ class MemoryScanner(AbstractMemoryScanner):
 
             address += memory_info.RegionSize
 
-    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL,
-                   step_enable: bool = False) -> tuple[int, int]:
+    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
         total_size = self.get_working_memory_size()
         current_size = 0
         element_size = len(value) // 2
@@ -299,13 +298,13 @@ class MemoryScanner(AbstractMemoryScanner):
             result_queue.put((region.size, result))
 
         def producer():
-            with ThreadPoolExecutor(max_workers=16) as executor:
+            with ThreadPoolExecutor() as executor:
                 for region in self.read_memory(element_size=element_size):
                     executor.submit(worker, region)
-            result_queue.put(None)  # signal completion
+            result_queue.put(None)
 
-        # Start the producer thread
-        threading.Thread(target=producer, daemon=True).start()
+        producer_thread = threading.Thread(target=producer)
+        producer_thread.start()
 
         while True:
             item = result_queue.get()
@@ -316,7 +315,18 @@ class MemoryScanner(AbstractMemoryScanner):
             yield result, progress
             current_size += region_size
 
+        producer_thread.join()
         yield None
+
+    # def scan_value_old(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
+    #     total_size = self.get_working_memory_size()
+    #     current_size = 0
+    #     element_size = len(value) // 2
+    #     value = np.frombuffer(value, dtype=f'<u{element_size}')
+    #     for region in self.read_memory(element_size=element_size):
+    #         yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
+    #         current_size += region.size
+    #     yield None
 
     def read_bytes(self, address: int, size: int) -> bytes:
         if not self.handle:

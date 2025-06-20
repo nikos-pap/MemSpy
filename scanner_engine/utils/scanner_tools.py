@@ -22,10 +22,7 @@ def match_condition(arr_chunk, offset, mode, start, end=None):
     flat_vals = arr_chunk[indices - offset].astype(f'V{arr_chunk.itemsize}')
     return indices, flat_vals
 
-
-def find_matches(bytestream: bytes | None = None, base_address: int = 0,
-                 mode: Condition = Condition.EQUAL, target=None,
-                 element_size: int = 4, aligment: bool = False) -> np.ndarray | list | None:
+def find_matches(bytestream: bytes | None = None, base_address: int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4, alignment: bool = False) -> np.ndarray | list | None:
     if bytestream is None or target is None:
         return []
 
@@ -36,6 +33,7 @@ def find_matches(bytestream: bytes | None = None, base_address: int = 0,
 
     stride = data.strides[0]
     windows = as_strided(data, shape=(length - element_size + 1, element_size), strides=(stride, stride))
+
     dtype_str = f'<u{element_size}'
     arr = windows.view(dtype_str).reshape(-1)
 
@@ -46,20 +44,25 @@ def find_matches(bytestream: bytes | None = None, base_address: int = 0,
     chunk_size = (len(arr) + num_threads - 1) // num_threads
     chunks = [(arr[i:i + chunk_size], i) for i in range(0, len(arr), chunk_size)]
 
-    results = []
+    results_indices = []
+    results_vals = []
+
+    val_dtype = np.dtype(f'V{element_size}')
+
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        futures = [executor.submit(match_condition, chunk, offset, mode, start, end)
+        futures = [executor.submit(match_condition, chunk, offset, mode, start, end, val_dtype)
                    for chunk, offset in chunks]
         for future in futures:
             indices, vals = future.result()
-            if len(indices):
-                results.append((indices, vals))
+            if indices.size > 0:
+                results_indices.append(indices)
+                results_vals.append(vals)
 
-    if not results:
+    if not results_indices:
         return []
 
-    all_indices = np.concatenate([r[0] for r in results])
-    all_vals = np.concatenate([r[1] for r in results])
+    all_indices = np.concatenate(results_indices)
+    all_vals = np.concatenate(results_vals)
 
     dt = np.dtype([
         ("num", np.uint64),
