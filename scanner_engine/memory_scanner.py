@@ -138,6 +138,7 @@ class AbstractMemoryScanner(ABC):
 
     def close(self):
         if self.handle:
+            ctypes.windll.kernel32.SetProcessWorkingSetSize(self.handle, -1, -1)
             CloseHandle(self.handle)
             self.handle = None
         if self.hSnapshot:

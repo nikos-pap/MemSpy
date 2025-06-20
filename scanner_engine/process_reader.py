@@ -1,8 +1,9 @@
 import ctypes
 import os
-import time
-import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from ctypes import wintypes
+from queue import Queue
 from typing import Any, Generator
 
 import numpy as np
@@ -13,6 +14,7 @@ import scanner_engine.utils.pointer_scanner_tools as pst
 from scanner_engine.utils.scanner_tools import find_matches
 from utils.types import Condition
 
+
 MAX_PATH = 260
 
 MEM_COMMIT = 0x1000
@@ -22,6 +24,9 @@ PAGE_EXECUTE = 0x10
 PAGE_EXECUTE_READ = 0x20
 PAGE_EXECUTE_READWRITE = 0x40
 PAGE_EXECUTE_WRITECOPY = 0x80
+
+PAGE_NOACCESS = 0x01
+PAGE_GUARD = 0x100
 
 class MEMORY_BASIC_INFORMATION(ctypes.Structure):
     _fields_ = [
@@ -142,7 +147,7 @@ class MemoryScanner(AbstractMemoryScanner):
     def __init__(self, enable_debug: bool = False):
         super().__init__(enable_debug=enable_debug)
 
-    def read_memory(self, chunk_size=2**25, element_size=4):
+    def read_memory(self, chunk_size=2**26, element_size=4):
         if not self.handle:
             print("Failed to open process. Try running as Administrator.")
             return
@@ -151,6 +156,12 @@ class MemoryScanner(AbstractMemoryScanner):
         address = 0
         id = 0
         overlap = element_size - 1
+        buffer = ctypes.create_string_buffer(chunk_size + overlap)
+
+        allowed = (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE |
+                   PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)
+
+        blocked = (PAGE_NOACCESS | PAGE_GUARD)
 
         while address < 0x7FFFFFFFFFFF:  # Max user space address (Windows x64)
             size = VirtualQueryEx(self.handle, ctypes.c_void_p(address), ctypes.byref(memory_info),
@@ -162,7 +173,7 @@ class MemoryScanner(AbstractMemoryScanner):
             region_size = memory_info.RegionSize
 
             if memory_info.State == MEM_COMMIT:  # MEM_COMMIT
-                if memory_info.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY):
+                if (memory_info.Protect & allowed) and not (memory_info.Protect & blocked):
                     module_name = ctypes.create_unicode_buffer(MAX_PATH)
                     module_base = ctypes.c_void_p(memory_info.AllocationBase)
 
@@ -173,15 +184,14 @@ class MemoryScanner(AbstractMemoryScanner):
 
                     chunk_offset = 0
                     while chunk_offset < region_size:
-                        # First chunk has no overlap
                         if chunk_offset == 0:
                             read_start = base_addr
                             read_size = min(chunk_size, region_size)
                         else:
                             read_start = base_addr + chunk_offset - overlap
-                            read_size = min(chunk_size + overlap, region_size - chunk_offset + overlap)
+                            max_possible = region_size - (chunk_offset - overlap)
+                            read_size = min(chunk_size + overlap, max_possible)
 
-                        buffer = ctypes.create_string_buffer(read_size)
                         bytes_read = ctypes.c_size_t()
                         read_address = ctypes.c_void_p(read_start)
 
@@ -190,8 +200,8 @@ class MemoryScanner(AbstractMemoryScanner):
                             yield Region(read_start, bytes_read.value, region_name, memoryview(buffer)[:bytes_read.value], id)
 
                         chunk_offset += chunk_size
-                    id += 1
 
+                    id += 1
             address += memory_info.RegionSize
 
     def read_memory_by_region(self, region):
@@ -268,19 +278,43 @@ class MemoryScanner(AbstractMemoryScanner):
 
             address += memory_info.RegionSize
 
-    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
+    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL,
+                   step_enable: bool = False) -> tuple[int, int]:
         total_size = self.get_working_memory_size()
         current_size = 0
         element_size = len(value) // 2
         value = np.frombuffer(value, dtype=f'<u{element_size}')
-        # regions = self.get_regions(element_size=element_size)
-        for region in self.read_memory(element_size=element_size):
-            yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
-            current_size += region.size
-        # for region in self.get_regions(element_size=element_size):
-        #     self.read_memory_by_region(region)
-        #     yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
-        #     current_size += region.size
+
+        result_queue = Queue()
+
+        def worker(region):
+            result = find_matches(
+                bytestream=region.data,
+                base_address=region.base_address,
+                mode=condition,
+                target=value,
+                element_size=element_size
+            )
+            result_queue.put((region.size, result))
+
+        def producer():
+            with ThreadPoolExecutor(max_workers=16) as executor:
+                for region in self.read_memory(element_size=element_size):
+                    executor.submit(worker, region)
+            result_queue.put(None)  # signal completion
+
+        # Start the producer thread
+        threading.Thread(target=producer, daemon=True).start()
+
+        while True:
+            item = result_queue.get()
+            if item is None:
+                break
+            region_size, result = item
+            progress = (current_size * 100) // total_size
+            yield result, progress
+            current_size += region_size
+
         yield None
 
     def read_bytes(self, address: int, size: int) -> bytes:
