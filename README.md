@@ -15,7 +15,7 @@ To execute the app you must run ```python gui.py```. After that, a window will p
 * In the upper left corner, there is a search field. The user can enter a value in this box and select the appropriate value type from the drop-down menu (SByte, Int16, Int32, Int64, UInt16, **UInt32**, UInt64, **Float**, Double, **String**).
 * Currently only "equals" operation works for the first Scan ("New Scan")
 * After New Scan, some results may appear on the right side of the window. On top of that a filter box is located and user can also move into pages.
-* Now user can set a different value on the search box and deside an operation. Next, user can press the filter button to filter out some values.
+* Now user can set a different value on the search box and choose an operation. Next, user can press the filter button to filter out some values.
 * The desired value can be transferred to the left-down box by double-clicking the address. In that box user can freeze or change the values using right click.
 
 ![GUI](imgs/GUI.png)
