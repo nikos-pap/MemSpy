@@ -1,7 +1,7 @@
 # MemSpy
 
 ## About this project
-MemSpy is a Python-based tool that is similar to "Cheat Engine", a well-known cheating program created in Object Pascal and C language. Our tool is the only cheat engine like tool, which runs in Python, making it easier to understand and use. The main objective of this tool is to scan for values into varius memory regions of running applications, allowing users to change or freeze those values.
+MemSpy is a Python-based tool that is similar to "Cheat Engine", a well-known cheating program created in Object Pascal and C language. Our tool is the only cheat engine like tool, which runs in Python, making it easier to understand and use. The main objective of this tool is to scan for values into various memory regions of running applications, allowing users to change or freeze those values.
 
 ## Setup and Prerequisites
 ### Python
