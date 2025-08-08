@@ -222,6 +222,7 @@ class MemoryScannerUI(QMainWindow):
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
+
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)
 
@@ -319,9 +320,9 @@ class MemoryScannerUI(QMainWindow):
                 if icon and not icon.isNull():
                     self.process_box.addItem(icon, label, pid)
                 else:
-                    self.process_box.addItem(label)
+                    self.process_box.addItem(label, pid)
             else:
-                self.process_box.addItem(label)
+                self.process_box.addItem(label, pid)
         self.process_box.refresh_items()
         self.process_box.blockSignals(False)
         print(f"[MemoryScannerUI] Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
@@ -448,10 +449,10 @@ class MemoryScannerUI(QMainWindow):
         self.condition_combo.setDisabled(False)
         self.filter_btn.setDisabled(False)
 
-    def process_selection_handle(self, proc_id: int | None, icon: QIcon | None):
+    def process_selection_handle(self, proc_id: int | None, icon: QIcon  = QIcon()):
         if proc_id == -1:
             icon = self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarMenuButton)
-            self.setWindowIcon(icon)
+            self.setWindowIcon(icon or QIcon())
             self.backend.init_process_reader(-1)
             self.setWindowTitle("Memory Scanner")
             self.isAttached = False
