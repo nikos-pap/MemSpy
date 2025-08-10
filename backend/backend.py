@@ -171,7 +171,6 @@ class Backend(QObject):
 
                 pids.append(pid)
                 if pid not in self.active_processes:
-                    # print(pid)
                     self.active_processes.add(pid)
                     img = image_extractor.get_process_image(exe)
                     process = ProcessEntry(name, pid, img)
