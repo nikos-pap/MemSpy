@@ -6,7 +6,7 @@ import numpy as np
 
 from logger import create_logger
 from utils.message import Message, MessageType
-from utils.types import Condition, ScanType
+from utils.types import Condition, ScanType, get_address_dtype
 from scanner_engine.process_reader import MemoryScanner
 from scanner_engine.pointer_scanner import PointerScanner
 
@@ -119,6 +119,9 @@ class MemoryParserProcess(Process):
         self._scan_type = ScanType.ADDRESS_SCAN
         self._scan_start = time.time()
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [0]), False)
+        # TODO fix value to always be a list
+        # TODO fix value length
+        self.queue_out.put(Message(MessageType.START_SCAN, [condition, [value], get_address_dtype(4)]), False)
         self.logger.debug('Scan started')
 
     def _emit_results(self, data: list[int] | np.ndarray, progress: int) -> None:
@@ -135,6 +138,7 @@ class MemoryParserProcess(Process):
         self._current_scan = None
         elapsed = time.time() - self._scan_start
         self.queue_progress.put(Message(MessageType.SCAN_COMPLETED), False)
+        self.queue_out.put(Message(MessageType.SCAN_COMPLETED))
         self.queue_progress.put(Message(MessageType.SET_PROGRESS, [100]), False)
         self.logger.debug(f'Scan finished in {elapsed:.3f} seconds')
 

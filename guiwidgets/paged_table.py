@@ -41,21 +41,21 @@ class PaginatedTable(QWidget):
         self.prev_button = QPushButton("Previous")
         self.next_button = QPushButton("Next")
 
-        # self.filter_command: Callable[[str], dict[str, RowEntry]] = filter_command
-        # self.freeze_command: Callable[[str], None] = freeze_command
-        # self.change_value_command: Callable[[str, bytes], None] = change_value_command
-        # self.page_command: Callable[[bool], None] = page_command
         self.init_ui()
 
     def init_ui(self):
         layout = QVBoxLayout(self)
+        filter_layout = QHBoxLayout(self)
 
         # Filter input
         self.filter_input.setPlaceholderText("Filter by name (column 1)...")
         # noinspection PyUnresolvedReferences
         self.filter_input.textChanged.connect(self.filterSignal)
-        layout.addWidget(self.filter_input)
-
+        filter_layout.addWidget(self.filter_input)
+        filter_button = QPushButton('Filter')
+        # filter_button.clicked.connect(self.filterSignal)
+        filter_layout.addWidget(filter_button)
+        layout.addLayout(filter_layout)
         # Table
         # noinspection PyUnresolvedReferences
         # self.table.itemChanged.connect(self.on_item_changed)
@@ -71,9 +71,9 @@ class PaginatedTable(QWidget):
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
         layout.addLayout(pagination_layout)
-        self.connectSignals()
+        self.__connect_signals()
 
-    def connectSignals(self):
+    def __connect_signals(self):
         # self.filter_input.textChanged.connect(self.on_filter_text_changed)
 
         self.prev_button.clicked.connect(self.prev_page)

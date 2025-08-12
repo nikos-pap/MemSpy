@@ -3,6 +3,8 @@ from sys import byteorder
 from enum import Enum, auto
 import struct
 
+import numpy as np
+
 
 class Type(Enum):
     Int8 = 'Int8'
@@ -171,3 +173,10 @@ def is_valid_type(t: Type, s: str) -> bool:
 
     # Unknown type
     return False
+
+
+def get_address_dtype(element_size: int) -> np.typing.DTypeLike:
+    return np.dtype([
+        ("num", np.uint64),
+        ("bytes", f"V{element_size}")
+    ])

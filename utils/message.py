@@ -29,6 +29,7 @@ class MessageType(Enum):
     INVALID_ADDRESS = auto()
     # scanner messages
     INIT_SCANNER = auto()
+    FINALIZE_SCAN = auto()
     START_SCAN = auto()
     CANCEL_SCAN = auto()
     START_POINTER_SCAN = auto()

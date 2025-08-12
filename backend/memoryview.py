@@ -3,11 +3,13 @@ from multiprocessing import Process, Queue
 import time
 
 from memory_manager_engine.address_manager import AddressManager
+from memory_manager_engine.address_manager_generic import AddressManagerAbstract
 from memory_manager_engine.mapped_address_manager import MmapAddressManager
 from memory_manager_engine.pointer_manager import PointerManager
 from logger import create_logger
 from scanner_engine.process_reader import MemoryScanner
 from utils.message import Message, MessageType
+from utils.types import get_address_dtype
 
 
 class MemoryViewProcess(Process):
@@ -31,8 +33,7 @@ class MemoryViewProcess(Process):
         self.process_reader: Optional[MemoryScanner] = MemoryScanner()
 
         # Address storage
-        # self.address_manager: AddressManager = AddressManager(self.process_reader, page_size)
-        self.address_manager: MmapAddressManager = MmapAddressManager(self.process_reader, page_size=100)
+        self.address_manager: AddressManagerAbstract = MmapAddressManager(self.process_reader, page_size)
         self.pointer_manager: PointerManager = PointerManager(self.process_reader)
         self.logger = None
 
@@ -75,6 +76,8 @@ class MemoryViewProcess(Process):
         elif typ == MessageType.ADD_ADDRESS:
             self.address_manager.extend(data)
             self._update_stats()
+        elif typ == MessageType.START_SCAN:
+            self.address_manager.init_scan(*data)
         elif typ == MessageType.ADD_POINTER:
             self.pointer_manager.extend(data)
         elif typ == MessageType.SAVE_ADDRESS:
@@ -90,20 +93,22 @@ class MemoryViewProcess(Process):
         elif typ == MessageType.FILTER_ADDRESSES:
             self.address_manager.filter_addresses(data[0])
         elif typ == MessageType.SCAN_ADDRESS_LIST:
-            self.address_manager.scan_addresses(data[0], data[1])
+            self.address_manager.scan_addresses(data[0], [data[1]])
         elif typ == MessageType.GET_NEXT_PAGE:
             self.address_manager.next_page()
             self.out_queue.put(Message(MessageType.SET_PAGE_RANGE, [self.address_manager.current_index()]))
         elif typ == MessageType.GET_PREV_PAGE:
             self.address_manager.previous_page()
             self.out_queue.put(Message(MessageType.SET_PAGE_RANGE, [self.address_manager.current_index()]))
+        elif typ == MessageType.SCAN_COMPLETED:
+            if hasattr(self.address_manager, 'flush'):
+                self.address_manager.flush()
         elif typ == MessageType.RESET:
             self._reset_all()
         elif typ == MessageType.EXIT:
             self.logger.info('Exiting')
         else:
-            # Ignore unsupported types or EMPTY
-            pass
+            self.logger.debug(f'Got Unhandled Message of type {type}.')
 
     def _update_stats(self) -> None:
         address_stats = self.address_manager.get_stats()
