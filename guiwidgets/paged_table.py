@@ -45,20 +45,12 @@ class PaginatedTable(QWidget):
 
     def init_ui(self):
         layout = QVBoxLayout(self)
-        filter_layout = QHBoxLayout(self)
 
         # Filter input
         self.filter_input.setPlaceholderText("Filter by name (column 1)...")
         # noinspection PyUnresolvedReferences
         self.filter_input.textChanged.connect(self.filterSignal)
-        filter_layout.addWidget(self.filter_input)
-        filter_button = QPushButton('Filter')
-        # filter_button.clicked.connect(self.filterSignal)
-        filter_layout.addWidget(filter_button)
-        layout.addLayout(filter_layout)
-        # Table
-        # noinspection PyUnresolvedReferences
-        # self.table.itemChanged.connect(self.on_item_changed)
+        layout.addWidget(self.filter_input)
 
         layout.addWidget(self.table)
         layout.addWidget(self.info_label)
@@ -66,8 +58,7 @@ class PaginatedTable(QWidget):
         vh.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         # Pagination controls
         pagination_layout = QHBoxLayout()
-        # self.prev_button.clicked.connect(self.prev_page)
-        # self.next_button.clicked.connect(self.next_page)
+
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
         layout.addLayout(pagination_layout)

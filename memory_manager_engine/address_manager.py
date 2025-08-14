@@ -10,11 +10,6 @@ from utils.types import Condition, filter_cases
 class AddressManager(AddressManagerAbstract):
     def __init__(self, scanner: MemoryScanner, page_size: int = 100):
         super().__init__(scanner, page_size)
-        self.addresses: np.ndarray | None = None
-
-        # lazy filter state
-        self.current_filter: str = ''
-        self.total_matches: int = 0
 
         # single buffer array, created once
         self.filter_array: np.ndarray = np.full(self.page_size, -1, dtype=int)

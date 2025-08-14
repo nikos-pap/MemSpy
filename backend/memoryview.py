@@ -33,7 +33,7 @@ class MemoryViewProcess(Process):
         self.process_reader: Optional[MemoryScanner] = MemoryScanner()
 
         # Address storage
-        self.address_manager: AddressManagerAbstract = MmapAddressManager(self.process_reader, page_size)
+        self.address_manager: AddressManagerAbstract = MmapAddressManager(self.process_reader, 2)
         self.pointer_manager: PointerManager = PointerManager(self.process_reader)
         self.logger = None
 
@@ -75,7 +75,6 @@ class MemoryViewProcess(Process):
                 self.logger.debug(f'Process set to {pid}')
         elif typ == MessageType.ADD_ADDRESS:
             self.address_manager.extend(data)
-            self._update_stats()
         elif typ == MessageType.START_SCAN:
             self.address_manager.init_scan(*data)
         elif typ == MessageType.ADD_POINTER:

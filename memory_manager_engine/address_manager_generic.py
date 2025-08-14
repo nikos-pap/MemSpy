@@ -3,6 +3,7 @@ from abc import abstractmethod, ABC
 from typing import Iterator, Tuple, Optional
 import numpy as np
 
+import logger
 from logger import get_logger
 from memory_manager_engine.manager_stats import Stat
 from scanner_engine.process_reader import MemoryScanner
@@ -13,14 +14,14 @@ class AddressManagerAbstract(ABC):
     def __init__(self, scanner: MemoryScanner, page_size: int = 100):
         self.scanner: MemoryScanner = scanner
         self.page_size: int = page_size
-        self.addresses: Optional = None
+        self.addresses: Optional[np.ndarray] = None
 
-        # lazy filter state
+        # filter state
         self.current_filter: str = ''
         self.total_matches: int = 0
+        self.total_filtered: int = 0
 
-        self.filter_array: Optional = None
-        # page_no is the next 0-based page to fetch
+        self.filter_array: Optional[np.ndarray] = None
         self.page_no: int = 0
 
         self.frozen_addresses: dict[int, bytes] = {}
@@ -54,15 +55,14 @@ class AddressManagerAbstract(ABC):
     def set_page(self, page_number: int) -> None:
         pass
 
-
     @abstractmethod
     def refresh_pages(self) -> None:
         pass
 
     def next_page(self) -> None:
         """Advance to the next page (if any) in lazy-page flow."""
-        total_pages = math.ceil(self.total_matches / self.page_size)
-        print(self.page_no, total_pages)
+        total = self.total_filtered if self.current_filter else self.total_matches
+        total_pages = math.ceil(total / self.page_size)
         # page_no is next page index; only set if there *is* a next page
         if self.page_no < total_pages:
             self.set_page(self.page_no + 1)
@@ -74,16 +74,15 @@ class AddressManagerAbstract(ABC):
         """
         # current = page_no - 1; to back up one page, we need to fetch current-1
         current = max(self.page_no - 1, 0)
-        if current > 0:
+        if current >= 0:
             # reset page_no so set_page fetches (current-1)
-            self.page_no = current - 1
+            self.page_no = current
             self.set_page(self.page_no)
 
     def current_index(self) -> int:
         """0-based index of the first item on the last-fetched page."""
         # last fetched page was at page_no-1
-        last_page = max(self.page_no - 1, 0)
-        return last_page * self.page_size
+        return self.page_no * self.page_size
 
     @property
     def last_page_count(self) -> int:
@@ -111,7 +110,7 @@ class AddressManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def scan_addresses(self, condition: Condition, value: list[bytes] | None) -> int:
+    def scan_addresses(self, condition: Condition, value: list[bytes]) -> int:
         pass
 
     def set_value(self, address: int, value: bytes) -> None:
@@ -154,11 +153,11 @@ class AddressManagerAbstract(ABC):
         """Clear all state: addresses, filters, freeze/saved lists."""
         self.current_filter = ''
         self.total_matches = 0
+        self.total_filtered = 0
         self.page_no = 0
         self.frozen_addresses.clear()
         self.saved_addresses.clear()
 
     def get_stats(self) -> Stat:
         """Return (total_scanned, total_filtered_matches)."""
-        total = len(self.addresses) if self.addresses is not None else 0
-        return Stat(total, self.total_matches)
+        return Stat(self.total_matches, self.total_filtered)

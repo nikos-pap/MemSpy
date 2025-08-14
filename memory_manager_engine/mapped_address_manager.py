@@ -6,6 +6,7 @@ from memory_manager_engine.address_manager_generic import AddressManagerAbstract
 from memory_manager_engine.operation import Operation
 from scanner_engine.process_reader import MemoryScanner
 from utils.types import Condition, filter_cases
+from logger import get_logger
 
 
 
@@ -19,33 +20,29 @@ class MmapAddressManager(AddressManagerAbstract):
     simple persistent backing store for the address table.
     """
 
-    def __init__(self, scanner: MemoryScanner, page_size: int = 100):
+    def __init__(self, scanner: MemoryScanner, page_size: int = 100, buffer_size: int = 10_000):
         super().__init__(scanner, page_size)
 
         self.__current_operation: Optional[Operation] = None
-        self.addresses: np.memmap | None = None
         self.__table_buffer: Optional[np.ndarray] = None
-
-
+        self.filter_array = np.full((page_size,1), -1, dtype=int)
+        self.__buffer_size: int = buffer_size
         self.history: list[Operation] = []
 
     def init_scan(self, condition: Condition, values: list, dtype: np.dtype):
-
         self.addresses = None
         self.__current_operation = Operation(condition, values, dtype)
         self.__current_operation.touch()
-
         self.history.append(self.__current_operation)
-
-        # self.addresses = np.memmap(self.__current_operation.filename, dtype=self.__current_operation.dtype, shape=(0,), mode='r')
 
     def extend(self, data: np.ndarray) -> None:
         if self.__table_buffer is None:
             self.__table_buffer = data
-        elif len(self.__table_buffer) < 2000:
+        elif len(self.__table_buffer) < self.__buffer_size:
             self.__table_buffer = np.concatenate((self.__table_buffer, data), axis=0)
         else:
             self.flush()
+            self.calculate_filtered_page()
 
 
     def flush(self):
@@ -63,13 +60,32 @@ class MmapAddressManager(AddressManagerAbstract):
         self.__table_buffer = None
 
     def filter_addresses(self, filter_str: str) -> None:
-        pass
+        self.current_filter = filter_str
+        self.page_no = 0
+        self.calculate_filtered_page()
+
+
+    def calculate_filtered_page(self) -> None:
+        last_index = -1
+        mask = self.filter_array > -1
+        if np.any(mask):
+            last_index = self.filter_array[mask][-1]
+        self.total_filtered = 0
+        self.filter_array[:] = -1
+        count = 0
+
+        for index, address in enumerate(self.addresses[:]['num']):
+            if self.current_filter in hex(address):
+                if count < self.page_size and index >= self.page_no * self.page_size:
+                    self.filter_array[count] = index
+                    count += 1
+                self.total_filtered += 1
 
     def set_page(self, page_number: int) -> None:
-        print(page_number)
-        start = page_number * self.page_size
-        end = min(start + self.page_size, self._size)
         self.page_no = page_number
+        self.calculate_filtered_page()
+        get_logger('MemoryViewProcess').info(f'Current Page: {self.page_no}')
+        get_logger('MemoryViewProcess').info(self.filter_array[self.filter_array > -1])
 
     def refresh_pages(self) -> None:
         pass
@@ -77,14 +93,20 @@ class MmapAddressManager(AddressManagerAbstract):
     def get_current_page(self) -> Iterator[Tuple[int, bytes, bytes]]:
         if self.addresses is None:
             return
-        start = self.page_no * self.page_size
 
-        for addr, prev in self.addresses[start: start + self.page_size]:
-            cur = self.scanner.read_bytes(int(addr), prev.itemsize)
-            yield int(addr), cur, prev.tobytes()
+        if self.current_filter:
+            for addr, prev in self.addresses[self.filter_array[self.filter_array > -1]]:
+                cur = self.scanner.read_bytes(int(addr), prev.itemsize)
+                yield int(addr), cur, prev.tobytes()
+        else:
+            start = self.page_no * self.page_size
+
+            for addr, prev in self.addresses[start: start + self.page_size]:
+                cur = self.scanner.read_bytes(int(addr), prev.itemsize)
+                yield int(addr), cur, prev.tobytes()
 
 
-    def scan_addresses(self, condition: Condition, values: list[bytes] | None) -> int:
+    def scan_addresses(self, condition: Condition, values: list[bytes]) -> int:
         if self.addresses is None:
             return 0
 
@@ -97,7 +119,6 @@ class MmapAddressManager(AddressManagerAbstract):
 
         filtered_list = []
         count = 0
-        print(values)
         for address, value in self.addresses:
             cur = self.scanner.read_bytes(int(address), value.itemsize)
             if filter_cases[condition](values, cur):
