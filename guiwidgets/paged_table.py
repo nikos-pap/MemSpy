@@ -226,16 +226,10 @@ class PaginatedTable(QWidget):
         self.clear_table()
 
     def next_page(self):
-        # if (self.current_page + 1) * self.page_size < len(self.filtered_data):
-        #     self.current_page += 1
-            # self.render_current_page()
         self.model.clear()
         self.nextPageSignal.emit()
 
     def prev_page(self):
-        # if self.current_page > 0:
-        #     self.current_page -= 1
-        #     self.render_current_page()
         self.model.clear()
         self.previousPageSignal.emit()
 

@@ -15,7 +15,7 @@ from guiwidgets import ProcessSelectorBox, AddressTreeContainer
 from guiwidgets.paged_table import PaginatedTable
 from guiwidgets.pointer_table import PointerScanTable
 from guiwidgets.settings_window import SettingsDialog, SettingsManager
-from utils import Type, TYPE_RANGES, convert_to_bytes
+from utils import Type, convert_to_bytes
 from utils.types import Condition, PointerSettingsType, is_valid_type, ScanType
 
 
@@ -27,7 +27,7 @@ class MemoryScannerUI(QMainWindow):
         self.backend = Backend()
         self.isAttached = False
         self.valid_input = False
-        self.scan_type: ScanType | None = None
+        self.scan_type: Optional[ScanType] = None
 
         self._setup_window()
         self._create_widgets()
@@ -391,6 +391,8 @@ class MemoryScannerUI(QMainWindow):
             return
         if condition == Condition.BETWEEN:
             values.append(convert_to_bytes(self.search_input2.text(), self.typeCombo.currentData()))
+        self.disable_scan_navigation()
+        self.new_scan_btn.setDisabled(True)
         self.backend.filter_scan(condition, values)
 
     def pointer_scan_command(self, address: int):
@@ -401,6 +403,7 @@ class MemoryScannerUI(QMainWindow):
                                   options[PointerSettingsType.MAX_OFFSET],
                                   options[PointerSettingsType.NEGATIVE_OFFSETS],
                                   options[PointerSettingsType.DEVICE])
+        self.disable_scan_navigation()
 
     def stop_scan_command(self):
         self.backend.stop_scan()
@@ -413,6 +416,8 @@ class MemoryScannerUI(QMainWindow):
         self.enable_scan_navigation()
 
     def toggle_scan_button(self):
+        if not self.new_scan_btn.isEnabled():
+            return
         self.new_scan_btn.clicked.disconnect()
         if self.new_scan_btn.text() == 'Cancel Scan':
             self.new_scan_btn.setText('New Scan')
@@ -444,6 +449,7 @@ class MemoryScannerUI(QMainWindow):
         self.filter_btn.setDisabled(True)
 
     def enable_scan_navigation(self):
+        self.new_scan_btn.setDisabled(False)
         self.typeCombo.setDisabled(False)
         self.search_input.setDisabled(False)
         self.condition_combo.setDisabled(False)

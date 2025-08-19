@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QSize, QSettings
 from guiwidgets.utils import list_devices
-from utils.types import PointerSettingsType
+from utils.types import PointerSettingsType, ScanSettingsType
 
 
 class SettingsManager:
@@ -92,7 +92,7 @@ class SettingsDialog(QDialog):
         self.sidebar = QListWidget()
         self.sidebar.setFixedWidth(180)
         self.sidebar.setFont(QFont('Segoe UI', 11))
-        for name in ("General", "Appearance", "Advanced", "Pointer Scan"):
+        for name in ("General", "Appearance", "Advanced", "Pointer Scan", "Scan"):
             item = QListWidgetItem(name)
             item.setSizeHint(QSize(180, 36))
             self.sidebar.addItem(item)
@@ -104,6 +104,7 @@ class SettingsDialog(QDialog):
         self.pages.addWidget(self.wrap_scroll(self.create_appearance_page()))
         self.pages.addWidget(self.wrap_scroll(self.create_advanced_page()))
         self.pages.addWidget(self.wrap_scroll(self._create_pointer_scan_page()))
+        self.pages.addWidget(self.wrap_scroll((self._create_scan_page())))
         content_layout.addWidget(self.pages, 1)
         root_layout.addLayout(content_layout)
 
@@ -269,6 +270,124 @@ class SettingsDialog(QDialog):
         self.random_scan.setChecked(options[PointerSettingsType.RANDOM_SCAN])
         f.addRow("Random Scan:", self.random_scan)
         v.addWidget(grp)
+        v.addStretch(1)
+        return page
+
+    def _create_scan_page(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setSpacing(15)
+
+        # Load persisted options (dict-like)
+        # options = self.manager.get_scan_options()
+        options = {
+            ScanSettingsType.FAST_SCAN: True,
+            ScanSettingsType.THREADS: 8,
+            ScanSettingsType.ALIGNMENT_BYTES: 4,
+            ScanSettingsType.PAUSE_TARGET_WHILE_SCANNING: False,
+            ScanSettingsType.SCAN_PRIORITY: 0,  # Normal
+
+            ScanSettingsType.WRITABLE_ONLY: True,
+            ScanSettingsType.INCLUDE_EXECUTABLE: False,
+            ScanSettingsType.INCLUDE_COPY_ON_WRITE: False,
+            ScanSettingsType.INCLUDE_HEAP: True,
+            ScanSettingsType.INCLUDE_STACK: True,
+            ScanSettingsType.INCLUDE_MAPPED_FILES: False,
+
+            ScanSettingsType.HISTORY_DEPTH: 10,
+            ScanSettingsType.AUTO_SAVE_TABLES: True,
+            ScanSettingsType.SHOW_PREVIOUS_VALUES: True,
+            ScanSettingsType.PAGE_SIZE: 100,
+        }
+        v.addWidget(self._make_header("Scan Settings", "Global scanning performance and memory-region options."))
+
+        # ---------- Performance ----------
+        perf_grp = QGroupBox("Performance")
+        perf_form = QFormLayout(perf_grp)
+
+        self.fast_scan = QCheckBox()
+        self.fast_scan.setChecked(options.get(ScanSettingsType.FAST_SCAN, True))
+        perf_form.addRow("Fast Scan:", self.fast_scan)
+
+        self.threads = QSpinBox()
+        self.threads.setRange(1, 128)  # keep generous; you can clamp to CPU cores in save/apply
+        self.threads.setValue(options.get(ScanSettingsType.THREADS, 8))
+        self.threads.setSuffix(" thread(s)")
+        perf_form.addRow("Worker Threads:", self.threads)
+
+        self.alignment = QSpinBox()
+        self.alignment.setRange(1, 64)
+        self.alignment.setSingleStep(1)
+        self.alignment.setValue(options.get(ScanSettingsType.ALIGNMENT_BYTES, 4))
+        self.alignment.setSuffix(" byte(s)")
+        perf_form.addRow("Memory Alignment:", self.alignment)
+
+        self.pause_target = QCheckBox()
+        self.pause_target.setChecked(options.get(ScanSettingsType.PAUSE_TARGET_WHILE_SCANNING, False))
+        perf_form.addRow("Pause Target While Scanning:", self.pause_target)
+
+        self.scan_priority = QComboBox()
+        self.scan_priority.addItems(["Normal", "High"])
+        self.scan_priority.setCurrentIndex(int(options.get(ScanSettingsType.SCAN_PRIORITY, 0)))
+        perf_form.addRow("Scan Priority:", self.scan_priority)
+
+        v.addWidget(perf_grp)
+
+        # ---------- Memory Regions ----------
+        mem_grp = QGroupBox("Memory Regions")
+        mem_form = QFormLayout(mem_grp)
+
+        self.writable_only = QCheckBox()
+        self.writable_only.setChecked(options.get(ScanSettingsType.WRITABLE_ONLY, True))
+        mem_form.addRow("Writable Only:", self.writable_only)
+
+        self.include_executable = QCheckBox()
+        self.include_executable.setChecked(options.get(ScanSettingsType.INCLUDE_EXECUTABLE, False))
+        mem_form.addRow("Include Executable (Code):", self.include_executable)
+
+        self.include_cow = QCheckBox()
+        self.include_cow.setChecked(options.get(ScanSettingsType.INCLUDE_COPY_ON_WRITE, False))
+        mem_form.addRow("Include Copy-On-Write:", self.include_cow)
+
+        self.include_heap = QCheckBox()
+        self.include_heap.setChecked(options.get(ScanSettingsType.INCLUDE_HEAP, True))
+        mem_form.addRow("Include Heap:", self.include_heap)
+
+        self.include_stack = QCheckBox()
+        self.include_stack.setChecked(options.get(ScanSettingsType.INCLUDE_STACK, True))
+        mem_form.addRow("Include Stack:", self.include_stack)
+
+        self.include_mapped = QCheckBox()
+        self.include_mapped.setChecked(options.get(ScanSettingsType.INCLUDE_MAPPED_FILES, False))
+        mem_form.addRow("Include Mapped Files:", self.include_mapped)
+
+        v.addWidget(mem_grp)
+
+        # ---------- Results / Tables ----------
+        res_grp = QGroupBox("Results & Tables")
+        res_form = QFormLayout(res_grp)
+
+        self.history_depth = QSpinBox()
+        self.history_depth.setRange(0, 100)
+        self.history_depth.setValue(options.get(ScanSettingsType.HISTORY_DEPTH, 10))
+        res_form.addRow("History Depth:", self.history_depth)
+
+        self.auto_save_tables = QCheckBox()
+        self.auto_save_tables.setChecked(options.get(ScanSettingsType.AUTO_SAVE_TABLES, True))
+        res_form.addRow("Auto-Save Search Tables:", self.auto_save_tables)
+
+        self.show_previous_values = QCheckBox()
+        self.show_previous_values.setChecked(options.get(ScanSettingsType.SHOW_PREVIOUS_VALUES, True))
+        res_form.addRow("Show Previous Values Column:", self.show_previous_values)
+
+        self.page_size = QSpinBox()
+        self.page_size.setMinimum(1) # keep generous; you can clamp to CPU cores in save/apply
+        self.page_size.setMaximum(1000) # keep generous; you can clamp to CPU cores in save/apply
+        self.page_size.setValue(options.get(ScanSettingsType.PAGE_SIZE, 100))
+        res_form.addRow("Page Size:", self.page_size)
+
+        v.addWidget(res_grp)
+
         v.addStretch(1)
         return page
 

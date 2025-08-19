@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 import ctypes
 from ctypes import wintypes
 
+from logger import create_logger
+
 # ——— Constants ———
 PROCESS_ALL_ACCESS = 0x1F0FFF
 TH32CS_SNAPMODULE = 0x00000008
@@ -104,6 +106,7 @@ class AbstractMemoryScanner(ABC):
             enable_debug_privilege()
         self.handle: wintypes.HANDLE | None = None
         self.hSnapshot: wintypes.HANDLE | None = None
+        self.logger = create_logger("MemoryScanner")
 
     def change_process(self, pid: int):
         # clean up previous handle

@@ -2,6 +2,7 @@ import math
 from sys import byteorder
 from enum import Enum, auto
 import struct
+from typing import Optional
 
 import numpy as np
 
@@ -47,8 +48,11 @@ class Condition(Enum):
     GREATER_THAN = auto()
     LESS_THAN = auto()
     BETWEEN = auto()
-    CHANGED = auto()
     NOT_EQUAL = auto()
+    CHANGED = auto()
+    UNCHANGED = auto()
+    INCREASED = auto()
+    DECREASED = auto()
 
 
 filter_cases = {
@@ -57,8 +61,32 @@ filter_cases = {
             Condition.LESS_THAN: lambda parameters, current_value: current_value is not None and current_value <= parameters[0],
             Condition.GREATER_THAN: lambda parameters, current_value: current_value is not None and current_value >= parameters[0],
             Condition.NOT_EQUAL: lambda parameters, current_value: current_value is not None and current_value != parameters[0],
-            Condition.CHANGED: lambda parameters, current_value: current_value is not None and current_value != parameters[0]
+            Condition.CHANGED: lambda parameters, current_value: current_value is not None and current_value != parameters[0],
+            Condition.UNCHANGED: lambda parameters, current_value: current_value is not None and current_value == parameters[0],
+            Condition.INCREASED: lambda parameters, current_value: current_value is not None and current_value > parameters[0],
+            Condition.DECREASED: lambda parameters, current_value: current_value is not None and current_value < parameters[0]
         }
+
+def evaluate_condition(condition: Condition, current_value: bytes, previous_value: bytes, check_value: bytes, check_value2: Optional[bytes] = None) -> bool:
+    if condition == Condition.EQUAL:
+        return current_value == check_value
+    if condition == Condition.BETWEEN:
+        return check_value <= current_value <= check_value2
+    if condition == Condition.LESS_THAN:
+        return current_value <= check_value
+    if condition == Condition.GREATER_THAN:
+        return current_value >= check_value
+    if condition == Condition.NOT_EQUAL:
+        return current_value != check_value
+    if condition == Condition.CHANGED:
+        return current_value != previous_value
+    if condition == Condition.UNCHANGED:
+        return current_value == previous_value
+    if condition == Condition.INCREASED:
+        return current_value > previous_value
+    if condition == Condition.DECREASED:
+        return current_value < previous_value
+    return False
 
 
 def convert_to_bytes(value: str, to_type: Type) -> bytes:
@@ -126,6 +154,29 @@ class PointerSettingsType(Enum):
     DEPTH = auto()
     MAX_OFFSET = auto()
     RANDOM_SCAN = auto()
+
+
+class ScanSettingsType(Enum):
+    # --- Performance ---
+    PAGE_SIZE = auto()
+    FAST_SCAN = auto()
+    THREADS = auto()
+    ALIGNMENT_BYTES = auto()
+    PAUSE_TARGET_WHILE_SCANNING = auto()
+    SCAN_PRIORITY = auto()   # 0 = Normal, 1 = High
+
+    # --- Memory Regions ---
+    WRITABLE_ONLY = auto()
+    INCLUDE_EXECUTABLE = auto()
+    INCLUDE_COPY_ON_WRITE = auto()
+    INCLUDE_HEAP = auto()
+    INCLUDE_STACK = auto()
+    INCLUDE_MAPPED_FILES = auto()
+
+    # --- Results / Tables ---
+    HISTORY_DEPTH = auto()
+    AUTO_SAVE_TABLES = auto()
+    SHOW_PREVIOUS_VALUES = auto()
 
 
 def is_valid_type(t: Type, s: str) -> bool:

@@ -279,7 +279,7 @@ class MemoryScanner(AbstractMemoryScanner):
 
             address += memory_info.RegionSize
 
-    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
+    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> Generator[tuple[Any, int | Any] | None, Any, None]:
         total_size = self.get_working_memory_size()
         current_size = 0
         element_size = len(value) // 2
@@ -328,9 +328,10 @@ class MemoryScanner(AbstractMemoryScanner):
     #         current_size += region.size
     #     yield None
 
-    def read_bytes(self, address: int, size: int) -> bytes:
+    def read_bytes(self, address: int, size: int) -> bytes | None:
         if not self.handle:
-            raise ctypes.WinError(ctypes.get_last_error())
+            # raise ctypes.WinError(ctypes.get_last_error())
+            self.logger.error('No open process')
 
         # Create a buffer to hold the read data
         buffer = ctypes.create_string_buffer(size)

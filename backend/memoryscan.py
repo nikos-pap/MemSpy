@@ -1,8 +1,8 @@
 import time
 from multiprocessing import Process, Queue
-from typing import Iterator, Iterable
+from typing import Iterator, Optional
 
-import numpy as np
+from numpy.typing import NDArray
 
 from logger import create_logger
 from utils.message import Message, MessageType
@@ -36,10 +36,10 @@ class MemoryParserProcess(Process):
 
         self.scanner: MemoryScanner = MemoryScanner()
         self.pointer_scanner: PointerScanner = PointerScanner(self.scanner)
-        self._current_scan: Iterator | None = None
+        self._current_scan: Optional[Iterator] = None
         self._scanning: bool = False
         self.logger = None
-        self._scan_type: ScanType | None = None
+        self._scan_type: Optional[ScanType] = None
         self._scan_start: float = 0.0
 
     def run(self) -> None:
@@ -77,10 +77,8 @@ class MemoryParserProcess(Process):
         if typ == MessageType.SET_PROCESS:
             self._cancel_scan()
             pid = data[0]
-            backend = ''
             if not self.scanner:
                 self.scanner = MemoryScanner()
-                backend = 'NewMemoryScanner'
             if pid == -1:
                 self.scanner.close()
                 self.logger.debug('Process detached')
@@ -124,7 +122,7 @@ class MemoryParserProcess(Process):
         self.queue_out.put(Message(MessageType.START_SCAN, [condition, [value], get_address_dtype(4)]), False)
         self.logger.debug('Scan started')
 
-    def _emit_results(self, data: list[int] | np.ndarray, progress: int) -> None:
+    def _emit_results(self, data: list[int] | NDArray, progress: int) -> None:
         """Send addresses batch and periodic progress updates without conversion overhead."""
         if self._scan_type == ScanType.ADDRESS_SCAN and len(data):
             self.queue_out.put(Message(MessageType.ADD_ADDRESS, data), False)
