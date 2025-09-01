@@ -22,6 +22,7 @@ class QueueWorker(QObject):
     scanCompletedSignal = pyqtSignal()
     updateSavedSignal = pyqtSignal('quint64', bytes)
     pointerUpdateSignal = pyqtSignal(PointerChain)
+    processExitedSignal = pyqtSignal(int)
 
     def __init__(self, queue: Queue):
         super().__init__()
@@ -52,6 +53,8 @@ class QueueWorker(QObject):
                     self.filterValuesSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SCAN_COMPLETED:
                     self.scanCompletedSignal.emit()
+                elif msg.message_type == MessageType.PROCESS_EXITED:
+                    self.processExitedSignal.emit(msg.message)
                 else:
                     print(f"[QueueWorker] Unhandled message: {msg}")
         except Exception as e:

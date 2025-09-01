@@ -59,7 +59,16 @@ class MemoryParserProcess(Process):
             if msg.message_type == MessageType.EXIT:
                 break
 
+            if self.scanner.process_exited():
+                self.logger.info(f'Process Exited.')
+                self.scanner.close()
+
             if self._scanning and self._current_scan:
+                if self.scanner.process_exited():
+                    self.logger.info(f'Process Exited during Scan.')
+                    self._cancel_scan()
+                    continue
+
                 result = next(self._current_scan)
 
                 if result is None:
@@ -85,9 +94,13 @@ class MemoryParserProcess(Process):
             else:
                 self.scanner.change_process(pid)
                 self.logger.debug(f'Process set to {pid}')
+
             while not self.queue_out.empty():
                 self.queue_out.get_nowait()
             self.queue_out.put(Message(MessageType.RESET))
+
+            if self.scanner.process_exited():
+                self.scanner.close()
 
         elif typ == MessageType.START_SCAN:
             if not self.scanner:

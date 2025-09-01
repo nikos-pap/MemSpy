@@ -5,6 +5,7 @@ from numpy import ndarray
 
 class MessageType(Enum):
     SET_PROCESS = auto()
+    PROCESS_EXITED = auto()
     EXIT = auto()
     RESET = auto()
     EMPTY = auto()

@@ -347,7 +347,7 @@ class MemoryScanner(AbstractMemoryScanner):
         )
 
         if not success:
-            print(f"Invalid access to memory at address: {hex(address)}")
+            self.logger.error(f"Invalid access to memory at address: {hex(address)}")
             return None
 
         # Return the raw bytes read

@@ -111,7 +111,7 @@ class MmapAddressManager(AddressManagerAbstract):
         for address, value in self._addresses:
             cur = self._scanner.read_bytes(int(address), value.itemsize)
             if cur is None:
-                return 0
+                continue
             if evaluate_condition(condition, current_value=cur, previous_value=value, *values):
                 filtered_list.append((address, cur))
                 count += 1

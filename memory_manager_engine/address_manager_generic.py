@@ -88,6 +88,9 @@ class AddressManagerAbstract(ABC):
     def scan_addresses(self, condition: Condition, value: list[bytes]) -> int:
         pass
 
+    def process_exited(self) -> bool:
+        return self._scanner.process_exited()
+
     def set_value(self, address: int, value: bytes) -> None:
         if address in self._frozen_addresses:
             self._frozen_addresses[address] = value

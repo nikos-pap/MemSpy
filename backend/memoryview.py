@@ -48,6 +48,12 @@ class MemoryViewProcess(Process):
                 if current_msg.message_type == MessageType.EXIT:
                     return
 
+            if self.address_manager.process_exited():
+                self.logger.info('Process Exited.')
+                self.process_reader.close()
+                self.address_manager.reset()
+                self.out_queue.put(Message(MessageType.PROCESS_EXITED, [0]))
+
             self.address_manager.update()
             self.pointer_manager.update_chains()
 
@@ -119,6 +125,8 @@ class MemoryViewProcess(Process):
         if not self.process_reader.hasHandle():
             return
         for address, new_value, value in self.address_manager.get_current_page():
+            if new_value is None:
+                continue
             self.out_queue.put(Message(MessageType.VALUE_CHANGED, [address, new_value, value]))
 
     def _push_pointer_values(self):

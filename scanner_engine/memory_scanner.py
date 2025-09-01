@@ -13,6 +13,7 @@ TH32CS_SNAPMODULE32 = 0x00000010  # For 32-bit modules in a 64-bit process or vi
 TOKEN_ADJUST_PRIVILEGES = 0x0020
 TOKEN_QUERY = 0x0008
 SE_PRIVILEGE_ENABLED = 0x00000002
+WAIT_OBJECT_0 = 0x00000000
 
 
 # ——— Structures ———
@@ -138,6 +139,11 @@ class AbstractMemoryScanner(ABC):
     @abstractmethod
     def write_bytes(self, address: int, value: bytes) -> None:
         pass
+
+    def process_exited(self) -> bool:
+        """Return True if process has exited, False if still alive."""
+        r = kernel32.WaitForSingleObject(self.handle, 0)
+        return r == WAIT_OBJECT_0
 
     def close(self):
         if self.handle:

@@ -24,11 +24,11 @@ class MemoryScannerUI(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.backend = Backend()
-        self.isAttached = False
-        self.valid_input = False
+        self.backend: Backend = Backend()
+        self.isAttached: bool = False
+        self.valid_input: bool = False
         self.scan_type: Optional[ScanType] = None
-
+        
         self._setup_window()
         self._create_widgets()
         self._create_layouts()
@@ -222,6 +222,7 @@ class MemoryScannerUI(QMainWindow):
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
+        listener.processExitedSignal.connect(self.process_closed_handle)
 
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)
@@ -478,6 +479,10 @@ class MemoryScannerUI(QMainWindow):
 
     def set_message(self, message: str):
         self.status.showMessage(message)
+
+    @pyqtSlot(int)
+    def process_closed_handle(self, code: int) -> None:
+        self.process_box.setCurrentIndex(0)
 
     def validate_input(self):
         text = self.search_input.text()

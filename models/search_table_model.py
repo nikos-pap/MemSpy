@@ -63,26 +63,26 @@ class SortedPagedTableModel(QAbstractTableModel):
 
         return super().headerData(section, orientation, role)
 
-    def setPage(self, page: int):
-        """Switch to the given zero-based page index."""
-        if page < 0 or page == self.current_page:
-            return
-        max_page = (len(self._keys) - 1) // self.page_size
-        page = min(page, max_page)
-
-        # full reload removal
-        old_count = self.rowCount()
-        if old_count > 0:
-            self.beginRemoveRows(QModelIndex(), 0, old_count - 1)
-            self.endRemoveRows()
-
-        self.current_page = page
-
-        # full reload insertion
-        new_count = self.rowCount()
-        if new_count > 0:
-            self.beginInsertRows(QModelIndex(), 0, new_count - 1)
-            self.endInsertRows()
+    # def setPage(self, page: int):
+    #     """Switch to the given zero-based page index."""
+    #     if page < 0 or page == self.current_page:
+    #         return
+    #     max_page = (len(self._keys) - 1) // self.page_size
+    #     page = min(page, max_page)
+    #
+    #     # full reload removal
+    #     old_count = self.rowCount()
+    #     if old_count > 0:
+    #         self.beginRemoveRows(QModelIndex(), 0, old_count - 1)
+    #         self.endRemoveRows()
+    #
+    #     self.current_page = page
+    #
+    #     # full reload insertion
+    #     new_count = self.rowCount()
+    #     if new_count > 0:
+    #         self.beginInsertRows(QModelIndex(), 0, new_count - 1)
+    #         self.endInsertRows()
 
     @pyqtSlot('quint64', bytes, bytes)
     def handleUpdate(self, key: int, val: bytes, initial_value: bytes):

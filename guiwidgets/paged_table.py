@@ -1,12 +1,14 @@
-from PyQt6.QtGui import QFont, QBrush, QColor
+from typing import Optional
+
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QTableWidgetItem, QLineEdit, QPushButton, QLabel, QCheckBox, QTableView, QHeaderView
+    QLineEdit, QPushButton, QLabel, QTableView, QHeaderView
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSlot, pyqtSignal, QModelIndex
+from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 
 from models.search_table_model import SortedPagedTableModel
-from utils.types import convert_from_bytes, convert_to_bytes, Type
+from utils.types import Type
 
 
 class PaginatedTable(QWidget):
@@ -17,21 +19,26 @@ class PaginatedTable(QWidget):
     previousPageSignal = pyqtSignal()
     addressActivated = pyqtSignal(dict)
 
-    def __init__(self, *args):
+    def __init__(self, font: Optional[QFont] = None, *args):
         super().__init__()
         self.setWindowTitle("Large Table with Filter + Pagination")
 
-        self.page_size = 100
-        self.current_page = 0
-        self.model = SortedPagedTableModel(self)
-        # self.filtered_data: Dict[str, RowEntry] = dict()
-        self.font = QFont()
-        self.font.setPointSize(12)
+        self.page_size: int = 100
+        self.current_page: int = 0
+        self.model: SortedPagedTableModel = SortedPagedTableModel(self)
+        self.font: QFont = font or QFont()
+        if not font:
+            self.font.setPointSize(12)
 
-        self.page_start = 0
-        self.page_end = -1
-        self.total = 0
-        self.filtered = -1
+        self.page_start: int = 0
+        self.page_end: int = -1
+        self.total: int = 0
+        self.filtered: int = -1
+
+        self._init_ui()
+
+    def _init_ui(self):
+        layout = QVBoxLayout(self)
 
         self.filter_input = QLineEdit()
         self.table = QTableView(self)
@@ -41,21 +48,16 @@ class PaginatedTable(QWidget):
         self.prev_button = QPushButton("Previous")
         self.next_button = QPushButton("Next")
 
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout(self)
-
         # Filter input
-        self.filter_input.setPlaceholderText("Filter by name (column 1)...")
-        # noinspection PyUnresolvedReferences
-        self.filter_input.textChanged.connect(self.filterSignal)
+        self.filter_input.setPlaceholderText("Filter by address (column 1)...")
+
         layout.addWidget(self.filter_input)
 
         layout.addWidget(self.table)
         layout.addWidget(self.info_label)
         vh = self.table.verticalHeader()
         vh.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+
         # Pagination controls
         pagination_layout = QHBoxLayout()
 
@@ -65,7 +67,8 @@ class PaginatedTable(QWidget):
         self.__connect_signals()
 
     def __connect_signals(self):
-        # self.filter_input.textChanged.connect(self.on_filter_text_changed)
+        # noinspection PyUnresolvedReferences
+        self.filter_input.textChanged.connect(self.filterSignal)
 
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
@@ -78,88 +81,8 @@ class PaginatedTable(QWidget):
         self.model.rowsRemoved.connect(self._on_rows_changed)
         self.model.modelReset.connect(self._on_rows_changed)
 
-    def setHorizontalHeaderLabels(self, *args):
-        self.model.setHorizontalHeaderLabels(*args)
-
     def horizontalHeader(self):
         return self.table.horizontalHeader()
-
-    # def on_filter_text_changed(self, text):
-    #     self.filtered_data = self.filter_command(text)
-    #     self.current_page = 0
-    #     self.render_current_page()
-
-    # def render_current_page(self):
-    #     self.table.blockSignals(True)
-    #     start = self.current_page * self.page_size
-    #     end = start + self.page_size
-    #     filtered_list = list(self.filtered_data.keys())
-    #     page_data = filtered_list[start:end]
-    #
-    #     self.table.setRowCount(len(page_data))
-    #     for i, address in enumerate(page_data):
-    #         entry = self.filtered_data[address]
-    #         chk = QCheckBox()
-    #         chk.setFixedSize(QSize(25, 25))
-    #         chk.setStyleSheet('text-align: center;')
-    #         chk.setFont(self.font)
-    #         if '0x1ad44c8feec' in address:
-    #             print(entry.isFrozen)
-    #         chk.setChecked(entry.isFrozen)
-    #         # noinspection PyUnresolvedReferences
-    #         chk.stateChanged.connect(lambda state, r=address: self.on_checkbox_state_changed(r, state))
-    #         # checkbox.stateChanged.connect(lambda state, r=row: self.on_checkbox_state_changed(r, state))
-    #         container = QWidget()
-    #         layout = QHBoxLayout(container)
-    #         layout.addWidget(chk)
-    #         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    #         layout.setContentsMargins(0, 0, 0, 0)
-    #         self.table.setCellWidget(i, 0, container)
-    #         self.table.resizeColumnToContents(0)
-    #
-    #         addr = QTableWidgetItem(address)
-    #         addr.setFlags(addr.flags() & ~Qt.ItemFlag.ItemIsEditable)
-    #         addr.setFont(self.font)
-    #         self.table.setItem(i, 1, addr)
-    #         new_value = convert_from_bytes(entry.new_value, entry.data_type)
-    #         val = QTableWidgetItem(str(new_value))
-    #
-    #         val.setFont(self.font)
-    #         val.setData(Qt.ItemDataRole.UserRole, address)
-    #         value = convert_from_bytes(entry.value, entry.data_type)
-    #         self.table.setItem(i, 2, val)
-    #
-    #         old_val = QTableWidgetItem(str(value))
-    #         old_val.setFlags(old_val.flags() & ~Qt.ItemFlag.ItemIsEditable)
-    #         old_val.setFont(self.font)
-    #         old_val.setData(Qt.ItemDataRole.UserRole, entry.data_type)
-    #         self.table.setItem(i, 3, old_val)
-    #         color = 'white'
-    #         n_val = convert_from_bytes(entry.new_value, Type.UInt32)
-    #         o_val = convert_from_bytes(entry.value, Type.UInt32)
-    #         if n_val > o_val:
-    #             color = 'limegreen'
-    #         elif n_val < o_val:
-    #             color = 'red'
-    #
-    #         val.setForeground(QBrush(QColor(color)))
-    #
-    #     self.prev_button.setEnabled(self.current_page > 0)
-    #     self.next_button.setEnabled(end < len(self.filtered_data))
-    #
-    #     filtered = len(self.filtered_data)
-    #
-    #     if filtered == 0:
-    #         self.info_label.setText("No results found.")
-    #         self.start = 0
-    #         self.end = -1
-    #     else:
-    #         self.start = self.current_page * self.page_size + 1
-    #         self.end = min((self.current_page + 1) * self.page_size, filtered)
-    #         filtered_text = f'{filtered} filtered ' if filtered != self.total else ''
-    #         self.info_label.setText(f"Showing {self.start}–{self.end} ({filtered_text}of {self.total} total)")
-    #
-    #     self.table.blockSignals(False)
 
     def show_message(self):
         filtered_text = f'{self.filtered} of ' if self.filter_input.text() else ''
@@ -170,11 +93,6 @@ class PaginatedTable(QWidget):
         self.prev_button.setDisabled(start == 0)
         self.info_label.setText(text)
 
-    def fill_data(self, address_list):
-        self.filter_input.setText('')
-        self.filtered_data = address_list
-        self.current_page = 0
-
     def setPageRanges(self, start: int):
         self.page_start = start
         self._on_rows_changed()
@@ -184,11 +102,6 @@ class PaginatedTable(QWidget):
         self.model.handleUpdate(key, val, old_val)
         self.show_message()
 
-    def getPageRange(self):
-        start = self.current_page * self.page_size
-        end = start + self.page_size
-        return start, end
-
     def setTotal(self, total: int) -> None:
         if total == 0:
             self.clear()
@@ -196,6 +109,7 @@ class PaginatedTable(QWidget):
 
     def setFiltered(self, value):
         self.filtered = value
+        self.show_message()
 
     @pyqtSlot()
     def _on_rows_changed(self):
