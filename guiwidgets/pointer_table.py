@@ -6,12 +6,12 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QComboBox,
     QPushButton,
-    # QFileDialog,
-    # QMessageBox,
+    QFileDialog,
+    QMessageBox,
     QLabel
 )
 from PyQt6.QtCore import QModelIndex, pyqtSlot
-# import csv
+import csv
 from utils import Type, PointerChain
 from models import PointerScanTableModel
 
@@ -47,6 +47,7 @@ class PointerScanTable(QWidget):
         ctrl = QHBoxLayout()
         self.import_btn = QPushButton("Import")
         self.import_btn.clicked.connect(self.importData)
+        self.import_btn.setDisabled(True)
         self.export_btn = QPushButton("Export")
         self.export_btn.clicked.connect(self.exportData)
         ctrl.addWidget(self.import_btn)
@@ -57,7 +58,7 @@ class PointerScanTable(QWidget):
         for t in Type:
             self.type_combo.addItem(t.name, t)
         self.type_combo.setCurrentText(Type.UInt32.name)
-        self.type_combo.currentIndexChanged.connect(lambda data_type: self.model.setValueType(self.type_combo.itemData(data_type)))
+        self.type_combo.currentIndexChanged.connect(lambda data_type: self.model.set_value_type_handle(self.type_combo.itemData(data_type)))
         # self.type_combo.currentTextChanged.connect(lambda data_type: self.model.setValueType(data_type))
         ctrl.addWidget(self.type_combo)
         layout.addLayout(ctrl)
@@ -84,7 +85,7 @@ class PointerScanTable(QWidget):
     @pyqtSlot(PointerChain)
     def handleUpdate(self, pointer: PointerChain):
         # rows: list of tuples as per input format
-        self.model.handleUpdate(pointer)
+        self.model.update_handle(pointer)
         self.show_message()
 
     def setTotal(self, total: int) -> None:
@@ -122,18 +123,18 @@ class PointerScanTable(QWidget):
 
     def exportData(self):
         pass
-        # path, _ = QFileDialog.getSaveFileName(self, "Export Pointer Data", "", "CSV Files (*.csv);;All Files (*)")
-        # if not path:
-        #     return
-        # try:
-        #     rows = self.model.getData()
-        #     with open(path, 'w', newline='') as f:
-        #         writer = csv.writer(f)
-        #         writer.writerow(self.model.headers)
-        #         for module_name, module_address, initial_offset, offsets, target_address, raw_bytes in rows:
-        #             row = [module_name, f"0x{module_address:X}", f"0x{initial_offset:X}"]
-        #             row += [f"0x{off:X}" for off in offsets]
-        #             row += [f"0x{target_address:X}", '0x' + raw_bytes.hex()]
-        #             writer.writerow(row)
-        # except Exception as e:
-        #     QMessageBox.critical(self, "Export Error", str(e))
+        path, _ = QFileDialog.getSaveFileName(self, "Export Pointer Data", "", "CSV Files (*.csv);;All Files (*)")
+        if not path:
+            return
+        try:
+            rows = self.model.getData()
+            with open(path, 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(self.model.headers)
+                for module_name, module_address, initial_offset, offsets, target_address, raw_bytes in rows:
+                    row = [module_name, f"0x{module_address:X}", f"0x{initial_offset:X}"]
+                    row += [f"0x{off:X}" for off in offsets]
+                    row += [f"0x{target_address:X}", '0x' + raw_bytes.hex()]
+                    writer.writerow(row)
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", str(e))

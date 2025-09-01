@@ -70,7 +70,7 @@ class PointerScanTableModel(QAbstractTableModel):
             return self._headers[section]
         return str(section + 1)
 
-    def setValueType(self, data_type: Type):
+    def set_value_type_handle(self, data_type: Type):
         self.value_type = data_type
         # 2) Notify the view that the Value column has changed for all rows:
         col = self._offset_count + 2
@@ -79,7 +79,7 @@ class PointerScanTableModel(QAbstractTableModel):
         self.dataChanged.emit(top_left, bottom_right,
                               [Qt.ItemDataRole.DisplayRole])
 
-    def _make_key(self, ptr: PointerChain) -> str:
+    def __make_key(self, ptr: PointerChain) -> str:
         return f"{ptr.module_name}|{'-'.join(map(str, ptr.offsets))}"
 
     def _recalc_headers(self):
@@ -94,11 +94,11 @@ class PointerScanTableModel(QAbstractTableModel):
         )
 
     @pyqtSlot(PointerChain)
-    def handleUpdate(self, ptr: PointerChain):
+    def update_handle(self, ptr: PointerChain):
         """
         Insert or update a PointerChain.
         """
-        key = self._make_key(ptr)
+        key = self.__make_key(ptr)
         is_new = key not in self._data
         # no-op if unchanged
         if not is_new:
@@ -124,7 +124,7 @@ class PointerScanTableModel(QAbstractTableModel):
             self.dataChanged.emit(left, right, [Qt.ItemDataRole.DisplayRole])
 
     @pyqtSlot(str)
-    def handleDelete(self, key: str):
+    def delete_handle(self, key: str):
         if key not in self._data:
             return
         idx = bisect.bisect_left(self._keys, key)
