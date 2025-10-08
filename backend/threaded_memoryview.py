@@ -62,7 +62,7 @@ class MemoryViewThread(QObject):
 
         for index, (address, value) in enumerate(page):
             current_data = self.__scanner.read_bytes(int(address), value.itemsize)
-            if self.__page_buffer[index].tobytes() != current_data or not self.__initialized_value_mask[index]:
+            if (self.__page_buffer[index].tobytes() != current_data or not self.__initialized_value_mask[index]) and current_data is not None:
                 self.__page_buffer[index] = current_data
                 self.dataReadySignal.emit(int(address), current_data, value.tobytes())
                 self.__initialized_value_mask[index] = True

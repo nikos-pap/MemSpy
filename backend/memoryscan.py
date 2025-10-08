@@ -149,13 +149,13 @@ class MemoryParserProcess(Process):
         self.__logger.debug('Scan started')
 
     def __start_filter_scan(self, values: tuple[bytes, bytes], condition: Condition, file_in: str) -> None:
+        dtype = address_dtype(len(values[0]))
         self.__file_writer.close()
         self.__scanning = True
         self.__scan_start = time.time()
-        self.__file_reader.set_file(file_in, len(values[0]))
+        self.__file_reader.set_file(file_in, dtype.itemsize)
         self.__current_scan = self.__filter_iterator(values, condition)
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [0]), False)
-        dtype = address_dtype(len(values[0]))
         self.__file_writer.temp_file(dtype)
         self.__queue_out.put(
             Message(MessageType.START_SCAN, [condition, values, dtype, self.__file_writer.filepath, ScanType.FILTER_SCAN]), False)
