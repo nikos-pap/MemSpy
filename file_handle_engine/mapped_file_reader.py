@@ -19,9 +19,9 @@ class MappedFileReader:
         self.__logger: Logger = create_logger(self.__class__.__name__)
 
     def set_file(self, filepath: str, dtype: DTypeLike) -> None:
+        self.reset()
         self.__filepath = filepath
         self.__dtype = dtype
-
         if os.path.getsize(filepath) == 0:
             self.__address_list = np.empty((0,), dtype=dtype)
         else:
@@ -50,9 +50,7 @@ class MappedFileReader:
 
     def reload_file(self) -> None:
         del self.__address_list
-        self.__address_list = np.memmap(self.__filepath, dtype=self.__dtype, mode="r")
-        self.__total_page_number = len(self.__address_list)
-        self.__current_page_number = 0
+        self.set_file(self.__filepath, self.__dtype)
 
     def filter_addresses(self, out_file: BinaryIO, filter_string: str = '', chunk_size: int = 100_000) -> int:
         if self.__address_list is None:
@@ -84,6 +82,10 @@ class MappedFileReader:
         return data_written
 
     @property
+    def filepath(self) -> str:
+        return self.__filepath
+
+    @property
     def dtype(self) -> DTypeLike:
         return self.__dtype
 
@@ -105,4 +107,7 @@ class MappedFileReader:
         self.__total_page_number: int = 0
 
     def close(self) -> None:
+        del self.__address_list
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         del self.__address_list

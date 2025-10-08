@@ -217,14 +217,17 @@ class MemoryScannerUI(QMainWindow):
         data_thread = self.backend.memory_worker
         data_thread.dataReadySignal.connect(self.search_address_table.handleUpdate)
         data_thread.updateTotalsSignal.connect(self.__update_address_totals)
+        data_thread.filterValuesSignal.connect(self.search_address_table.setFiltered)
+
+        self.search_address_table.filterSignal.connect(data_thread.filterAddressSignal)
 
         listener.progressSignal.connect(self.progress_bar.setValue)
-        data_thread.addressPageSignal.connect(self.search_address_table.setPageRanges)
-        listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
+        listener.processExitedSignal.connect(self.process_closed_handle)
+
+        data_thread.addressPageSignal.connect(self.search_address_table.setPageRanges)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
-        listener.processExitedSignal.connect(self.process_closed_handle)
 
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)

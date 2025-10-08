@@ -2,38 +2,33 @@ from dataclasses import dataclass, field
 from typing import Optional
 import numpy as np
 from numpy.typing import DTypeLike
-
-from logger import Logger, get_logger
-from utils.types import Condition, OperationCondition
+from utils.types import Condition, OperationCondition, FilterCondition
 
 
 @dataclass(frozen=True)
-class Operation:
+class GenericOperation:
     """
-    Represents a memory scan operation and its parameters.
-
     Attributes
     ----------
     condition : OperationCondition
         The operation condition (e.g., EQUAL, BETWEEN).
-    values : tuple[bytes, bytes]
-        The byte values used for the condition.
     dtype : DTypeLike
         The NumPy dtype or equivalent.
     filepath : str
         File path to the related data.
     parent : Optional[Operation]
         Parent operation, if any.
-    __logger : Logger
-        Internal logger (not part of __init__, excluded from repr).
     """
     condition: OperationCondition
-    values: tuple[bytes, bytes]
     dtype: DTypeLike
     filepath: str
-    parent: Optional["Operation"] = None
-    __logger: Logger = field(default_factory=lambda: get_logger("Operation"),
-                             init=False, repr=False, compare=False)
+    parent: Optional["GenericOperation"] = None
+
+
+@dataclass(frozen=True)
+class Operation(GenericOperation):
+    condition: Condition
+    values: tuple[bytes, bytes] = (b'', b'')
 
     def history(self) -> list["Operation"]:
         """Return chain of parent → this collection."""
@@ -51,5 +46,20 @@ class Operation:
         with open(self.filepath, 'ab') as f:
             f.truncate(elements * np.dtype(self.dtype).itemsize)
 
-    def __repr__(self):
-        return f"<Operation {self.condition.name} {self.values}>"
+
+@dataclass(frozen=True)
+class FilterOperation(GenericOperation):
+    """
+    Attributes
+    ----------
+    condition : OperationCondition
+        The operation condition (e.g., EQUAL, BETWEEN).
+    dtype : DTypeLike
+        The NumPy dtype or equivalent.
+    filepath : str
+        File path to the related data.
+    parent : Optional[Operation]
+        Parent operation, if any.
+    filter_str : string from filter.
+    """
+    filter_str: str = ''

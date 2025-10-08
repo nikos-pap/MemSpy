@@ -11,6 +11,7 @@ from models.search_table_model import SortedPagedTableModel
 from utils.types import Type
 from logger import Logger, get_logger
 
+
 class PaginatedTable(QWidget):
     filterSignal = pyqtSignal(str)
     valueSetSignal = pyqtSignal(int, bytes)
@@ -35,6 +36,7 @@ class PaginatedTable(QWidget):
         self.page_end: int = -1
         self.total: int = 0
         self.filtered: int = -1
+        self.current_filter: str = ''
 
         self._init_ui()
 
@@ -51,8 +53,12 @@ class PaginatedTable(QWidget):
 
         # Filter input
         self.filter_input.setPlaceholderText("Filter by address (column 1)...")
+        filter_layout = QHBoxLayout()
+        self.filter_button = QPushButton("Filter Addresses")
+        filter_layout.addWidget(self.filter_input)
+        filter_layout.addWidget(self.filter_button)
 
-        layout.addWidget(self.filter_input)
+        layout.addLayout(filter_layout)
 
         layout.addWidget(self.table)
         layout.addWidget(self.info_label)
@@ -69,7 +75,7 @@ class PaginatedTable(QWidget):
 
     def __connect_signals(self):
         # noinspection PyUnresolvedReferences
-        self.filter_input.textChanged.connect(self.filterSignal)
+        self.filter_button.clicked.connect(self.__handle_filter)
 
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
@@ -111,6 +117,12 @@ class PaginatedTable(QWidget):
     def setFiltered(self, value):
         self.filtered = value
         self.show_message()
+
+    def __handle_filter(self) -> None:
+        filter_str = self.filter_input.text()
+        if filter_str != self.current_filter:
+            self.current_filter = filter_str
+            self.filterSignal.emit(filter_str)
 
     @pyqtSlot()
     def _on_rows_changed(self):

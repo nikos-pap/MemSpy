@@ -88,7 +88,7 @@ class Backend(QObject):
         self.__thread.start()
 
         self.__memory_thread = QThread(self)
-        self.memory_worker: MemoryViewThread = MemoryViewThread()
+        self.memory_worker: MemoryViewThread = MemoryViewThread(self.__save_dir.name)
         self.memory_worker.moveToThread(self.__memory_thread)
         self.__memory_thread.started.connect(self.memory_worker.run)
         self.__memory_thread.start()
@@ -160,16 +160,15 @@ class Backend(QObject):
 
     @pyqtSlot(list)
     def __start_operation(self, operation_data: list) -> None:
-        if operation_data[-1] != ScanType.ADDRESS_SCAN:
-            operation_data[-1] = self.__history[-1]
+        if operation_data[-2] != ScanType.ADDRESS_SCAN:
+            operation_data[-2] = self.__history[-1]
         else:
-            operation_data[-1] = None
+            operation_data[-2] = None
         operation = Operation(*operation_data)
         self.__logger.debug(f'Starting operation {operation}')
         self.__history.append(operation)
 
         self.memory_worker.scanFileCreatedSignal.emit(operation)
-
 
     def stop(self) -> None:
         """Gracefully stop background processes without blocking on crashed ones."""

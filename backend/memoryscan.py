@@ -82,6 +82,9 @@ class MemoryParserProcess(Process):
                     total = 0
                 elif result:
                     addresses, progress = result
+                    # shit = addresses['bytes'] != np.frombuffer((1691).to_bytes(4, 'little'), dtype='V4')
+                    # if np.any(shit):
+                    #     print(addresses[shit])
                     self.__file_writer.write(addresses)
                     total += len(addresses)
                     self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
@@ -144,7 +147,7 @@ class MemoryParserProcess(Process):
         dtype = address_dtype(len(value[0]))
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [0]), False)
         self.__file_writer.temp_file(dtype)
-        self.__queue_out.put(Message(MessageType.START_SCAN, [condition, value, dtype, self.__file_writer.filepath, scan_type]), False)
+        self.__queue_out.put(Message(MessageType.START_SCAN, [condition, dtype, self.__file_writer.filepath, scan_type, value]), False)
         # TODO fix value length
         self.__logger.debug('Scan started')
 

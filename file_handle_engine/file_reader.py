@@ -50,3 +50,7 @@ class FileStreamReader:
         while result:
             yield result
             result = self.__stream.read(self.__data_size)
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self.__stream and not self.__stream.closed:
+            self.__stream.close()
