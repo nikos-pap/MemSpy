@@ -3,12 +3,12 @@ from typing import Iterator, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from memory_manager_engine.address_manager_generic import AddressManagerAbstract
+from memory_manager_engine.address_manager_generic import AbstractAddressManager
 from scanner_engine.process_reader import MemoryScanner
 from utils.types import Condition, filter_cases
 
 
-class AddressManager(AddressManagerAbstract):
+class AddressManager(AbstractAddressManager):
     def __init__(self, scanner: MemoryScanner, page_size: int = 100):
         super().__init__(scanner, page_size)
 

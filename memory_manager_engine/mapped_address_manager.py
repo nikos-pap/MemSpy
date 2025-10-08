@@ -3,14 +3,14 @@ from typing import Optional, Iterator, Tuple
 import numpy as np
 from numpy.typing import NDArray
 
-from memory_manager_engine.address_manager_generic import AddressManagerAbstract
+from memory_manager_engine.address_manager_generic import AbstractAddressManager
 from memory_manager_engine.operation import Operation
-from scanner_engine.process_reader import MemoryScanner
+from scanner_engine.memory_scanner import AbstractMemoryScanner
 from utils.types import Condition, evaluate_condition
 from logger import get_logger
 
 
-class MmapAddressManager(AddressManagerAbstract):
+class MmapAddressManager(AbstractAddressManager):
     """Variant of :class:`AddressManager` that stores address data in a
     memory-mapped file instead of keeping it in ordinary NumPy arrays.
 
@@ -20,7 +20,7 @@ class MmapAddressManager(AddressManagerAbstract):
     simple persistent backing store for the address table.
     """
 
-    def __init__(self, scanner: MemoryScanner, page_size: int = 100, buffer_size: int = 10_000):
+    def __init__(self, scanner: AbstractMemoryScanner, page_size: int = 100, buffer_size: int = 10_000):
         super().__init__(scanner, page_size)
 
         self.__current_operation: Optional[Operation] = None
@@ -49,7 +49,7 @@ class MmapAddressManager(AddressManagerAbstract):
         if self._addresses is not None:
             old_n = len(self._addresses)
         new_n = old_n + len(self.__table_buffer)
-        filename = self.__current_operation.filename
+        filename = self.__current_operation.filepath
         dtype = self.__current_operation.dtype
         self.__current_operation.extend_file(new_n)
         self._addresses = np.memmap(filename, dtype=dtype, mode='r+', shape=(new_n,))
@@ -64,10 +64,15 @@ class MmapAddressManager(AddressManagerAbstract):
         self._calculate_filtered_page()
 
     def _calculate_filtered_page(self) -> None:
-        self._total_filtered = 0
         self._filter_array[:] = -1
-        count = 0
+        if not self._current_filter:
+            start = max(min(self._page_no * self._page_size, len(self._addresses)), 0)
+            self._filter_array[:] = np.arange(start, min(start + self._page_size, len(self._addresses)))
+            self._total_filtered = len(self._addresses)
+            return
 
+        self._total_filtered = 0
+        count = 0
         for index, address in enumerate(self._addresses[:]['num']):
             if self._current_filter in hex(address):
                 if count < self._page_size and index >= self._page_no * self._page_size:
@@ -117,11 +122,11 @@ class MmapAddressManager(AddressManagerAbstract):
                 count += 1
         filtered_list = np.array(filtered_list, dtype=current_operation.dtype)
 
-        new_filter = np.memmap(new_operation.filename, dtype=current_operation.dtype, shape=filtered_list.shape, mode='w+')
+        new_filter = np.memmap(new_operation.filepath, dtype=current_operation.dtype, shape=filtered_list.shape, mode='w+')
         new_filter[:] = filtered_list[:]
         new_filter.flush()
 
-        self._addresses = np.memmap(new_operation.filename, dtype=current_operation.dtype, shape=new_filter.shape, mode='r')
+        self._addresses = np.memmap(new_operation.filepath, dtype=current_operation.dtype, shape=new_filter.shape, mode='r')
         self._history.append(new_operation)
         self._total_matches = count
         self._page_no = 0

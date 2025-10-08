@@ -2,8 +2,8 @@ import math
 from sys import byteorder
 from enum import Enum, auto
 import struct
-from typing import Optional
-
+from typing import Optional, Union
+from numpy.typing import DTypeLike
 import numpy as np
 
 
@@ -41,6 +41,7 @@ class Type(Enum):
 class ScanType(Enum):
     POINTER_SCAN = auto()
     ADDRESS_SCAN = auto()
+    FILTER_SCAN = auto()
 
 
 class Condition(Enum):
@@ -55,6 +56,13 @@ class Condition(Enum):
     DECREASED = auto()
 
 
+class FilterCondition(Enum):
+    FILTER_ADDRESS = auto()
+
+
+OperationCondition = Union[Condition, FilterCondition]
+
+
 filter_cases = {
             Condition.EQUAL: lambda parameters, current_value: current_value is not None and parameters[0] == current_value,
             Condition.BETWEEN: lambda parameters, current_value: current_value is not None and parameters[0] <= current_value <= parameters[1],
@@ -66,6 +74,7 @@ filter_cases = {
             Condition.INCREASED: lambda parameters, current_value: current_value is not None and current_value > parameters[0],
             Condition.DECREASED: lambda parameters, current_value: current_value is not None and current_value < parameters[0]
         }
+
 
 def evaluate_condition(condition: Condition, current_value: bytes, previous_value: bytes, check_value: bytes, check_value2: Optional[bytes] = None) -> bool:
     if condition == Condition.EQUAL:
@@ -90,6 +99,7 @@ def evaluate_condition(condition: Condition, current_value: bytes, previous_valu
 
 
 def convert_to_bytes(value: str, to_type: Type) -> bytes:
+    t = b''
     match to_type:
         case Type.String:
             return value.encode('utf-8')
@@ -226,7 +236,16 @@ def is_valid_type(t: Type, s: str) -> bool:
     return False
 
 
-def get_address_dtype(element_size: int) -> np.typing.DTypeLike:
+def address_dtype(element_size: int) -> DTypeLike:
+    """
+    Return the dtype of the data.
+
+    Args:
+        element_size: The size of the data address values in bytes.
+
+    Returns:
+        np.typing.DTypeLike: A dtype to set for nparrays.
+    """
     return np.dtype([
         ("num", np.uint64),
         ("bytes", f"V{element_size}")

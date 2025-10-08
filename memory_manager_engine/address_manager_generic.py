@@ -6,13 +6,14 @@ from numpy.typing import NDArray
 
 from logger import get_logger
 from memory_manager_engine.manager_stats import Stat
+from scanner_engine.memory_scanner import AbstractMemoryScanner
 from scanner_engine.process_reader import MemoryScanner
 from utils.types import Condition
 
 
-class AddressManagerAbstract(ABC):
-    def __init__(self, scanner: MemoryScanner, page_size: int = 100):
-        self._scanner: MemoryScanner = scanner
+class AbstractAddressManager(ABC):
+    def __init__(self, scanner: AbstractMemoryScanner, page_size: int = 100):
+        self._scanner: AbstractMemoryScanner = scanner
         self._page_size: int = page_size
         self._addresses: Optional[NDArray] = None
 
@@ -34,7 +35,6 @@ class AddressManagerAbstract(ABC):
     def init_scan(self, condition: Condition, values: list, dtype: np.dtype) -> None:
         pass
 
-
     def reset_filter(self) -> None:
         """Clear paging state (does not clear current_filter)."""
         self._page_no = 0
@@ -53,6 +53,9 @@ class AddressManagerAbstract(ABC):
 
     @abstractmethod
     def set_page(self, page_number: int) -> None:
+        pass
+
+    def flush(self):
         pass
 
     def next_page(self) -> None:

@@ -1,10 +1,13 @@
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional
+from numpy.typing import NDArray
 import numpy as np
 from numpy.lib.stride_tricks import as_strided
-from utils.types import Condition
+
+from utils.types import Condition, address_dtype
 
 
-def match_condition(arr_chunk, offset, mode, start, end, dtype):
+def match_condition(arr_chunk, offset, mode: Condition, start, end, dtype):
     if mode == Condition.EQUAL:
         mask = (arr_chunk == start)
     elif mode == Condition.NOT_EQUAL:
@@ -22,14 +25,16 @@ def match_condition(arr_chunk, offset, mode, start, end, dtype):
     vals = arr_chunk[indices - offset].view(dtype)
     return indices, vals
 
-def find_matches(bytestream: bytes | None = None, base_address: int = 0, mode: Condition = Condition.EQUAL, target=None, element_size: int = 4, alignment: bool = False) -> np.ndarray | list | None:
+
+def find_matches(bytestream: Optional[bytes] = None, base_address: int = 0, mode: Condition = Condition.EQUAL, target: Optional = None, element_size: int = 4, alignment: bool = False) -> NDArray:
+    dtype = address_dtype(element_size)
     if bytestream is None or target is None:
-        return []
+        return np.empty((0, ), dtype=dtype)
 
     data = np.frombuffer(bytestream, dtype=np.uint8)
     length = len(data)
     if length < element_size:
-        return []
+        return np.empty((0, ), dtype=dtype)
 
     stride = data.strides[0]
     windows = as_strided(data, shape=(length - element_size + 1, element_size), strides=(stride, stride))
@@ -59,7 +64,7 @@ def find_matches(bytestream: bytes | None = None, base_address: int = 0, mode: C
                 results_vals.append(vals)
 
     if not results_indices:
-        return []
+        return np.empty((0, ), dtype=dtype)
 
     all_indices = np.concatenate(results_indices)
     all_vals = np.concatenate(results_vals)

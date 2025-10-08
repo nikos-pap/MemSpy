@@ -33,7 +33,7 @@ class MemoryScannerUI(QMainWindow):
         self._create_widgets()
         self._create_layouts()
         self._create_menu_bar()
-        self._connect_signals()
+        self.__connect_signals()
 
         self.update_process_list_command()
         self.initialise()
@@ -82,7 +82,7 @@ class MemoryScannerUI(QMainWindow):
         self.filter_btn.setEnabled(False)
 
         # Dock widgets and tables
-        self.search_address_table = PaginatedTable(0, 4)
+        self.search_address_table = PaginatedTable(font, 4)
         header = self.search_address_table.horizontalHeader()
         for i in range(3):
             header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -212,12 +212,14 @@ class MemoryScannerUI(QMainWindow):
         dlg = SettingsDialog(self, self.settings_manager)
         dlg.exec()
 
-    def _connect_signals(self):
+    def __connect_signals(self):
         listener = self.backend.listener
-        listener.dataReady.connect(self.search_address_table.handleUpdate)
+        data_thread = self.backend.memory_worker
+        data_thread.dataReadySignal.connect(self.search_address_table.handleUpdate)
+        data_thread.updateTotalsSignal.connect(self.__update_address_totals)
+
         listener.progressSignal.connect(self.progress_bar.setValue)
-        listener.totalValuesSignal.connect(self.scan_progress)
-        listener.pageRangeSignal.connect(self.search_address_table.setPageRanges)
+        data_thread.addressPageSignal.connect(self.search_address_table.setPageRanges)
         listener.filterValuesSignal.connect(self.search_address_table.setFiltered)
         listener.scanCompletedSignal.connect(self.finished_scan)
         listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
@@ -227,10 +229,8 @@ class MemoryScannerUI(QMainWindow):
         self.process_box.selectionSignal.connect(self.process_selection_handle)
         self.process_box.updateSignal.connect(self.update_process_list_command)
 
-        self.search_address_table.nextPageSignal.connect(self.backend.get_next_page)
-        self.search_address_table.previousPageSignal.connect(
-            self.backend.get_previous_page
-        )
+        self.search_address_table.nextPageSignal.connect(data_thread.nextPageSignal)
+        self.search_address_table.previousPageSignal.connect(data_thread.prevPageSignal)
         self.search_address_table.filterSignal.connect(self.filter_command)
         self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.search_table_action)
@@ -339,62 +339,52 @@ class MemoryScannerUI(QMainWindow):
         self.search_address_table.clear_table()
         self.backend.filter_addresses(pattern)
 
-    def scan_command(self):
-
+    def __prepare_scan(self) -> tuple[bool, Condition, tuple[bytes, bytes]]:
+        condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
+        values = (b'', b'')
         if not self.isAttached:
             self.set_message('⚠️ Select a process before starting a scan!')
-            return
-        condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
+            return False, condition, values
         if not self.search_input.text():
             self.set_message('⚠️ Fill scan value before scanning')
-            return
+            return False, condition, values
         if condition == Condition.BETWEEN and not self.search_input2.text():
             self.set_message('⚠️ Fill scan value before scanning')
-            return
+            return False, condition, values
 
         self.search_address_table.clear()
         value = convert_to_bytes(
             self.search_input.text(), self.typeCombo.currentData()
         )
-        if not value:
-            return
         if condition == Condition.BETWEEN:
-            value += convert_to_bytes(
-                self.search_input2.text(), self.typeCombo.currentData()
+            values = (value, convert_to_bytes(
+                self.search_input2.text(), self.typeCombo.currentData())
             )
         else:
-            value += b'\x00' * len(value)
+            values = (value, b'')
+
         self.set_message('')
         self.disable_scan_navigation()
-        self.scan_type = ScanType.ADDRESS_SCAN
-        self.backend.scan(value, condition)
         self.new_scan_btn.clicked.disconnect()
         self.new_scan_btn.setText('Cancel Scan')
         self.new_scan_btn.clicked.connect(self.stop_scan_command)
+        return True, condition, values
+
+    def scan_command(self) -> None:
+        OK, condition, values = self.__prepare_scan()
+        if not OK:
+            return
+
+        self.scan_type = ScanType.ADDRESS_SCAN
+        self.backend.scan(values, condition)
 
     def filter_scan_command(self):
-        if not self.isAttached:
-            self.set_message('⚠️ Select a process before starting a scan!')
-            return
-        condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
-        if not self.search_input.text():
-            self.set_message('⚠️ Fill scan value before scanning')
-            return
-        if condition == Condition.BETWEEN and not self.search_input2.text():
-            self.set_message('⚠️ Fill scan value before scanning')
+        OK, condition, values = self.__prepare_scan()
+        if not OK:
             return
 
-        self.search_address_table.clear()
-        values = [convert_to_bytes(
-            self.search_input.text(), self.typeCombo.currentData()
-        )]
-        if not values:
-            return
-        if condition == Condition.BETWEEN:
-            values.append(convert_to_bytes(self.search_input2.text(), self.typeCombo.currentData()))
-        self.disable_scan_navigation()
-        self.new_scan_btn.setDisabled(True)
-        self.backend.filter_scan(condition, values)
+        self.scan_type = ScanType.FILTER_SCAN
+        self.backend.filter_scan(values, condition)
 
     def pointer_scan_command(self, address: int):
         self.scan_type = ScanType.POINTER_SCAN
@@ -433,6 +423,11 @@ class MemoryScannerUI(QMainWindow):
         self.search_address_table.show_message()
         self.search_pointer_table.setTotal(total_pointers)
         self.search_pointer_table.show_message()
+
+    @pyqtSlot(int)
+    def __update_address_totals(self, total_addresses: int):
+        self.search_address_table.setTotal(total_addresses)
+        self.search_address_table.show_message()
 
     def initialise_scan_navigation(self):
         if self.new_scan_btn.text() == 'Cancel Scan':

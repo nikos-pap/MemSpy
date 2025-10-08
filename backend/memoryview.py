@@ -2,7 +2,7 @@ from typing import Optional
 from multiprocessing import Process, Queue
 import time
 
-from memory_manager_engine.address_manager_generic import AddressManagerAbstract
+from memory_manager_engine.address_manager_generic import AbstractAddressManager
 from memory_manager_engine.mapped_address_manager import MmapAddressManager
 from memory_manager_engine.pointer_manager import PointerManager
 from logger import create_logger
@@ -31,7 +31,7 @@ class MemoryViewProcess(Process):
         self.process_reader: Optional[MemoryScanner] = MemoryScanner()
 
         # Address storage
-        self.address_manager: AddressManagerAbstract = MmapAddressManager(self.process_reader, page_size)
+        self.address_manager: MmapAddressManager = MmapAddressManager(self.process_reader, page_size)
         self.pointer_manager: PointerManager = PointerManager(self.process_reader)
 
         # Logger
@@ -111,6 +111,7 @@ class MemoryViewProcess(Process):
         elif typ == MessageType.RESET:
             self._reset_all()
         elif typ == MessageType.EXIT:
+            self.address_manager.reset()
             self.logger.info('Exiting')
         else:
             self.logger.debug(f'Got Unhandled Message of type {type}.')

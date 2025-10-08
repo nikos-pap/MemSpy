@@ -4,14 +4,15 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from ctypes import wintypes
 from queue import Queue
-from typing import Any, Generator
+from typing import Any, Generator, Optional, Iterator
+from numpy.typing import NDArray
 
 import numpy as np
 from numba import cuda
 
 from scanner_engine.memory_scanner import AbstractMemoryScanner
 import scanner_engine.utils.pointer_scanner_tools as pst
-from scanner_engine.utils.scanner_tools import find_matches
+from scanner_engine.utils.scanner_tools import find_matches, match_condition
 from utils.types import Condition
 
 
@@ -279,13 +280,12 @@ class MemoryScanner(AbstractMemoryScanner):
 
             address += memory_info.RegionSize
 
-    def scan_value(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> Generator[tuple[Any, int | Any] | None, Any, None]:
+    def scan_value(self, values: tuple[bytes, bytes], use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> Iterator[Optional[tuple[NDArray, int]]]:
         total_size = self.get_working_memory_size()
         current_size = 0
-        element_size = len(value) // 2
-        value = np.frombuffer(value, dtype=f'<u{element_size}')
-
-        result_queue = Queue()
+        element_size = len(values[0])
+        value = np.frombuffer(b''.join(values), dtype=f'<u{element_size}')
+        result_queue: Queue[Optional[tuple[int, NDArray]]] = Queue()
 
         def worker(region):
             result = find_matches(
@@ -377,3 +377,11 @@ class MemoryScanner(AbstractMemoryScanner):
         if bytes_written.value != len(value):
             raise RuntimeError(f"Only wrote {bytes_written.value} out of {len(value)} bytes.")
         return True
+
+    def filter_values(self, array: NDArray, values: tuple[bytes, bytes], condition: Condition) -> NDArray:
+        new_values = np.vectorize(lambda item: self.read_bytes(int(item[0]), len(item[1])))(array)
+        array = array.copy()
+        array["bytes"][:] = new_values
+        values = np.frombuffer(b''.join(values), dtype=f'<u{len(values[0])}')
+        indices, _ = match_condition(new_values.view(f'<u{array.dtype["bytes"].itemsize}'), 0, condition, int.from_bytes(values[0], "little"), values[0], f'<u{array.dtype["bytes"].itemsize}')  # TODO DONT LEAVE 00000000 !!!!!!!!!!
+        return array[indices]

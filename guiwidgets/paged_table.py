@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 
 from models.search_table_model import SortedPagedTableModel
 from utils.types import Type
-
+from logger import Logger, get_logger
 
 class PaginatedTable(QWidget):
     filterSignal = pyqtSignal(str)
@@ -21,6 +21,7 @@ class PaginatedTable(QWidget):
 
     def __init__(self, font: Optional[QFont] = None, *args):
         super().__init__()
+        self.__logger: Logger = get_logger(self.__class__.__name__)
         self.setWindowTitle("Large Table with Filter + Pagination")
 
         self.page_size: int = 100
@@ -89,7 +90,7 @@ class PaginatedTable(QWidget):
         start = self.page_start
         end = self.page_end
         text = f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)" if self.total else ''
-        self.next_button.setDisabled(end == self.filtered)
+        self.next_button.setDisabled(end == self.filtered or self.total == end)
         self.prev_button.setDisabled(start == 0)
         self.info_label.setText(text)
 
