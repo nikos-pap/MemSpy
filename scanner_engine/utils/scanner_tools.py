@@ -5,6 +5,7 @@ import numpy as np
 from numpy.lib.stride_tricks import as_strided
 from numpy.lib.stride_tricks import sliding_window_view
 
+from scanner_engine.region import Region
 from utils.types import Condition, address_dtype, Type
 
 
@@ -20,40 +21,43 @@ def match_condition(arr_chunk, offset, mode: Condition, start, end, dtype, dtype
     elif mode == Condition.BETWEEN and end is not None:
         mask = (arr_chunk >= start) & (arr_chunk <= end)
     else:
-        return np.empty((0,), dtype=dtype)
+        return np.empty((0,), dtype=dtype), np.empty((0,), dtype=dtype2)
 
     indices = np.nonzero(mask)[0]
     vals = arr_chunk[indices].astype(dtype2)
-    t = vals[vals != np.frombuffer(start.tobytes(), dtype=dtype2)].shape
-    if np.any(t):
-        print(t)
+
     return indices+offset, vals
 
-def find_matches(bytestream: bytes, executor: ThreadPoolExecutor, dtype: DTypeLike, values_dtype: Type = Type.UInt32, base_address: int = 0, mode: Condition = Condition.EQUAL, target: Optional = None, element_size: int = 4) -> np.ndarray:
+def find_matches(region: Region, executor: ThreadPoolExecutor, values_dtype: Type = Type.UInt32, mode: Condition = Condition.EQUAL, target: Optional = None) -> np.ndarray:
+    def chunk_bytes(data, x, n):
+        total_length = len(arr)
+
+        # Compute chunk size (multiple of n)
+        chunk_size = max((total_length // x // n) * n, n)
+
+        # Compute indices for slicing
+        indices = list(range(0, total_length, chunk_size))
+        chunks = [data[i:i + chunk_size] for i in indices]
+
+        return chunks, indices
+
+    bytestream = region.data
+    dtype = address_dtype(values_dtype.size())
     if bytestream is None or target is None:
         return np.empty((0,), dtype=dtype)
 
-    data = np.frombuffer(bytestream, dtype=np.uint8)
-    if len(data) < element_size:
-        return np.empty((0,), dtype=dtype)
-
-    # Create sliding windows of element_size
-    windows = sliding_window_view(data, dtype['bytes'].itemsize)
-    arr = windows.view(values_dtype.dtype).reshape(-1)
+    arr = np.frombuffer(bytestream, dtype=values_dtype.dtype)
 
     start = target[0]
     end = target[1] if len(target) > 1 else None
 
-    num_threads = executor._max_workers
-
-    # Split data into chunks
-    chunk_size = (len(arr) + num_threads - 1) // num_threads
-    chunks = [(arr[i:i + chunk_size], i) for i in range(0, len(arr), chunk_size)]
-
+    itemsize = values_dtype.size()
+    workers = executor._max_workers
+    chunks, indices = chunk_bytes(arr, itemsize, workers)
     # Submit chunks to executor
     futures = [
-        executor.submit(match_condition, chunk.copy(), offset, mode, start, end, dtype, values_dtype.dtype)
-        for chunk, offset in chunks
+        executor.submit(match_condition, chunk, offset, mode, start, end, dtype, values_dtype.dtype)
+        for chunk, offset in zip(chunks, indices) if np.sum(chunk) != 0
     ]
 
     # Collect results
@@ -72,6 +76,7 @@ def find_matches(bytestream: bytes, executor: ThreadPoolExecutor, dtype: DTypeLi
     all_vals = np.concatenate(results_vals)
 
     result = np.empty(len(all_indices), dtype=dtype)
-    result['num'] = all_indices + base_address
+    result['num'] = all_indices * itemsize + region.base_address
     result['bytes'] = all_vals
+
     return result

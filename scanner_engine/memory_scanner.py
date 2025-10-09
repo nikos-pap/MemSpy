@@ -123,7 +123,7 @@ class AbstractMemoryScanner(ABC):
         cnt.cb = ctypes.sizeof(cnt)
         if not psapi.GetProcessMemoryInfo(self.handle, ctypes.byref(cnt), cnt.cb):
             raise ctypes.WinError(ctypes.get_last_error())
-        return cnt.WorkingSetSize
+        return cnt.PeakWorkingSetSize
 
     def hasHandle(self) -> bool:
         return self.handle is not None

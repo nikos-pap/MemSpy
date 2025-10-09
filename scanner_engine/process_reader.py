@@ -2,14 +2,13 @@ import ctypes
 import os
 from ctypes import wintypes
 from typing import Any, Generator, Optional, Iterator
-
-from numba.core.types import DType
 from numpy.typing import NDArray
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from numba import cuda
 from scanner_engine.memory_scanner import AbstractMemoryScanner
 import scanner_engine.utils.pointer_scanner_tools as pst
+from scanner_engine.region import Region
 from scanner_engine.utils.scanner_tools import find_matches, match_condition
 from utils.types import Condition, address_dtype, Type
 
@@ -25,6 +24,8 @@ PAGE_EXECUTE_WRITECOPY = 0x80
 
 PAGE_NOACCESS = 0x01
 PAGE_GUARD = 0x100
+
+PAGE_SIZE = 0x1000
 
 class MEMORY_BASIC_INFORMATION(ctypes.Structure):
     _fields_ = [
@@ -69,110 +70,51 @@ Module32Next = kernel32.Module32Next
 Module32Next.restype = ctypes.wintypes.BOOL
 Module32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(MODULEENTRY32)]
 
-class Region:
-    def __init__(self, base_address: int = 0, size: int = 0, name: str = '', data: int | bytes | memoryview = b'', id: int = 0):
-        self.base_address = base_address
-        self.size = size
-        self.name = name
-        self.static = 1 if name else 0
-        self.data = data
-        self.pointers = np.array([])
-        self.id = id
-
-    def data2values(self, ranges, values_type, use_gpu=True, step_enable=True):
-        values_type_size = np.dtype(values_type).itemsize
-        data_array = np.frombuffer(self.data, dtype=np.uint8)
-
-        ranges_np = np.array(ranges, dtype=np.uint64)
-        ranges_len = ranges_np.shape[0]
-
-        if use_gpu:
-            length = data_array.shape[0] - values_type_size + 1
-
-            d_data = cuda.to_device(data_array)
-            d_ranges = cuda.to_device(ranges_np)
-
-            d_addrs = cuda.device_array(length, dtype=np.uint64)
-            d_values = cuda.device_array(length, dtype=values_type)
-            d_ids = cuda.device_array(length, dtype=np.uint32)
-            d_counts = cuda.to_device(np.array([0], dtype=np.uint32))
-
-            threads_per_block = 256
-            blocks = (length + threads_per_block - 1) // threads_per_block
-
-            pst.filter_and_extract_values_gpu[blocks, threads_per_block](
-                d_data, self.base_address, d_ranges, ranges_len, d_addrs, d_values, d_ids, d_counts,
-                values_type_size, length, step_enable
-            )
-
-            count = d_counts.copy_to_host()[0]
-            addrs = d_addrs.copy_to_host()[:count]
-            values = d_values.copy_to_host()[:count]
-            ids = d_ids.copy_to_host()[:count]
-            addr_id = np.full((count, 1), self.id, dtype=np.uint32)
-            addr_static = np.full((count, 1), self.static, dtype=np.uint8)
-        else:
-            length = len(data_array)
-            addrs, values, ids = pst.filter_and_extract_values_cpu(
-                data_array, self.base_address, ranges_np, values_type, values_type_size,
-                length, step_enable
-            )
-            mask = addrs != 0
-            addrs = addrs[mask]
-            values = values[mask]
-            ids = ids[mask]
-            addr_id = np.full((len(addrs), 1), self.id, dtype=np.uint32)
-            addr_static = np.full((len(addrs), 1), self.static, dtype=np.uint8)
-
-
-        self.pointers = np.column_stack((addrs,addr_id, values, ids, addr_static))
-        self.data = None  # clear reference
-
-    def pointers_filter(self, ranges):
-        if self.pointers is None or len(self.pointers) == 0:
-            self.pointers = np.empty((0, 5), dtype=np.uint64)
-            return
-
-        ptrs_in = self.pointers.astype(np.uint64)  # shape (N, 5)
-        ranges = np.asarray(ranges, dtype=np.uint64)
-        self.pointers = pst.filter_existing_pointers_cpu(ptrs_in, ranges)
-
-    def check_loops(self):
-        if np.all(self.pointers[:, 3] == self.id):
-            self.pointers = np.array([])
-
-
 class MemoryScanner(AbstractMemoryScanner):
     def __init__(self, enable_debug: bool = False):
         super().__init__(enable_debug=enable_debug)
-            
-    def read_memory(self, chunk_size=2**25, element_size=4):
+
+    def read_memory(self, chunk_size_multiplier=min(2**13, (2**13)*PAGE_SIZE)):
+        """
+        Reads process memory region by region in chunks that are multiples of PAGE_SIZE.
+        No overlap between chunks.
+        """
+
         if not self.handle:
             print("Failed to open process. Try running as Administrator.")
             return
 
+        chunk_size = chunk_size_multiplier * PAGE_SIZE
+
         memory_info = MEMORY_BASIC_INFORMATION()
         address = 0
-        id = 0
-        overlap = element_size - 1
-        buffer = ctypes.create_string_buffer(chunk_size + overlap)
+        region_id = 0
 
-        allowed = (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE |
-                   PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)
+        # Allocate read buffer
+        buffer = ctypes.create_string_buffer(chunk_size)
 
-        blocked = (PAGE_NOACCESS | PAGE_GUARD)
+        allowed = (
+                PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE |
+                PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+        )
+        blocked = PAGE_NOACCESS | PAGE_GUARD
 
         while address < 0x7FFFFFFFFFFF:  # Max user space address (Windows x64)
-            size = VirtualQueryEx(self.handle, ctypes.c_void_p(address), ctypes.byref(memory_info),
-                                  ctypes.sizeof(memory_info))
+            size = VirtualQueryEx(
+                self.handle,
+                ctypes.c_void_p(address),
+                ctypes.byref(memory_info),
+                ctypes.sizeof(memory_info)
+            )
             if size == 0:
                 break
 
             base_addr = ctypes.cast(memory_info.BaseAddress, ctypes.c_void_p).value
             region_size = memory_info.RegionSize
 
-            if memory_info.State == MEM_COMMIT:  # MEM_COMMIT
-                if (memory_info.Protect & allowed) and not (memory_info.Protect & blocked):
+            if memory_info.State == MEM_COMMIT:
+                protection = memory_info.Protect
+                if (protection & allowed) and not (protection & blocked):
                     module_name = ctypes.create_unicode_buffer(MAX_PATH)
                     module_base = ctypes.c_void_p(memory_info.AllocationBase)
 
@@ -183,24 +125,20 @@ class MemoryScanner(AbstractMemoryScanner):
 
                     chunk_offset = 0
                     while chunk_offset < region_size:
-                        if chunk_offset == 0:
-                            read_start = base_addr
-                            read_size = min(chunk_size, region_size)
-                        else:
-                            read_start = base_addr + chunk_offset - overlap
-                            max_possible = region_size - (chunk_offset - overlap)
-                            read_size = min(chunk_size + overlap, max_possible)
+                        read_start = base_addr + chunk_offset
+                        remaining = region_size - chunk_offset
+                        read_size = min(chunk_size, remaining)
 
                         bytes_read = ctypes.c_size_t()
                         read_address = ctypes.c_void_p(read_start)
 
-                        if ReadProcessMemory(self.handle, read_address, buffer, ctypes.c_size_t(read_size),
-                                             ctypes.byref(bytes_read)):
-                            yield Region(read_start, bytes_read.value, region_name, memoryview(buffer)[:bytes_read.value], id)
+                        if ReadProcessMemory( self.handle, read_address, buffer, ctypes.c_size_t(read_size), ctypes.byref(bytes_read)):
+                            yield Region(base_address=read_start, size=bytes_read.value, name=region_name, data=memoryview(buffer)[:bytes_read.value], id=region_id)
 
-                        chunk_offset += chunk_size
+                        chunk_offset += chunk_size  # Move to next aligned chunk
 
-                    id += 1
+                    region_id += 1
+
             address += memory_info.RegionSize
 
     def read_memory_by_region(self, region):
@@ -270,7 +208,7 @@ class MemoryScanner(AbstractMemoryScanner):
                             read_start = base_addr + chunk_offset - overlap
                             read_size = min(chunk_size + overlap, region_size - chunk_offset + overlap)
 
-                        yield Region(read_start, read_size, region_name, b'', id)
+                        yield Region(base_address=read_start, size=read_size, name=region_name, data=b'', id=id)
 
                         chunk_offset += chunk_size
                     id += 1
@@ -281,25 +219,20 @@ class MemoryScanner(AbstractMemoryScanner):
             self,
             values: tuple[bytes, bytes],
             condition: Condition = Condition.EQUAL,
-            element_size: int = 4,
             dtype: Type = Type.UInt32,
-            threads: int = 16
+            threads: int = os.cpu_count() if os.cpu_count() else 1
     ) -> Iterator[Optional[tuple]]:
         total_size = self.get_working_memory_size()
         current_size = 0
-        value = np.frombuffer(b''.join(values), dtype=f'<u{element_size}')
-
-        with ThreadPoolExecutor(max_workers=8) as executor:
-            for region in self.read_memory(element_size=element_size):
+        value = np.frombuffer(b''.join(values), dtype=f'<u{dtype.size()}')
+        with ThreadPoolExecutor(max_workers=16) as executor:
+            for region in self.read_memory():
                 result = find_matches(
-                    bytestream=region.data,
-                    dtype=address_dtype(4),
+                    region = region,
                     values_dtype = dtype,
-                    base_address=region.base_address,
                     mode=condition,
                     target=value,
-                    element_size=element_size,
-                    executor=executor,  # Reuse threads
+                    executor=executor
                 )
                 progress = (current_size * 100) // total_size
                 yield result, progress

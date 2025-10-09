@@ -25,7 +25,6 @@ class MappedFileReader:
         if os.path.getsize(filepath) == 0:
             self.__address_list = np.empty((0,), dtype=dtype)
         else:
-            self.__logger.debug(f'Problem {os.path.getsize(filepath)}')
             self.__address_list = np.memmap(filepath, dtype=dtype, mode="r")
         self.__total_page_number = len(self.__address_list)
         self.__current_page_number = 0

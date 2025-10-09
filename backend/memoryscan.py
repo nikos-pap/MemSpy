@@ -135,11 +135,7 @@ class MemoryParserProcess(Process):
 
         self.__file_writer.close()
 
-        self.__current_scan = self.__scanner.scan_value(
-            values=values,
-            condition=condition,
-            dtype=data_type,
-        )
+        self.__current_scan = self.__scanner.scan_value(values=values, condition=condition, dtype=data_type)
 
         self.__scanning = True
         self.__scan_start = time.time()

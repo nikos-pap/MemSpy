@@ -28,7 +28,7 @@ class Type(Enum):
         self._np_dtype = np_dtype
 
     # Keep your current API intact
-    def size(self) -> Optional[int]:
+    def size(self) -> int:
         """Returns the fixed byte-size of this type, or None if variable."""
         return self._size_bytes
 

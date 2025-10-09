@@ -119,7 +119,7 @@ class PaginatedTable(QWidget):
         self.show_message()
 
     def __handle_filter(self) -> None:
-        filter_str = self.filter_input.text()
+        filter_str = self.filter_input.text().lower()
         if filter_str != self.current_filter:
             self.current_filter = filter_str
             self.filterSignal.emit(filter_str)
