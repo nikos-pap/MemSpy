@@ -4,7 +4,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from memory_manager_engine.address_manager_generic import AbstractAddressManager
-from memory_manager_engine.operation import Operation
+from utils.operation import Operation
 from scanner_engine.memory_scanner import AbstractMemoryScanner
 from utils.types import Condition, evaluate_condition
 from logger import get_logger

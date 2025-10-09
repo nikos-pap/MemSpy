@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QFormLayout, QHeaderView, QAbstractItemView, QCheckBox
 )
 from PyQt6.QtGui import QStandardItem, QAction, QFont
-from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
+from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, pyqtSlot
 
 from guiwidgets.address_dialog import EditAddressDialog
 from guiwidgets.utils import SavedTreeTypes
@@ -292,6 +292,7 @@ class AddressTreeView(QTreeView):
             value_item.setText(data['value'])
             print(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
 
+    @pyqtSlot('quint64', bytes)
     def update_saved_addresses(self, name: int, new_val: bytes):
         root = self.model.invisibleRootItem()
         row_count = root.rowCount()
@@ -380,6 +381,7 @@ class AddressTreeContainer(QWidget):
 
         self.setLayout(main_layout)
 
+    @pyqtSlot(dict)
     def add_address(self, data: dict):
         data['name'] = self.tree_view.next_temp_label()
         self.tree_view.add_address(data)

@@ -6,7 +6,7 @@ import numpy as np
 from logger import logger, Logger
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 from file_handle_engine import MappedFileReader, FileWriter, FileStreamReader
-from memory_manager_engine.operation import Operation, GenericOperation
+from utils.operation import Operation, GenericOperation
 from scanner_engine.process_reader import MemoryScanner
 from utils.history import History
 
@@ -16,8 +16,6 @@ class MemoryViewThread(QObject):
     scanFinishedSignal = pyqtSignal()
     filterAddressSignal = pyqtSignal(str)
     filterValuesSignal = pyqtSignal(int)
-    nextPageSignal = pyqtSignal()
-    prevPageSignal = pyqtSignal()
     exitSignal = pyqtSignal()
     setFileSignal = pyqtSignal(str)
     dataReadySignal = pyqtSignal('quint64', bytes, bytes)
@@ -79,8 +77,6 @@ class MemoryViewThread(QObject):
         self.scanFileCreatedSignal.connect(self.__handle_new_file)
         self.scanFinishedSignal.connect(self.__handle_scan_finished)
         self.filterAddressSignal.connect(self.__filter)
-        self.prevPageSignal.connect(self.__prev_page)
-        self.nextPageSignal.connect(self.__next_page)
         self.exitSignal.connect(self.__handle_exit)
 
     # Signal handlers
@@ -124,13 +120,13 @@ class MemoryViewThread(QObject):
         self.filterValuesSignal.emit(self.__mapped_data_reader.size)
 
     @pyqtSlot()
-    def __next_page(self) -> None:
+    def next_page_handle(self) -> None:
         self.current_page_number = self.__mapped_data_reader.next_page()
         self.__page_buffer = None
         self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
 
     @pyqtSlot()
-    def __prev_page(self) -> None:
+    def prev_page_handle(self) -> None:
         self.current_page_number = self.__mapped_data_reader.prev_page()
         self.__page_buffer = None
         self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)

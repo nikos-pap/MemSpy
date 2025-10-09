@@ -1,5 +1,5 @@
 from typing import Optional
-from memory_manager_engine.operation import Operation, GenericOperation, FilterOperation
+from utils.operation import Operation, GenericOperation, FilterOperation
 from utils.types import FilterCondition
 
 

@@ -1,3 +1,5 @@
+from re import Scanner
+
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from multiprocessing import Queue
 from typing import NamedTuple
@@ -6,8 +8,9 @@ from tempfile import TemporaryDirectory
 from logger import Logger, create_logger
 from backend.threaded_memoryview import MemoryViewThread
 from backend.memoryscan import MemoryParserProcess
-from memory_manager_engine.operation import Operation
-from utils import insort, image_extractor, PointerChain
+from utils.operation import Operation
+from utils import image_extractor, PointerChain
+from bisect import insort
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
 from utils.types import Condition, ScanType, Type
@@ -15,11 +18,7 @@ from utils.types import Condition, ScanType, Type
 
 class QueueWorker(QObject):
     """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
-    # dataReady = pyqtSignal('quint64', bytes, bytes)  # REMOVE
     progressSignal = pyqtSignal(int)
-    totalValuesSignal = pyqtSignal(int, int)
-    filterValuesSignal = pyqtSignal(int)
-    pageRangeSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
     updateSavedSignal = pyqtSignal('quint64', bytes)
     pointerUpdateSignal = pyqtSignal(PointerChain)
@@ -38,24 +37,14 @@ class QueueWorker(QObject):
                 if msg.message_type == MessageType.EXIT:
                     self.__logger.info(f"Exiting")
                     break
-                # elif msg.message_type == MessageType.VALUE_CHANGED:  # memoryview
-                #     address, raw, initial_value = msg.message
-                #     self.dataReady.emit(int(address), raw, initial_value)
                 # elif msg.message_type == MessageType.POINTER_CHAIN_UPDATED:  # memoryview
                 #     pointer = msg.message[0]
                 #     self.pointerUpdateSignal.emit(pointer)
                 elif msg.message_type == MessageType.SET_PROGRESS:  # scanner
                     self.progressSignal.emit(msg.message[0])
-                # elif msg.message_type == MessageType.SET_PAGE_RANGE:  # memoryview
-                #     self.pageRangeSignal.emit(msg.message[0])
-                # elif msg.message_type == MessageType.SET_TOTAL_VALUES:  # memoryview
-                #     self.totalValuesSignal.emit(msg.message[0], msg.message[1])
                 # elif msg.message_type == MessageType.SAVED_VALUE_CHANGED:  # memoryview Process
                 #     self.updateSavedSignal.emit(msg.message[0], msg.message[1])
-                # elif msg.message_type == MessageType.SET_FILTERED_VALUES:
-                #     self.filterValuesSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.START_SCAN:
-                    # self._logger.info(f"Starting scan")
                     self.scanStartedSignal.emit(msg.message)
                 elif msg.message_type == MessageType.SCAN_COMPLETED:  # scanner
                     self.scanCompletedSignal.emit()
@@ -114,21 +103,25 @@ class Backend(QObject):
         self.memory_worker.set_process(pid)
         self.__scanner_queue_in.put(msg)
 
+    @pyqtSlot('quint64', bytes)
     def set_value(self, address: int, value: bytes) -> None:
         """Edit a memory address value."""
         pass
         # msg = Message(MessageType.EDIT_ADDRESS, [address, value])
         # self.proc_queue_in.put(msg)
 
+    @pyqtSlot('quint64', bytes, bool)
     def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
         pass
         # message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
         # self.proc_queue_in.put(Message(message, [address, value]))
 
+    @pyqtSlot('quint64')
     def save_address(self, address: int) -> None:
         pass
         # self.proc_queue_in.put(Message(MessageType.SAVE_ADDRESS, [address]))
 
+    @pyqtSlot('quint64')
     def unsave_address(self, address: int) -> None:
         pass
         # message = Message(MessageType.UNSAVE_ADDRESS, [address])
@@ -146,11 +139,12 @@ class Backend(QObject):
         # self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
         pass
 
-    def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition, data_type]))
-
-    def filter_scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN, [values, condition, self.memory_worker.get_last_file(), data_type]))
+    def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType) -> None:
+        if scan_type == ScanType.ADDRESS_SCAN:
+            self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition, data_type]))
+        elif scan_type == ScanType.FILTER_SCAN:
+            self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN,
+                                                [values, condition, self.memory_worker.get_last_file(), data_type]))
 
     def stop_scan(self):
         self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))

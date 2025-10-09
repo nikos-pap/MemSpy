@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 import numpy as np
 from numpy.typing import DTypeLike
-from utils.types import Condition, OperationCondition, FilterCondition
+from utils.types import Condition, OperationCondition
 
 
 @dataclass(frozen=True)
