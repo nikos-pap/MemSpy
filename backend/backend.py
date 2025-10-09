@@ -75,7 +75,6 @@ class Backend(QObject):
         self.listener.moveToThread(self.__thread)
         self.__thread.started.connect(self.listener.run)
         self.__thread.start()
-
         self.__memory_thread = QThread(self)
         self.memory_worker: MemoryViewThread = MemoryViewThread(self.__save_dir.name)
         self.memory_worker.moveToThread(self.__memory_thread)
@@ -127,18 +126,6 @@ class Backend(QObject):
         # message = Message(MessageType.UNSAVE_ADDRESS, [address])
         # self.proc_queue_in.put()
 
-    def get_next_page(self) -> None:
-        # self.proc_queue_in.put(Message(MessageType.GET_NEXT_PAGE, []))
-        pass
-
-    def get_previous_page(self) -> None:
-        # self.proc_queue_in.put(Message(MessageType.GET_PREV_PAGE, []))
-        pass
-
-    def filter_addresses(self, pattern: str) -> None:
-        # self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
-        pass
-
     def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType) -> None:
         if scan_type == ScanType.ADDRESS_SCAN:
             self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition, data_type]))
@@ -177,10 +164,12 @@ class Backend(QObject):
 
         if self.__scanner.is_alive():
             self.__scanner.join()
-
         self.memory_worker.exitSignal.emit()
-        self.__thread.wait()
-        self.__memory_thread.wait()
+
+        if self.__thread.isRunning():
+            self.__thread.wait()
+        if self.__memory_thread.isRunning():
+            self.__memory_thread.wait()
 
     def get_running_processes(self) -> list[NamedTuple]:
         """Retrieve and cache running processes and their icons."""
