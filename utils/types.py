@@ -37,6 +37,21 @@ class Type(Enum):
         }
         return sizes[self]
 
+    def dtype(self):
+        dt = {
+            Type.Int8: np.int8,
+            Type.Int16: np.int16,
+            Type.Int32: np.int32,
+            Type.Int64: np.int64,
+            Type.UInt8: np.uint8,
+            Type.UInt16: np.uint16,
+            Type.UInt32: np.uint32,
+            Type.UInt64: np.uint64,
+            Type.Float: np.float32,
+            Type.Double: np.float64,
+            Type.String: None,  # variable length
+        }
+        return dt[self]
 
 class ScanType(Enum):
     POINTER_SCAN = auto()

@@ -2,6 +2,8 @@ import ctypes
 import os
 from ctypes import wintypes
 from typing import Any, Generator, Optional, Iterator
+
+from numba.core.types import DType
 from numpy.typing import NDArray
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
@@ -9,8 +11,7 @@ from numba import cuda
 from scanner_engine.memory_scanner import AbstractMemoryScanner
 import scanner_engine.utils.pointer_scanner_tools as pst
 from scanner_engine.utils.scanner_tools import find_matches, match_condition
-from utils.types import Condition
-
+from utils.types import Condition, address_dtype, Type
 
 MAX_PATH = 260
 
@@ -280,22 +281,25 @@ class MemoryScanner(AbstractMemoryScanner):
             self,
             values: tuple[bytes, bytes],
             condition: Condition = Condition.EQUAL,
-            element_size: int = 4
+            element_size: int = 4,
+            dtype: Type = Type.UInt32,
+            threads: int = 16
     ) -> Iterator[Optional[tuple]]:
         total_size = self.get_working_memory_size()
         current_size = 0
         value = np.frombuffer(b''.join(values), dtype=f'<u{element_size}')
 
-        num_threads = 32
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:  # Reuse threads
+        with ThreadPoolExecutor(max_workers=8) as executor:
             for region in self.read_memory(element_size=element_size):
                 result = find_matches(
                     bytestream=region.data,
+                    dtype=address_dtype(4),
+                    values_dtype = dtype,
                     base_address=region.base_address,
                     mode=condition,
                     target=value,
                     element_size=element_size,
-                    executor=executor,  # Pass shared pool
+                    executor=executor,  # Reuse threads
                 )
                 progress = (current_size * 100) // total_size
                 yield result, progress
