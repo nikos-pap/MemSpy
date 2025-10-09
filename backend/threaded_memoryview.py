@@ -95,6 +95,7 @@ class MemoryViewThread(QObject):
 
     @pyqtSlot()
     def __handle_scan_finished(self) -> None:
+        self.__page_buffer = None
         self.__mapped_data_reader.reload_file()
         self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
 

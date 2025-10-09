@@ -379,7 +379,7 @@ class MemoryScannerUI(QMainWindow):
             return
 
         self.scan_type = ScanType.ADDRESS_SCAN
-        self.backend.scan(values, condition)
+        self.backend.scan(values, condition, self.typeCombo.currentData())
 
     def filter_scan_command(self):
         OK, condition, values = self.__prepare_scan()
@@ -387,7 +387,7 @@ class MemoryScannerUI(QMainWindow):
             return
 
         self.scan_type = ScanType.FILTER_SCAN
-        self.backend.filter_scan(values, condition)
+        self.backend.filter_scan(values, condition, self.typeCombo.currentData())
 
     def pointer_scan_command(self, address: int):
         self.scan_type = ScanType.POINTER_SCAN

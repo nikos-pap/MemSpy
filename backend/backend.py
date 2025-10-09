@@ -10,7 +10,7 @@ from memory_manager_engine.operation import Operation
 from utils import insort, image_extractor, PointerChain
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
-from utils.types import Condition, ScanType
+from utils.types import Condition, ScanType, Type
 
 
 class QueueWorker(QObject):
@@ -146,11 +146,11 @@ class Backend(QObject):
         # self.proc_queue_in.put(Message(MessageType.FILTER_ADDRESSES, [pattern]))
         pass
 
-    def scan(self, values: tuple[bytes, bytes], condition: Condition) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition]))
+    def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type) -> None:
+        self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition, data_type]))
 
-    def filter_scan(self, values: tuple[bytes, bytes], condition: Condition) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN, [values, condition, self.memory_worker.get_last_file()]))
+    def filter_scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type) -> None:
+        self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN, [values, condition, self.memory_worker.get_last_file(), data_type]))
 
     def stop_scan(self):
         self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))

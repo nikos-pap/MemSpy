@@ -357,10 +357,19 @@ class MemoryScanner(AbstractMemoryScanner):
             raise RuntimeError(f"Only wrote {bytes_written.value} out of {len(value)} bytes.")
         return True
 
-    def filter_values(self, array: NDArray, values: tuple[bytes, bytes], condition: Condition) -> NDArray:
+    def filter_values(self, array: NDArray, values: tuple[bytes, bytes], condition: Condition, data_type: Type = Type.UInt32) -> NDArray:
         new_values = np.vectorize(lambda item: self.read_bytes(int(item[0]), len(item[1])))(array)
         array = array.copy()
         array["bytes"][:] = new_values
-        values = np.frombuffer(b''.join(values), dtype=f'<u{len(values[0])}')
-        indices, _ = match_condition(new_values.view(f'<u{array.dtype["bytes"].itemsize}'), 0, condition, int.from_bytes(values[0], "little"), values[0], f'<u{array.dtype["bytes"].itemsize}')  # TODO DONT LEAVE 00000000 !!!!!!!!!!
+        values = np.frombuffer(b''.join(values).ljust(len(values[0])*2, b'\x00'), dtype=data_type.dtype)
+
+        indices, _ = match_condition(
+            new_values.view(f'<u{array.dtype["bytes"].itemsize}'),
+            0,
+            condition,
+            values[0],
+            values[1],
+            f'<u{array.dtype["bytes"].itemsize}',
+            data_type.dtype
+        )  # TODO DONT LEAVE 00000000 !!!!!!!!!!
         return array[indices]

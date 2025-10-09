@@ -24,7 +24,7 @@ def match_condition(arr_chunk, offset, mode: Condition, start, end, dtype, dtype
 
     indices = np.nonzero(mask)[0]
     vals = arr_chunk[indices].astype(dtype2)
-    t = vals[vals != np.frombuffer((96).to_bytes(4, 'little'), dtype=dtype2)].shape
+    t = vals[vals != np.frombuffer(start.tobytes(), dtype=dtype2)].shape
     if np.any(t):
         print(t)
     return indices+offset, vals
@@ -39,7 +39,7 @@ def find_matches(bytestream: bytes, executor: ThreadPoolExecutor, dtype: DTypeLi
 
     # Create sliding windows of element_size
     windows = sliding_window_view(data, dtype['bytes'].itemsize)
-    arr = windows.view(values_dtype.dtype()).reshape(-1)
+    arr = windows.view(values_dtype.dtype).reshape(-1)
 
     start = target[0]
     end = target[1] if len(target) > 1 else None
@@ -52,7 +52,7 @@ def find_matches(bytestream: bytes, executor: ThreadPoolExecutor, dtype: DTypeLi
 
     # Submit chunks to executor
     futures = [
-        executor.submit(match_condition, chunk.copy(), offset, mode, start, end, dtype, values_dtype.dtype())
+        executor.submit(match_condition, chunk.copy(), offset, mode, start, end, dtype, values_dtype.dtype)
         for chunk, offset in chunks
     ]
 

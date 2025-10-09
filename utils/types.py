@@ -1,57 +1,49 @@
 import math
 from sys import byteorder
-from enum import Enum, auto
+from enum import Enum, auto, unique
 import struct
 from typing import Optional, Union
 from numpy.typing import DTypeLike
 import numpy as np
 
 
+@unique
 class Type(Enum):
-    Int8 = 'Int8'
-    Int16 = 'Int16'
-    Int32 = 'Int32'
-    Int64 = 'Int64'
-    UInt8 = 'UInt8'
-    UInt16 = 'UInt16'
-    UInt32 = 'UInt32'
-    UInt64 = 'UInt64'
-    Float = 'Float'
-    Double = 'Double'
-    String = 'String'
+    # name = (wire_name, size_in_bytes, numpy_dtype)
+    Int8   = ("Int8",   1, np.int8)
+    Int16  = ("Int16",  2, np.int16)
+    Int32  = ("Int32",  4, np.int32)
+    Int64  = ("Int64",  8, np.int64)
+    UInt8  = ("UInt8",  1, np.uint8)
+    UInt16 = ("UInt16", 2, np.uint16)
+    UInt32 = ("UInt32", 4, np.uint32)
+    UInt64 = ("UInt64", 8, np.uint64)
+    Float  = ("Float",  4, np.float32)
+    Double = ("Double", 8, np.float64)
+    String = ("String", None, None)  # variable length
 
-    def size(self) -> int | None:
+    def __init__(self, label: str, size_bytes: Optional[int], np_dtype: Optional[DTypeLike]):
+        self._label = label
+        self._size_bytes = size_bytes
+        self._np_dtype = np_dtype
+
+    # Keep your current API intact
+    def size(self) -> Optional[int]:
         """Returns the fixed byte-size of this type, or None if variable."""
-        sizes = {
-            Type.Int8: 1,
-            Type.Int16: 2,
-            Type.Int32: 4,
-            Type.Int64: 8,
-            Type.UInt8: 1,
-            Type.UInt16: 2,
-            Type.UInt32: 4,
-            Type.UInt64: 8,
-            Type.Float: 4,
-            Type.Double: 8,
-            Type.String: None,  # variable length
-        }
-        return sizes[self]
+        return self._size_bytes
 
-    def dtype(self):
-        dt = {
-            Type.Int8: np.int8,
-            Type.Int16: np.int16,
-            Type.Int32: np.int32,
-            Type.Int64: np.int64,
-            Type.UInt8: np.uint8,
-            Type.UInt16: np.uint16,
-            Type.UInt32: np.uint32,
-            Type.UInt64: np.uint64,
-            Type.Float: np.float32,
-            Type.Double: np.float64,
-            Type.String: None,  # variable length
-        }
-        return dt[self]
+    @property
+    def dtype(self) -> Optional[DTypeLike]:
+        return self._np_dtype
+
+    # Nice-to-haves that don’t change behavior elsewhere
+    def __str__(self) -> str:
+        return self._label
+
+    @property
+    def label(self) -> str:
+        return self._label
+
 
 class ScanType(Enum):
     POINTER_SCAN = auto()
@@ -254,10 +246,8 @@ def is_valid_type(t: Type, s: str) -> bool:
 def address_dtype(element_size: int) -> DTypeLike:
     """
     Return the dtype of the data.
-
     Args:
         element_size: The size of the data address values in bytes.
-
     Returns:
         np.typing.DTypeLike: A dtype to set for nparrays.
     """
