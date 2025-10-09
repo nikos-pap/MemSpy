@@ -136,10 +136,8 @@ class MemoryParserProcess(Process):
         self.__file_writer.close()
 
         self.__current_scan = self.__scanner.scan_value(
-            value,
-            use_gpu=True,
+            values=value,
             condition=condition,
-            step_enable=False
         )
 
         self.__scanning = True

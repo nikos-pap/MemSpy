@@ -1,15 +1,11 @@
 import ctypes
 import os
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from ctypes import wintypes
-from queue import Queue
 from typing import Any, Generator, Optional, Iterator
 from numpy.typing import NDArray
-
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from numba import cuda
-
 from scanner_engine.memory_scanner import AbstractMemoryScanner
 import scanner_engine.utils.pointer_scanner_tools as pst
 from scanner_engine.utils.scanner_tools import find_matches, match_condition
@@ -280,53 +276,32 @@ class MemoryScanner(AbstractMemoryScanner):
 
             address += memory_info.RegionSize
 
-    def scan_value(self, values: tuple[bytes, bytes], use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> Iterator[Optional[tuple[NDArray, int]]]:
+    def scan_value(
+            self,
+            values: tuple[bytes, bytes],
+            condition: Condition = Condition.EQUAL,
+            element_size: int = 4
+    ) -> Iterator[Optional[tuple]]:
         total_size = self.get_working_memory_size()
         current_size = 0
-        element_size = len(values[0])
         value = np.frombuffer(b''.join(values), dtype=f'<u{element_size}')
-        result_queue: Queue[Optional[tuple[int, NDArray]]] = Queue()
 
-        def worker(region):
-            result = find_matches(
-                bytestream=region.data,
-                base_address=region.base_address,
-                mode=condition,
-                target=value,
-                element_size=element_size
-            )
-            result_queue.put((region.size, result))
+        num_threads = 32
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:  # Reuse threads
+            for region in self.read_memory(element_size=element_size):
+                result = find_matches(
+                    bytestream=region.data,
+                    base_address=region.base_address,
+                    mode=condition,
+                    target=value,
+                    element_size=element_size,
+                    executor=executor,  # Pass shared pool
+                )
+                progress = (current_size * 100) // total_size
+                yield result, progress
+                current_size += region.size
 
-        def producer():
-            with ThreadPoolExecutor() as executor:
-                for region in self.read_memory(element_size=element_size):
-                    executor.submit(worker, region)
-            result_queue.put(None)
-
-        producer_thread = threading.Thread(target=producer)
-        producer_thread.start()
-
-        while True:
-            item = result_queue.get()
-            if item is None:
-                break
-            region_size, result = item
-            progress = (current_size * 100) // total_size
-            yield result, progress
-            current_size += region_size
-
-        producer_thread.join()
         yield None
-
-    # def scan_value_old(self, value: bytes, use_gpu: bool = False, condition: Condition = Condition.EQUAL, step_enable: bool = False) -> tuple[int, int]:
-    #     total_size = self.get_working_memory_size()
-    #     current_size = 0
-    #     element_size = len(value) // 2
-    #     value = np.frombuffer(value, dtype=f'<u{element_size}')
-    #     for region in self.read_memory(element_size=element_size):
-    #         yield find_matches(bytestream=region.data, base_address=region.base_address, mode=condition, target=value, element_size=element_size), (current_size * 100) // total_size
-    #         current_size += region.size
-    #     yield None
 
     def read_bytes(self, address: int, size: int) -> bytes | None:
         if not self.handle:
