@@ -1,10 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
-from numpy.typing import DTypeLike
 import numpy as np
-from numpy.lib.stride_tricks import as_strided
-from numpy.lib.stride_tricks import sliding_window_view
-
 from scanner_engine.region import Region
 from utils.types import Condition, address_dtype, Type
 
