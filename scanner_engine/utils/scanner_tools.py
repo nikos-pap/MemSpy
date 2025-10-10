@@ -57,7 +57,7 @@ def find_matches(region: Region, executor: ThreadPoolExecutor, values_dtype: Typ
     # Submit chunks to executor
     futures = [
         executor.submit(match_condition, chunk, offset, mode, start, end, dtype, values_dtype.dtype)
-        for chunk, offset in zip(chunks, indices) if np.sum(chunk) != 0
+        for chunk, offset in zip(chunks, indices)
     ]
 
     # Collect results
