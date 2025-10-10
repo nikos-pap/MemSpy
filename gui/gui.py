@@ -188,7 +188,7 @@ class MemoryScannerUI(QMainWindow):
         data_thread.filterValuesSignal.connect(self.search_address_table.setFiltered)
         data_thread.addressPageSignal.connect(self.search_address_table.setPageRanges)
 
-        self.search_address_table.filterSignal.connect(data_thread.filterAddressSignal)
+        self.search_address_table.filterSignal.connect(self.__filter_command)
 
         listener.progressSignal.connect(self.progress_bar.setValue)
         listener.scanCompletedSignal.connect(self.__finished_scan)
@@ -198,7 +198,6 @@ class MemoryScannerUI(QMainWindow):
 
         self.search_address_table.nextPageSignal.connect(data_thread.next_page_handle)
         self.search_address_table.previousPageSignal.connect(data_thread.prev_page_handle)
-        self.search_address_table.filterSignal.connect(self.__filter_command)
         self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.saved_table_action)
@@ -303,7 +302,7 @@ class MemoryScannerUI(QMainWindow):
     @pyqtSlot(str)
     def __filter_command(self, pattern: str):
         self.search_address_table.clear_table()
-        self.backend.filter_addresses(pattern)
+        self.backend.memory_worker.filterAddressSignal.emit(pattern)
 
     @pyqtSlot(int)
     def __update_address_totals(self, total_addresses: int):
