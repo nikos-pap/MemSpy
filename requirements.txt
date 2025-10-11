@@ -7,3 +7,5 @@ pyqt6
 numpy
 numba
 wmi
+pytest
+pytest-qt
