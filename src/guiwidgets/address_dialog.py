@@ -29,8 +29,8 @@ class EditAddressDialog(QDialog):
         self.freeze_checkbox.setChecked(frozen)
         self.type_combobox = QComboBox()
         for t in Type:
-            self.type_combobox.addItem(t.value, t)
-        self.type_combobox.setCurrentText(Type.UInt32.value)
+            self.type_combobox.addItem(t.label, t)
+        self.type_combobox.setCurrentText(Type.UInt32.label)
         # Layout
         form = QFormLayout(self)
         form.addRow("Name:", self.name_edit)
