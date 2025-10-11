@@ -79,7 +79,7 @@ class MemoryScanner(AbstractMemoryScanner):
         """
 
         if not self.handle:
-            print("Failed to open process. Try running as Administrator.")
+            self._logger.warning("Failed to open process. Try running as Administrator.")
             return
 
         chunk_size = chunk_size_multiplier * PAGE_SIZE

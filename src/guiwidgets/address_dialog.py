@@ -1,3 +1,5 @@
+from logging import getLogger, Logger
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QTreeView, QDialog, QFormLayout,
     QLineEdit, QCheckBox, QPushButton, QHBoxLayout, QWidget, QMenu, QComboBox
@@ -10,16 +12,19 @@ from guiwidgets.utils import is_uint64_hex
 from utils import Type
 from utils.types import is_valid_type
 
+
 # Custom role for freeze state
 define_freeze_role = Qt.ItemDataRole.UserRole + 1
 FREEZE_ROLE = define_freeze_role
 
 
 class EditAddressDialog(QDialog):
+
+    __logger: Logger = getLogger()
+
     def __init__(self, parent=None, name='', desc='', addr='', value='', frozen=False):
         super().__init__(parent)
         self.setWindowTitle("Edit Parameters")
-
         # Fields
         self.name_edit = QLineEdit(name)
         self.desc_edit = QLineEdit(desc)
@@ -87,7 +92,7 @@ class EditAddressDialog(QDialog):
 
     def _on_apply(self):
         # perform apply logic here (emit signal or callback)
-        print(f"Applying: {self.name_edit.text()}, frozen={self.freeze_checkbox.isChecked()}")
+        self.__logger.debug(f"Applying: {self.name_edit.text()}, frozen={self.freeze_checkbox.isChecked()}")
 
     def _on_ok(self):
         # apply then close
@@ -107,6 +112,8 @@ class EditAddressDialog(QDialog):
 
 
 class MainWindow(QMainWindow):
+    __logger: Logger = getLogger(__qualname__)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Example: Edit/Add Address")
@@ -155,7 +162,8 @@ class MainWindow(QMainWindow):
             ]
             items[0].setData(data['frozen'], FREEZE_ROLE)
             self.model.appendRow(items)
-            print(f"Added {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
+            desc = f"({data.get('desc', '')})"
+            self.__logger.debug(f"Added '{data['name']}' {desc}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
 
     def _edit_address(self, index: QModelIndex):
         if not index.isValid():
@@ -182,7 +190,7 @@ class MainWindow(QMainWindow):
             desc_item.setText(data['desc'])
             addr_item.setText(data['addr'])
             value_item.setText(data['value'])
-            print(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
+            self.__logger.debug(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
 
 
 if __name__ == '__main__':

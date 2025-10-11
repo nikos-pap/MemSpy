@@ -5,6 +5,7 @@ import pytest
 ad_mod = pytest.importorskip("guiwidgets.address_dialog", reason="address_dialog.py not importable")
 EditAddressDialog = ad_mod.EditAddressDialog
 
+
 @pytest.mark.gui
 def test_ok_button_enables_on_valid_input(qtbot):
     dlg = EditAddressDialog()
@@ -22,6 +23,7 @@ def test_ok_button_enables_on_valid_input(qtbot):
 
     # OK should now be enabled
     assert ok_btn.isEnabled()
+
 
 @pytest.mark.gui
 def test_get_data_returns_expected_types(qtbot):

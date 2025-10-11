@@ -3,8 +3,7 @@ from typing import Optional
 from numpy.typing import NDArray
 import numpy as np
 
-from logger import Logger
-from logger import logger
+from logging import Logger, getLogger
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 from file_handle_engine import MappedFileReader, FileWriter, FileStreamReader
 from utils.operation import Operation, GenericOperation
@@ -25,7 +24,7 @@ class MemoryViewThread(QObject):
 
     def __init__(self, save_dir: str, update_rate: int = 500, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__logger: Logger = logger.create_logger(self.__class__.__name__)
+        self.__logger: Logger = getLogger(self.__class__.__name__)
 
         self.__history: History = History()
         self.__mapped_data_reader: MappedFileReader = MappedFileReader()

@@ -1,8 +1,7 @@
 from abc import ABC, abstractmethod
 import ctypes
 from ctypes import wintypes
-
-from logger import create_logger
+from logging import getLogger, Logger
 
 # ——— Constants ———
 PROCESS_ALL_ACCESS = 0x1F0FFF
@@ -101,13 +100,14 @@ def enable_debug_privilege():
 
 
 class AbstractMemoryScanner(ABC):
+    _logger: Logger = getLogger(__qualname__)
+
     @abstractmethod
     def __init__(self, enable_debug: bool = False):
         if enable_debug:
             enable_debug_privilege()
         self.handle: wintypes.HANDLE | None = None
         self.hSnapshot: wintypes.HANDLE | None = None
-        self.logger = create_logger("MemoryScanner")
 
     def change_process(self, pid: int):
         # clean up previous handle

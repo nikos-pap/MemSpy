@@ -2,12 +2,14 @@ import os
 
 from numpy.typing import NDArray, DTypeLike
 from typing import Optional, BinaryIO
-from logger import create_logger
-from logging import Logger
+from logging import Logger, getLogger
 import numpy as np
 
 
 class MappedFileReader:
+
+    __logger: Logger = getLogger(__qualname__)
+
     def __init__(self, page_size: int = 100):
         self.__page_size: int = page_size
 
@@ -16,7 +18,6 @@ class MappedFileReader:
         self.__filepath: Optional[str] = None
         self.__current_page_number: int = 0
         self.__total_page_number: int = 0
-        self.__logger: Logger = create_logger(self.__class__.__name__)
 
     def set_file(self, filepath: str, dtype: DTypeLike) -> None:
         self.reset()

@@ -1,4 +1,5 @@
 import re
+from logging import Logger, getLogger
 from typing import Any
 
 from PyQt6.QtWidgets import (
@@ -30,9 +31,11 @@ class AddressTreeView(QTreeView):
     removeAddressSignal = pyqtSignal('quint64')
     pointerScanSignal = pyqtSignal('quint64')
     pointerRequested = pyqtSignal(str, str, bool, str, object)
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
         self.setDragEnabled(True)
         self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
@@ -82,7 +85,7 @@ class AddressTreeView(QTreeView):
             menu.addAction(scan_action)
             menu.addAction(delete_action)
             menu.addAction(freeze_action)
-            # print()
+
         add_pointer = QAction("Add Pointer", self)
         add_pointer.triggered.connect(lambda: self._on_add_pointer(index))
         menu.addAction(add_pointer)
@@ -92,7 +95,7 @@ class AddressTreeView(QTreeView):
 
     def delete_address(self, index, row_items):
         self.removeAddressSignal.emit(int(row_items[2], 16))
-        print(f'Deleting {row_items[2]}')
+        self.__logger.debug(f'Deleting {row_items[2]}')
         self.model.removeRow(index.row(), index.parent())
 
     def freeze_address(self, index):
@@ -107,7 +110,7 @@ class AddressTreeView(QTreeView):
         else:
             name_item.setText(f"{new_name} 🔒")
         name_item.setData(not frozen, FREEZE_ROLE)
-        print(f'Freezing {address_text}, {value_text}')
+        self.__logger.debug(f'Freezing {address_text}, {value_text}')
         self.freezeSignal.emit(int(address_text, 16), convert_to_bytes(value_text, data_type), not frozen)
 
     def pointer_scan(self, index, row_items):
@@ -219,7 +222,7 @@ class AddressTreeView(QTreeView):
         # always look at column 0’s UserRole to see if it’s a pointer row
         flag_idx = index.siblingAtColumn(0)
         kind = flag_idx.data(Qt.ItemDataRole.UserRole)
-        print(kind)
+
         if kind == SavedTreeTypes.POINTER:
             self._edit_pointer(index)
         elif kind == SavedTreeTypes.ADDRESS:
@@ -282,6 +285,9 @@ class AddressTreeView(QTreeView):
             name_text = data['name'] + (' 🔒' if data['frozen'] else '')
             name_item.setText(name_text)
             name_item.setData(data['frozen'], FREEZE_ROLE)
+
+            desc_item.setText(data['desc'])
+
             address = int(addr_item.text(), 16)
             data_type = data.get('type', Type.UInt32)
             if frozen != data['frozen']:
@@ -290,7 +296,7 @@ class AddressTreeView(QTreeView):
                 self.setValueSignal.emit(address, convert_to_bytes(data['value'], data_type))
             addr_item.setText(hex(data['addr']))
             value_item.setText(data['value'])
-            print(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
+            self.__logger.debug(f"Edited {data['name']}: frozen={data['frozen']}, addr={data['addr']}, value={data['value']}")
 
     @pyqtSlot('quint64', bytes)
     def update_saved_addresses(self, name: int, new_val: bytes):

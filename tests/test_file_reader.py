@@ -85,5 +85,5 @@ def test_reset_and_close(temp_binary_file):
     reader.close()
 
     # After close, internal attributes should be reset
-    assert reader._FileStreamReader__filepath is None
-    assert reader._FileStreamReader__data_size is None
+    assert getattr(reader, '_FileStreamReader__filepath') is None
+    assert getattr(reader, '_FileStreamReader__data_size') is None

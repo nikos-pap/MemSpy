@@ -1,18 +1,19 @@
 import os
 from numpy.typing import DTypeLike
 from typing import Optional, BinaryIO
-from logger import create_logger
-from logging import Logger
+from logging import Logger, getLogger
 from collections.abc import Iterable
 
 
 class FileStreamReader:
+
+    __logger: Logger = getLogger(__qualname__)
+
     def __init__(self):
         self.__size: int = 0
         self.__data_size: Optional[int] = None
         self.__filepath: Optional[str] = None
         self.__stream: Optional[BinaryIO] = None
-        self.__logger: Logger = create_logger(self.__class__.__name__)
 
     def set_file(self, filepath: str, element_size: int) -> None:
         self.__filepath = filepath

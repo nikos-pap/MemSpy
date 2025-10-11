@@ -6,7 +6,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from file_handle_engine.file_reader import FileStreamReader
-from logger import create_logger, Logger
+from logging import getLogger, Logger
 from file_handle_engine.file_writer import FileWriter
 from utils.message import Message, MessageType
 from utils.types import Condition, ScanType, address_dtype, Type
@@ -46,7 +46,7 @@ class MemoryParserProcess(Process):
         self.__scan_start: float = 0.0
 
     def run(self) -> None:
-        self.__logger = create_logger(self.__class__.__name__)
+        self.__logger = getLogger(self.__class__.__name__)
         total = 0
         """Main loop: process commands and stream scan results."""
         while True:
@@ -64,12 +64,12 @@ class MemoryParserProcess(Process):
                 break
 
             if self.__scanner.process_exited():
-                self.__logger.info(f'Process Exited.')
+                self.__logger.debug(f'Process Exited.')
                 self.__scanner.close()
 
             if self.__scanning and self.__current_scan:
                 if self.__scanner.process_exited():
-                    self.__logger.info(f'Process Exited during Scan.')
+                    self.__logger.error(f'Process Exited during Scan.')
                     self.__cancel_scan()
                     continue
 
@@ -81,9 +81,6 @@ class MemoryParserProcess(Process):
                     total = 0
                 elif result:
                     addresses, progress = result
-                    # shit = addresses['bytes'] != np.frombuffer((1691).to_bytes(4, 'little'), dtype='V4')
-                    # if np.any(shit):
-                    #     print(addresses[shit])
                     self.__file_writer.write(addresses)
                     total += len(addresses)
                     self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)

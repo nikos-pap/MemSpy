@@ -1,4 +1,5 @@
 import re
+from logging import getLogger
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont
@@ -41,6 +42,7 @@ def _list_gpus() -> list[str]:
 
 
 def list_devices() -> list[dict[str, str | int]]:
+    logger = getLogger('Device Manager')
     devices = []
     # CPUs
     cpus = _list_cpus()
@@ -62,11 +64,14 @@ def list_devices() -> list[dict[str, str | int]]:
 
     # Print summary
     if not devices:
-        print("No devices found.")
+        logger.debug("No devices found.")
     else:
-        print("[Device Handler] Detected devices:")
+        text = 'Detected devices:'
+
         for dev in devices:
-            print(f"  [{dev['type']} {dev['index']}] {dev['name']}")
+            text += f"\n  [{dev['type']} {dev['index']}] {dev['name']}"
+
+        logger.info(text)
     return devices
 
 

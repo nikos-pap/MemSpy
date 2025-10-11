@@ -1,6 +1,6 @@
 import time
+from logging import getLogger, Logger
 from typing import Callable, Optional
-
 from PyQt6.QtCore import Qt, pyqtSlot
 from PyQt6.QtGui import QIcon, QFont, QAction
 from PyQt6.QtWidgets import (
@@ -19,6 +19,7 @@ from utils.types import PointerSettingsType, ScanType
 
 class MemoryScannerUI(QMainWindow):
     """Main window for the Memory Scanner application."""
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self):
         super().__init__()
@@ -26,11 +27,9 @@ class MemoryScannerUI(QMainWindow):
         self.isAttached: bool = False
         self.valid_input: bool = False
         self.scan_type: Optional[ScanType] = None
-
         self.__setup_window()
         self.__create_widgets()
         self.__create_layouts()
-        # self.__create_menu_bar()
         self.__connect_signals()
 
         self.__update_process_list_command()
@@ -56,7 +55,7 @@ class MemoryScannerUI(QMainWindow):
         self.__scan_controls: ScanControls = ScanControls(font=font)
 
         # Dock widgets and tables
-        self.search_address_table = PaginatedTable(font, 4)
+        self.search_address_table = PaginatedTable(font)
         header = self.search_address_table.horizontalHeader()
         for i in range(3):
             header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -190,7 +189,7 @@ class MemoryScannerUI(QMainWindow):
             return
         self.__scan_controls.new_scan_btn.clicked.disconnect()
         if self.__scan_controls.toggle_scan_button():
-            self.__scan_controls.new_scan_btn.clicked.connect(self.__scan_command)
+            self.__scan_controls.new_scan_btn.clicked.connect(lambda: self.__scan_command(ScanType.ADDRESS_SCAN))
         else:
             self.__scan_controls.new_scan_btn.clicked.connect(self.__stop_scan_command)
 
@@ -218,7 +217,7 @@ class MemoryScannerUI(QMainWindow):
         self.setWindowTitle(f'Mem Scanner - {proc_id}')
         start = time.time()
         self.backend.init_process_reader(proc_id)
-        print(f'Attached ({proc_id}) in {time.time() - start:.2f}s')
+        self.__logger.debug(f'Attached ({proc_id}) in {time.time() - start:.2f}s')
         self.setWindowIcon(icon or QIcon())
         if self.__scan_controls.initialise_scan_navigation():
             self.__toggle_scan_button()
@@ -226,6 +225,7 @@ class MemoryScannerUI(QMainWindow):
 
     @pyqtSlot(int)
     def __process_closed_handle(self, code: int) -> None:
+        self.__logger.debug(f'Closing process {code}')
         self.__scan_controls.process_box.setCurrentIndex(0)
 
     @pyqtSlot('quint64')
@@ -247,8 +247,8 @@ class MemoryScannerUI(QMainWindow):
         self.search_pointer_table.show_message()
 
     @pyqtSlot(str, str, bool, str, object)
-    def __on_pointer_command(self, name, typ, isPtr, baseHex, offsets):
-        print("Pointer requested:", name, typ, isPtr, baseHex, offsets)
+    def __on_pointer_command(self, name, typ, is_ptr, base_hex, offsets):
+        self.__logger.debug(f'Pointer requested: {name}, {typ}, {is_ptr}, {base_hex}, {offsets}')
         # … fire off your utility, read mem, insert into tree, etc. …
 
     @pyqtSlot(str)

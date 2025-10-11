@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 
 from ui_table_models.search_table_model import SortedPagedTableModel
 from utils.types import Type
-from logger import Logger, get_logger
+from logging import Logger, getLogger
 
 
 class PaginatedTable(QWidget):
@@ -20,9 +20,10 @@ class PaginatedTable(QWidget):
     previousPageSignal = pyqtSignal()
     addressActivated = pyqtSignal(dict)
 
-    def __init__(self, font: Optional[QFont] = None, *args):
-        super().__init__()
-        self.__logger: Logger = get_logger(self.__class__.__name__)
+    __logger: Logger = getLogger(__qualname__)
+
+    def __init__(self, font: Optional[QFont] = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.setWindowTitle("Large Table with Filter + Pagination")
 
         self.page_size: int = 100

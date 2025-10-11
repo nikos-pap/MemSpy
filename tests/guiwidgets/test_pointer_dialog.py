@@ -1,9 +1,8 @@
-import re
-
 import pytest
-
+re = pytest.importorskip("re")
 pd_mod = pytest.importorskip("guiwidgets.pointer_dialog", reason="pointer_dialog.py not importable")
 PointerDialog = pd_mod.PointerDialog
+
 
 @pytest.mark.gui
 def test_initial_state(qtbot):
@@ -14,6 +13,7 @@ def test_initial_state(qtbot):
     assert len(dlg._offset_rows) == 1
     # label seeded
     assert "Final Addr:" in dlg.final_label.text()
+
 
 @pytest.mark.gui
 def test_add_offset_and_recompute(qtbot, monkeypatch):
@@ -34,6 +34,7 @@ def test_add_offset_and_recompute(qtbot, monkeypatch):
     # final label should reflect the deterministic reads
     assert re.match(r'^Final Addr:\s*(0x[0-9a-fA-F]+),\s*Value:\s*(0x[0-9a-fA-F]+)$', dlg.final_label.text())
 
+
 @pytest.mark.gui
 def test_load_from_data_roundtrip(qtbot):
     dlg = PointerDialog()
@@ -44,6 +45,7 @@ def test_load_from_data_roundtrip(qtbot):
     assert dlg.type_combo.currentText() == "uint16"
     assert len(dlg._offset_rows) == 3
     assert [int(e.text(), 16) for e, _ in dlg._offset_rows] == [0x8, 0xC, 0x10]
+
 
 @pytest.mark.gui
 def test_get_result_shape(qtbot):

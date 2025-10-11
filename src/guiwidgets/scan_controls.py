@@ -1,4 +1,5 @@
 import time
+from logging import getLogger, Logger
 from typing import NamedTuple
 
 from PIL.ImageQt import ImageQt
@@ -14,9 +15,11 @@ from utils.types import is_valid_type, convert_to_bytes
 class ScanControls(QHBoxLayout):
     scanSignal = pyqtSignal()
     filterScanSignal = pyqtSignal()
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, parent=None, horizontal_spacing: int = 10, font: QFont = QFont()):
         super(ScanControls, self).__init__(parent)
+
         self.__font = font
         self.__horizontal_spacing = horizontal_spacing
         self.__setup_widgets()
@@ -60,7 +63,7 @@ class ScanControls(QHBoxLayout):
                 self.process_box.addItem(label, pid)
         self.process_box.refresh_items()
         self.process_box.blockSignals(False)
-        print(f"[MemoryScannerUI] Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
+        self.__logger.debug(f"Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
 
     def prepare_scan(self) -> tuple[bool, Condition, tuple[bytes, bytes], Type, str]:
         condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)

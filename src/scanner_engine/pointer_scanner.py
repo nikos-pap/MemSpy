@@ -7,7 +7,7 @@ from typing import Optional
 import scanner_engine.utils.pointer_scanner_tools as pst
 from utils.pointerchain import PointerChain
 
-warnings.simplefilter("ignore", category=NumbaWarning)
+# warnings.simplefilter("ignore", category=NumbaWarning)
 
 
 class PointerScanner:

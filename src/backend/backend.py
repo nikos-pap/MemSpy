@@ -1,18 +1,19 @@
+from logging import getLogger, Logger
+
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from multiprocessing import Queue
 from typing import NamedTuple
 import psutil
 from tempfile import TemporaryDirectory
-from logger import Logger, create_logger
 from backend.dataview_manager import MemoryViewThread
 from backend.memoryscan import MemoryParserProcess
 from utils.operation import Operation
-from utils import PointerChain
+from utils import PointerChain, Type, Condition
 from utils import image_extractor
 from bisect import insort
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
-from utils.types import Condition, ScanType, Type
+from utils.types import ScanType
 
 
 class QueueWorker(QObject):
@@ -23,18 +24,18 @@ class QueueWorker(QObject):
     pointerUpdateSignal = pyqtSignal(PointerChain)
     processExitedSignal = pyqtSignal(int)
     scanStartedSignal = pyqtSignal(list)
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, queue: Queue):
         super().__init__()
         self.__queue = queue
-        self.__logger: Logger = create_logger(self.__class__.__name__)
 
     def run(self) -> None:
         try:
             while not QThread.currentThread().isInterruptionRequested():
                 msg: Message = self.__queue.get()
                 if msg.message_type == MessageType.EXIT:
-                    self.__logger.info(f"Exiting")
+                    self.__logger.debug(f"Exiting")
                     break
                 # elif msg.message_type == MessageType.POINTER_CHAIN_UPDATED:  # memoryview
                 #     pointer = msg.message[0]
@@ -59,10 +60,10 @@ class QueueWorker(QObject):
 
 class Backend(QObject):
     """Central coordinator: manages memory scanning, process enumeration, and inter-thread communication."""
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self):
         super().__init__()
-        self.__logger: Logger = create_logger(self.__class__.__name__)
         self.__save_dir: TemporaryDirectory = TemporaryDirectory()
 
         # Communication queues
@@ -134,10 +135,10 @@ class Backend(QObject):
             self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN,
                                                 [values, condition, self.memory_worker.get_last_file(), data_type]))
 
-    def stop_scan(self):
+    def stop_scan(self) -> None:
         self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
 
-    def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool):
+    def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
         self.__scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, max_offset, negative_offsets_enabled, use_gpu]))
 
     @pyqtSlot(list)

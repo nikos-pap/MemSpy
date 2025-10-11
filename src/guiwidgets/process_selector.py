@@ -22,11 +22,6 @@ class ProcessSelectorBox(QComboBox):
         if index == -1 or proc_id is None or proc_id == self.current_pid:
             return
         icon = self.itemIcon(index)
-        # if index > 0:
-        #     if icon:
-        #         self.selectionSignal.emit(proc_id, icon)
-        #     else:
-        #         self.selectionSignal.emit(proc_id)
         self.selectionSignal.emit(proc_id, icon)
         self.current_pid = proc_id
 
