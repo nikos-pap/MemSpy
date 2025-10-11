@@ -1,7 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 import numpy as np
-
 from scanner_engine.region import Region
 from utils.types import Condition, address_dtype, Type
 
