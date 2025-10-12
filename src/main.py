@@ -13,7 +13,6 @@ def main():
         logging.getLogger("numba.cuda.cudadrv.driver").setLevel(logging.ERROR)
 
     app = QApplication(sys.argv)
-    app.setStyle('QtCurve')
     window = MemoryScannerUI()
     window.show()
     sys.exit(app.exec())
