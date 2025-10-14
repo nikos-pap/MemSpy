@@ -11,7 +11,8 @@ from PyQt6.QtGui import QStandardItem, QAction, QFont
 from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, pyqtSlot
 
 from gui.widgets.dialogs.address_dialog import EditAddressDialog
-from utils.types import convert_from_bytes, convert_to_bytes, WorkspaceDataType, Type
+from utils.types.converters import convert_from_bytes, convert_to_bytes
+from utils.types import WorkspaceDataType, Type
 from ui_table_models import SavedTreeModel
 from gui.widgets.dialogs.pointer_dialog import PointerDialog
 

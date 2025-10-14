@@ -12,8 +12,8 @@ from utils import PointerChain
 from backend import image_extractor
 from bisect import insort
 from utils.entry import ProcessEntry
-from utils.message import MessageType, Message
-from utils.types import ScanType, Type
+from utils.message import Message
+from utils.types import ScanType, Type, MessageType
 from utils.condition import Condition
 
 

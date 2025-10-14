@@ -4,7 +4,8 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSlot
 from PyQt6.QtGui import QBrush, QColor
 
 from utils import PointerChain
-from utils.types import Type, convert_from_bytes
+from utils.types import Type
+from utils.types.converters import convert_from_bytes
 
 
 class PointerScanTableModel(QAbstractTableModel):

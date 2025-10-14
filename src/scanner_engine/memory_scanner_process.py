@@ -8,7 +8,8 @@ from numpy.typing import NDArray
 from fileio.reader import FileStreamReader
 from logging import getLogger, Logger
 from fileio.writer import FileWriter
-from utils.message import Message, MessageType
+from utils.message import Message
+from utils.types import MessageType
 from utils.types import ScanType, Type
 from utils.condition import Condition
 from scanner_engine.process_reader import MemoryScanner

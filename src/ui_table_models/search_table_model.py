@@ -3,7 +3,8 @@ from PyQt6.QtCore import (
     Qt, QAbstractTableModel, QModelIndex, pyqtSlot
 )
 
-from utils.types import Type, convert_from_bytes
+from utils.types import Type
+from utils.types.converters import convert_from_bytes
 
 
 class SortedPagedTableModel(QAbstractTableModel):
