@@ -1,7 +1,7 @@
 import numpy as np
 from numba import cuda
 
-import scanner_engine.utils.pointer_scanner_tools as pst
+import scanner_engine.scanner_utils.pointer_scanner_tools as pst
 
 
 class Region:
@@ -59,8 +59,7 @@ class Region:
             addr_id = np.full((len(addrs), 1), self.id, dtype=np.uint32)
             addr_static = np.full((len(addrs), 1), self.static, dtype=np.uint8)
 
-
-        self.pointers = np.column_stack((addrs,addr_id, values, ids, addr_static))
+        self.pointers = np.column_stack((addrs, addr_id, values, ids, addr_static))
         self.data = None  # clear reference
 
     def pointers_filter(self, ranges):

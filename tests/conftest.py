@@ -4,6 +4,7 @@ import logging
 import pytest
 from contextlib import redirect_stdout, redirect_stderr
 
+
 @pytest.fixture(autouse=True, scope="session")
 def _disable_all_logging():
     """
@@ -14,6 +15,7 @@ def _disable_all_logging():
     logging.basicConfig = lambda *a, **k: None
     yield
     logging.disable(logging.NOTSET)
+
 
 @pytest.fixture(autouse=True)
 def _silence_stdout_stderr():

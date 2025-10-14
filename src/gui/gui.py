@@ -9,12 +9,15 @@ from PyQt6.QtWidgets import (
 )
 
 from backend import Backend
-from guiwidgets import (
-    AddressTreeContainer, ScanControls, PaginatedTable, MenuBar, PointerScanTable,
-    SettingsDialog, SettingsManager
-)
+from gui.widgets.trees.saved_addresses_tree import AddressTreeContainer
+from gui.widgets.controls.scan_controls import ScanControls
+from gui.widgets.tables.paged_table import PagedTable
+from gui.widgets.tables.pointer_table import PointerScanTable
+from gui.widgets.menus.menu_bar import MenuBar
+from gui.widgets.dialogs.settings__dialog import SettingsDialog, SettingsManager
 
-from utils.types import PointerSettingsType, ScanType
+from utils.types import ScanType
+# from utils.settings import PointerScanSettings
 
 
 class MemoryScannerUI(QMainWindow):
@@ -55,7 +58,7 @@ class MemoryScannerUI(QMainWindow):
         self.__scan_controls: ScanControls = ScanControls(font=font)
 
         # Dock widgets and tables
-        self.search_address_table = PaginatedTable(font)
+        self.search_address_table = PagedTable(font)
         header = self.search_address_table.horizontalHeader()
         for i in range(3):
             header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
@@ -233,10 +236,11 @@ class MemoryScannerUI(QMainWindow):
         self.scan_type = ScanType.POINTER_SCAN
         options = self.settings_manager.get_pointer_scan_options()
         self.backend.pointer_scan(address,
-                                  options[PointerSettingsType.DEPTH],
-                                  options[PointerSettingsType.MAX_OFFSET],
-                                  options[PointerSettingsType.NEGATIVE_OFFSETS],
-                                  options[PointerSettingsType.DEVICE])
+                                  options.depth,
+                                  options.max_offset,
+                                  options.negative_offsets,
+                                  bool(options.device))
+        # TODO fix device typing
         self.__scan_controls.disable_scan_navigation()
 
     @pyqtSlot(int, int)

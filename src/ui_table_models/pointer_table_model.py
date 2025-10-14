@@ -3,8 +3,8 @@ import bisect
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSlot
 from PyQt6.QtGui import QBrush, QColor
 
-from utils import Type, PointerChain
-from utils.types import convert_from_bytes
+from utils import PointerChain
+from utils.types import Type, convert_from_bytes
 
 
 class PointerScanTableModel(QAbstractTableModel):
@@ -22,6 +22,13 @@ class PointerScanTableModel(QAbstractTableModel):
         self.value_type = Type.UInt32
         # initial headers
         self._recalc_headers()
+
+    def getData(self):
+        return self._data
+
+    @property
+    def headers(self):
+        return self._headers
 
     def rowCount(self, parent=QModelIndex()):
         return len(self._keys)
@@ -79,9 +86,6 @@ class PointerScanTableModel(QAbstractTableModel):
         self.dataChanged.emit(top_left, bottom_right,
                               [Qt.ItemDataRole.DisplayRole])
 
-    def __make_key(self, ptr: PointerChain) -> str:
-        return f"{ptr.module_name}|{'-'.join(map(str, ptr.offsets))}"
-
     def _recalc_headers(self):
         if not self._data:
             self._offset_count = 0
@@ -98,7 +102,7 @@ class PointerScanTableModel(QAbstractTableModel):
         """
         Insert or update a PointerChain.
         """
-        key = self.__make_key(ptr)
+        key = f"{ptr.module_name}|{'-'.join(map(str, ptr.offsets))}"
         is_new = key not in self._data
         # no-op if unchanged
         if not is_new:

@@ -5,10 +5,10 @@ import numpy as np
 
 from logging import Logger, getLogger
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
-from file_handle_engine import MappedFileReader, FileWriter, FileStreamReader
+from fileio import MappedFileReader, FileWriter, FileStreamReader
 from utils.operation import Operation, GenericOperation
 from scanner_engine.process_reader import MemoryScanner
-from utils.history import History
+from backend.history import History
 
 
 class MemoryViewThread(QObject):

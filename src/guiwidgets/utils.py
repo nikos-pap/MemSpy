@@ -1,5 +1,5 @@
 import re
-from logging import getLogger
+from logging import getLogger, Logger
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap, QPainter, QFont
@@ -11,6 +11,9 @@ import wmi
 from enum import Enum, auto
 
 
+logger: Logger = getLogger('Device Manager')
+
+
 def _list_cpus() -> list[str]:
     """Return a list of CPU names on Windows via WMI."""
     cpus = []
@@ -19,9 +22,9 @@ def _list_cpus() -> list[str]:
         for cpu in c.Win32_Processor():
             cpus.append(cpu.Name.strip())
     except pywintypes.com_error as e:
-        print("⚠️ WMI COM error:", e)
+        logger.error("⚠️ WMI COM error:", e)
     except wmi.x_wmi as e:
-        print("⚠️ WMI query error:", e)
+        logger.error("⚠️ WMI query error:", e)
     return cpus
 
 
@@ -35,14 +38,13 @@ def _list_gpus() -> list[str]:
                 # .name is a bytestring, decode to UTF-8
                 gpu_list.append(dev.name.decode('utf-8'))
     except (CudaSupportError, CudaDriverError, CudaAPIError) as e:
-        print("⚠️ CUDA driver error:", e)
+        logger.error("⚠️ CUDA driver error:", e)
     except UnicodeDecodeError as e:
-        print("⚠️ GPU name decoding error:", e)
+        logger.error("⚠️ GPU name decoding error:", e)
     return gpu_list
 
 
 def list_devices() -> list[dict[str, str | int]]:
-    logger = getLogger('Device Manager')
     devices = []
     # CPUs
     cpus = _list_cpus()
@@ -75,7 +77,7 @@ def list_devices() -> list[dict[str, str | int]]:
     return devices
 
 
-class SavedTreeTypes(Enum):
+class WorkspaceTypes(Enum):
     POINTER = auto()
     GROUP = auto()
     ADDRESS = auto()
@@ -102,12 +104,12 @@ def emoji_icon(emoji: str, size: int = 32) -> QIcon:
 def is_uint64_hex(s: str, allow_prefix: bool = True) -> bool:
     # 1) Optionally strip "0x"/"0X"
     if allow_prefix:
-        if s.startswith(('0x','0X')):
+        if s.startswith(('0x', '0X')):
             s = s[2:]
     # 2) Check that what's left is 1 or more hex digits
     if not re.fullmatch(r'[0-9A-Fa-f]+', s):
         return False
-    # 3) Parse and make sure it fits in 0 .. 2**64-1
+    # 3) Parse and make sure it fits in 0 ... 2**64-1
     try:
         val = int(s, 16)
     except ValueError:

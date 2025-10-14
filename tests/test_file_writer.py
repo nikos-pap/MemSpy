@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pytest
-from file_handle_engine import FileWriter
+from fileio import FileWriter
 
 
 def test_temp_file_creation(tmp_path):
@@ -14,7 +14,7 @@ def test_temp_file_creation(tmp_path):
     assert fw.dtype == np.uint8
 
     fw.close()
-    assert not fw._FileWriter__file  # after close, internal handle is None
+    assert not getattr(fw, '_FileWriter__file')  # after close, internal handle is None
 
 
 def test_write_and_close(tmp_path):

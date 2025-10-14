@@ -1,14 +1,27 @@
 import ctypes
 import os
 from ctypes import wintypes
-from typing import Any, Generator, Optional, Iterator
+from logging import getLogger, Logger
+from typing import Any, Generator, Optional
 from numpy.typing import NDArray
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-from scanner_engine.memory_scanner import AbstractMemoryScanner
 from scanner_engine.region import Region
-from scanner_engine.utils.scanner_tools import find_matches, match_condition
-from utils.types import Condition, Type
+from scanner_engine.scanner_utils.scanner_tools import find_matches, match_condition
+from utils.types import Type
+from utils.condition import Condition
+
+
+# ——— Constants ———
+PROCESS_ALL_ACCESS = 0x1F0FFF
+TH32CS_SNAPMODULE = 0x00000008
+TH32CS_SNAPMODULE32 = 0x00000010  # For 32-bit modules in a 64-bit process or vice versa
+
+# Privilege constants
+TOKEN_ADJUST_PRIVILEGES = 0x0020
+TOKEN_QUERY = 0x0008
+SE_PRIVILEGE_ENABLED = 0x00000002
+WAIT_OBJECT_0 = 0x00000000
 
 MAX_PATH = 260
 
@@ -25,7 +38,25 @@ PAGE_GUARD = 0x100
 
 PAGE_SIZE = 0x1000
 
-class MEMORY_BASIC_INFORMATION(ctypes.Structure):
+
+# ——— Structures ———
+class ProcessMemoryCountersEx(ctypes.Structure):
+    _fields_ = [
+        ('cb', wintypes.DWORD),
+        ('PageFaultCount', wintypes.DWORD),
+        ('PeakWorkingSetSize', ctypes.c_size_t),
+        ('WorkingSetSize', ctypes.c_size_t),
+        ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+        ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+        ('PagefileUsage', ctypes.c_size_t),
+        ('PeakPagefileUsage', ctypes.c_size_t),
+        ('PrivateUsage', ctypes.c_size_t),
+    ]
+
+
+class MemoryBasicInformation(ctypes.Structure):
     _fields_ = [
         ("BaseAddress", wintypes.LPVOID),
         ("AllocationBase", wintypes.LPVOID),
@@ -35,6 +66,7 @@ class MEMORY_BASIC_INFORMATION(ctypes.Structure):
         ("Protect", wintypes.DWORD),
         ("Type", wintypes.DWORD),
     ]
+
 
 class MODULEENTRY32(ctypes.Structure):
     _fields_ = [
@@ -50,15 +82,49 @@ class MODULEENTRY32(ctypes.Structure):
         ("szExePath", ctypes.c_char * 260),
     ]
 
+
+# ——— Load libraries ———
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 psapi = ctypes.WinDLL("psapi", use_last_error=True)
+advapi32 = ctypes.WinDLL('Advapi32', use_last_error=True)
+
+# ——— For Debug Privileges ———
+# TODO check if debug works
+psapi.GetProcessMemoryInfo.argtypes = (wintypes.HANDLE, ctypes.POINTER(ProcessMemoryCountersEx), wintypes.DWORD)
+psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+
+advapi32.OpenProcessToken.argtypes = (wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE))
+advapi32.OpenProcessToken.restype = wintypes.BOOL
+advapi32.LookupPrivilegeValueW.argtypes = (wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.POINTER(ctypes.c_ulonglong))
+advapi32.LookupPrivilegeValueW.restype = wintypes.BOOL
+advapi32.AdjustTokenPrivileges.argtypes = (
+    wintypes.HANDLE, wintypes.BOOL, ctypes.c_void_p,
+    wintypes.DWORD, ctypes.c_void_p, ctypes.c_void_p
+)
+advapi32.AdjustTokenPrivileges.restype = wintypes.BOOL
+
+
+# ——— WinAPI prototypes ———
+OpenProcess = kernel32.OpenProcess
+OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+OpenProcess.restype = wintypes.HANDLE
+
+CloseHandle = kernel32.CloseHandle
+CloseHandle.argtypes = (wintypes.HANDLE,)
+CloseHandle.restype = wintypes.BOOL
+
 WriteProcessMemory = kernel32.WriteProcessMemory
 ReadProcessMemory = kernel32.ReadProcessMemory
+
 VirtualQueryEx = kernel32.VirtualQueryEx
-GetModuleFileNameEx = psapi.GetModuleFileNameExW
-VirtualQueryEx.argtypes = [wintypes.HANDLE, wintypes.LPCVOID, ctypes.POINTER(MEMORY_BASIC_INFORMATION),
-                           ctypes.c_size_t]
+VirtualQueryEx.argtypes = [wintypes.HANDLE, wintypes.LPCVOID, ctypes.POINTER(MemoryBasicInformation), ctypes.c_size_t]
 VirtualQueryEx.restype = ctypes.c_size_t
+
+GetModuleFileNameEx = psapi.GetModuleFileNameExW
+
+CreateToolHelp32Snapshot = kernel32.CreateToolhelp32Snapshot
+CreateToolHelp32Snapshot.restype = ctypes.wintypes.HANDLE
+CreateToolHelp32Snapshot.argtypes = [ctypes.wintypes.DWORD, ctypes.wintypes.DWORD]
 
 Module32First = kernel32.Module32First
 Module32First.restype = ctypes.wintypes.BOOL
@@ -68,9 +134,55 @@ Module32Next = kernel32.Module32Next
 Module32Next.restype = ctypes.wintypes.BOOL
 Module32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(MODULEENTRY32)]
 
-class MemoryScanner(AbstractMemoryScanner):
+
+# ——— Helper: enable SeDebugPrivilege ———
+def enable_debug_privilege():
+    hToken = wintypes.HANDLE()
+    if not advapi32.OpenProcessToken(
+            kernel32.GetCurrentProcess(),
+            TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
+            ctypes.byref(hToken)
+    ):
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    luid = ctypes.c_ulonglong()
+    if not advapi32.LookupPrivilegeValueW(None, 'SeDebugPrivilege', ctypes.byref(luid)):
+        CloseHandle(hToken)
+        raise ctypes.WinError(ctypes.get_last_error())
+
+    class LUIDAttributes(ctypes.Structure):
+        _fields_ = [('Luid', ctypes.c_ulonglong), ('Attributes', wintypes.DWORD)]
+
+    class TokenPrivileges(ctypes.Structure):
+        _fields_ = [('PrivilegeCount', wintypes.DWORD), ('Privileges', LUIDAttributes * 1)]
+
+    tp = TokenPrivileges()
+    tp.PrivilegeCount = 1
+    tp.Privileges[0] = LUIDAttributes(luid.value, SE_PRIVILEGE_ENABLED)
+
+    if not advapi32.AdjustTokenPrivileges(hToken, False, ctypes.byref(tp), ctypes.sizeof(tp), None, None):
+        CloseHandle(hToken)
+        raise ctypes.WinError(ctypes.get_last_error())
+
+
+class MemoryScanner:
+
+    __logger: Logger = getLogger(__qualname__)
+
     def __init__(self, enable_debug: bool = False):
-        super().__init__(enable_debug=enable_debug)
+        if enable_debug:
+            enable_debug_privilege()
+        self.handle: wintypes.HANDLE | None = None
+        self.hSnapshot: wintypes.HANDLE | None = None
+
+    def change_process(self, pid: int):
+        # clean up previous handle
+        if getattr(self, 'handle', None):
+            CloseHandle(self.handle)
+            self.handle = None
+        # open new handle
+        self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
+        self.hSnapshot = CreateToolHelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
 
     def read_memory(self, chunk_size_multiplier=min(2**13, (2**13)*PAGE_SIZE)):
         """
@@ -79,12 +191,12 @@ class MemoryScanner(AbstractMemoryScanner):
         """
 
         if not self.handle:
-            self._logger.warning("Failed to open process. Try running as Administrator.")
+            self.__logger.warning("Failed to open process. Try running as Administrator.")
             return
 
         chunk_size = chunk_size_multiplier * PAGE_SIZE
 
-        memory_info = MEMORY_BASIC_INFORMATION()
+        memory_info = MemoryBasicInformation()
         address = 0
         region_id = 0
 
@@ -130,7 +242,7 @@ class MemoryScanner(AbstractMemoryScanner):
                         bytes_read = ctypes.c_size_t()
                         read_address = ctypes.c_void_p(read_start)
 
-                        if ReadProcessMemory( self.handle, read_address, buffer, ctypes.c_size_t(read_size), ctypes.byref(bytes_read)):
+                        if ReadProcessMemory(self.handle, read_address, buffer, ctypes.c_size_t(read_size), ctypes.byref(bytes_read)):
                             yield Region(base_address=read_start, size=bytes_read.value, name=region_name, data=memoryview(buffer)[:bytes_read.value], id=region_id)
 
                         chunk_offset += chunk_size  # Move to next aligned chunk
@@ -151,7 +263,7 @@ class MemoryScanner(AbstractMemoryScanner):
         if ReadProcessMemory(self.handle, read_address, buffer, ctypes.c_size_t(region.size),
                              ctypes.byref(bytes_read)):
 
-            region.data=memoryview(buffer)[:bytes_read.value]
+            region.data = memoryview(buffer)[:bytes_read.value]
 
     def get_modules(self):
         me32 = MODULEENTRY32()
@@ -169,12 +281,12 @@ class MemoryScanner(AbstractMemoryScanner):
 
     def get_regions(self, chunk_size=2**25, element_size=4) -> Generator[Region, Any, None]:
         if not self.handle:
-            print("Failed to open process. Try running as Administrator.")
+            self.__logger.error("Failed to open process. Try running as Administrator.")
             return None
 
-        memory_info = MEMORY_BASIC_INFORMATION()
+        memory_info = MemoryBasicInformation()
         address = 0
-        id = 0
+        region_id = 0
         overlap = element_size - 1
 
         while address < 0x7FFFFFFFFFFF:  # Max user space address (Windows x64)
@@ -206,12 +318,12 @@ class MemoryScanner(AbstractMemoryScanner):
                             read_start = base_addr + chunk_offset - overlap
                             read_size = min(chunk_size + overlap, region_size - chunk_offset + overlap)
 
-                        yield Region(base_address=read_start, size=read_size, name=region_name, data=b'', id=id)
+                        yield Region(base_address=read_start, size=read_size, name=region_name, data=b'', id=region_id)
 
                         chunk_offset += chunk_size
-                    id += 1
-
+                    region_id += 1
             address += memory_info.RegionSize
+        return None
 
     def scan_value(
             self,
@@ -219,15 +331,16 @@ class MemoryScanner(AbstractMemoryScanner):
             condition: Condition = Condition.EQUAL,
             dtype: Type = Type.UInt32,
             threads: int = os.cpu_count() if os.cpu_count() else 1
-    ) -> Iterator[Optional[tuple]]:
-        total_size = self.get_working_memory_size()
+    ) -> Generator[Optional[tuple], Any, None]:
+        self.__logger.debug(f'Number of threads: {threads}')
+        total_size = self.__get_working_memory_size()
         current_size = 0
         value = np.frombuffer(b''.join(values), dtype=f'<u{dtype.size()}')
         with ThreadPoolExecutor(max_workers=16) as executor:
             for region in self.read_memory():
                 result = find_matches(
-                    region = region,
-                    values_dtype = dtype,
+                    region=region,
+                    values_dtype=dtype,
                     mode=condition,
                     target=value,
                     executor=executor
@@ -241,7 +354,7 @@ class MemoryScanner(AbstractMemoryScanner):
     def read_bytes(self, address: int, size: int) -> bytes | None:
         if not self.handle:
             # raise ctypes.WinError(ctypes.get_last_error())
-            self.logger.error('No open process')
+            self.__logger.error('No open process')
 
         # Create a buffer to hold the read data
         buffer = ctypes.create_string_buffer(size)
@@ -257,7 +370,7 @@ class MemoryScanner(AbstractMemoryScanner):
         )
 
         if not success:
-            self.logger.error(f"Invalid access to memory at address: {hex(address)}")
+            self.__logger.error(f"Invalid access to memory at address: {hex(address)}")
             return None
 
         # Return the raw bytes read
@@ -304,3 +417,34 @@ class MemoryScanner(AbstractMemoryScanner):
             data_type.dtype
         )  # TODO DONT LEAVE 00000000 !!!!!!!!!!
         return array[indices]
+
+    def process_exited(self) -> bool:
+        """Return True if process has exited, False if still alive."""
+        r = kernel32.WaitForSingleObject(self.handle, 0)
+        return r == WAIT_OBJECT_0
+
+    def close(self):
+        if self.handle:
+            kernel32.SetProcessWorkingSetSize(self.handle, -1, -1)
+            CloseHandle(self.handle)
+            self.handle = None
+        if self.hSnapshot:
+            CloseHandle(self.hSnapshot)
+            self.hSnapshot = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+
+    def __del__(self):
+        if getattr(self, 'handle', None):
+            CloseHandle(self.handle)
+
+    def __get_working_memory_size(self) -> int:
+        cnt = ProcessMemoryCountersEx()
+        cnt.cb = ctypes.sizeof(cnt)
+        if not psapi.GetProcessMemoryInfo(self.handle, ctypes.byref(cnt), cnt.cb):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return max(cnt.WorkingSetSize, cnt.PrivateUsage, cnt.PagefileUsage, cnt.PeakWorkingSetSize, cnt.PeakPagefileUsage)

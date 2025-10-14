@@ -6,14 +6,15 @@ from typing import NamedTuple
 import psutil
 from tempfile import TemporaryDirectory
 from backend.dataview_manager import MemoryViewThread
-from backend.memoryscan import MemoryParserProcess
+from scanner_engine.memory_scanner_process import MemoryScannerProcess
 from utils.operation import Operation
-from utils import PointerChain, Type, Condition
-from utils import image_extractor
+from utils import PointerChain
+from backend import image_extractor
 from bisect import insort
 from utils.entry import ProcessEntry
 from utils.message import MessageType, Message
-from utils.types import ScanType
+from utils.types import ScanType, Type
+from utils.condition import Condition
 
 
 class QueueWorker(QObject):
@@ -84,7 +85,7 @@ class Backend(QObject):
         self.__memory_thread.started.connect(self.memory_worker.run)
         self.__memory_thread.start()
 
-        self.__scanner = MemoryParserProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir.name)
+        self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir.name)
         self.__scanner.start()
 
         # Cached process list
