@@ -3,3 +3,4 @@
 .vs/python-memscanner/v16/.suo
 .vs/slnx.sqlite
 .vs/VSWorkspaceState.json
+src/memspy/scan_test.py
