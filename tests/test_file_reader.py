@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pytest
-from fileio import FileStreamReader, FileWriter
+from memspy.fileio import FileStreamReader, FileWriter
 
 
 @pytest.fixture

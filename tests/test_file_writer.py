@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pytest
-from fileio import FileWriter
+from memspy.fileio import FileWriter
 
 
 def test_temp_file_creation(tmp_path):
