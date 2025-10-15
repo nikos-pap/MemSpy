@@ -1,7 +1,5 @@
 Pillow
 pywin32
-Pymem
-regex
 psutil
 pyqt6
 numpy

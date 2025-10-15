@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memspy"
+version = "0.1.0"
+description = "MemSpy"
+readme = "README.md"
+requires-python = ">=3.10"
+# Runtime deps only
+dependencies = [
+    "numpy",
+    "Pillow",
+    "psutil",
+    "pyqt6",
+    "numba",
+    # Windows-only:
+    'pywin32; platform_system == "Windows"',
+    'wmi; platform_system == "Windows"',
+]
+# (Optional) classifiers, authors, etc.
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-qt"]
+
+[project.scripts]
+memspy = "memspy.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
