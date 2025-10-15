@@ -1,6 +1,7 @@
 import pytest
+from memspy.gui.widgets.dialogs.pointer_dialog import PointerDialog
 re = pytest.importorskip("re")
-pd_mod = pytest.importorskip("gui.widgets.dialogs.pointer_dialog", reason="pointer_dialog.py not importable")
+pd_mod = pytest.importorskip("memspy.gui.widgets.dialogs.pointer_dialog", reason="pointer_dialog.py not importable")
 PointerDialog = pd_mod.PointerDialog
 
 

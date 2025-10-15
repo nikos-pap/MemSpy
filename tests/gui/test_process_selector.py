@@ -1,6 +1,6 @@
 import pytest
 
-ps_mod = pytest.importorskip("gui.widgets.controls.process_selector", reason="process_selector.py not importable")
+ps_mod = pytest.importorskip("memspy.gui.widgets.controls.process_selector", reason="process_selector.py not importable")
 ProcessSelector = ps_mod.ProcessSelector
 
 

@@ -8,12 +8,10 @@ from tempfile import TemporaryDirectory
 from memspy.backend.dataview_manager import MemoryViewThread
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
 from memspy.utils.operation import Operation
-from memspy.utils import PointerChain
 from memspy.backend import image_extractor
 from bisect import insort
-from memspy.utils.entry import ProcessEntry
 from memspy.utils.message import Message
-from memspy.utils.types import ScanType, Type, MessageType
+from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem
 from memspy.utils.condition import Condition
 
 
@@ -22,7 +20,7 @@ class QueueWorker(QObject):
     progressSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
     updateSavedSignal = pyqtSignal('quint64', bytes)
-    pointerUpdateSignal = pyqtSignal(PointerChain)
+    pointerUpdateSignal = pyqtSignal(PointerItem)
     processExitedSignal = pyqtSignal(int)
     scanStartedSignal = pyqtSignal(list)
     __logger: Logger = getLogger(__qualname__)
@@ -89,7 +87,7 @@ class Backend(QObject):
         self.__scanner.start()
 
         # Cached process list
-        self.__running_procs: list[ProcessEntry] = []
+        self.__running_procs: list[ProcessItem] = []
         self.__active_processes: set = set()
 
         self.__history: list[Operation] = []
@@ -192,7 +190,7 @@ class Backend(QObject):
                 if pid not in self.__active_processes:
                     self.__active_processes.add(pid)
                     img = image_extractor.get_process_image(exe)
-                    process = ProcessEntry(name, pid, img)
+                    process = ProcessItem(name, pid, img)
                     insort(self.__running_procs, process, key=lambda p: p.name.lower())
                 found.add(pid)
             except (psutil.AccessDenied, psutil.NoSuchProcess) as e:

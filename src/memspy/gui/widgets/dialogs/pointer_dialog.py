@@ -1,7 +1,9 @@
 import random
 
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, QWidget, QPushButton, QLabel, \
+from PyQt6.QtWidgets import (
+    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox, QWidget, QPushButton, QLabel,
     QDialogButtonBox, QHBoxLayout
+)
 
 
 class PointerDialog(QDialog):

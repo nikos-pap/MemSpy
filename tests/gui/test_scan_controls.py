@@ -1,7 +1,7 @@
 import pytest
 from collections import namedtuple
 
-sc_mod = pytest.importorskip("gui.widgets.controls.scan_controls", reason="scan_controls.py not importable")
+sc_mod = pytest.importorskip("memspy.gui.widgets.controls.scan_controls", reason="scan_controls.py not importable")
 ScanControls = sc_mod.ScanControls
 
 

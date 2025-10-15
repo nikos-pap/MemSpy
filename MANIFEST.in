@@ -1,0 +1,17 @@
+# Include all README and license files
+include README.md LICENSE pytest.ini
+include *.txt *toml
+
+# Include everything in the package folder
+recursive-include src/memspy *
+recursive-include tests *
+
+# Exclude temporary or build files
+global-exclude *.py[cod]
+recursive-exclude * __pycache__ *.py[cod]
+prune tests/.pytest_cache
+prune build
+prune dist
+prune tools
+prune scripts
+prune docs

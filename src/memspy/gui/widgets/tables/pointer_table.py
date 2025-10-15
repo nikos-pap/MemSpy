@@ -12,8 +12,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import QModelIndex, pyqtSlot
 import csv
-from memspy.utils import PointerChain
-from memspy.utils.types import Type
+from memspy.utils.types import Type, PointerItem
 from memspy.ui_table_models import PointerScanTableModel
 
 
@@ -83,8 +82,8 @@ class PointerScanTable(QWidget):
         record = self.model.itemData(index)
         print(record)
 
-    @pyqtSlot(PointerChain)
-    def handleUpdate(self, pointer: PointerChain):
+    @pyqtSlot(PointerItem)
+    def handleUpdate(self, pointer: PointerItem):
         # rows: list of tuples as per input format
         self.model.update_handle(pointer)
         self.show_message()

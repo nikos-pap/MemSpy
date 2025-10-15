@@ -8,7 +8,7 @@ from PyQt6.QtGui import QStandardItemModel, QStandardItem, QAction
 from PyQt6.QtCore import Qt, QModelIndex, QPoint
 import sys
 
-from memspy.guiwidgets.utils import is_uint64_hex
+from memspy.utils.strings import is_uint64_hex
 from memspy.utils.types import Type
 
 

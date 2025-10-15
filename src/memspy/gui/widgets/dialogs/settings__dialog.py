@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QTabWidget
 )
 from PyQt6.QtCore import QSize, QSettings
-from memspy.guiwidgets.utils import list_devices
+from memspy.utils.devices import list_devices
 from memspy.utils.settings import PointerScanSettings, ScanSettings
 
 

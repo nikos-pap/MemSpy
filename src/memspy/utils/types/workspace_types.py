@@ -6,14 +6,14 @@ from numpy.typing import DTypeLike
 from memspy.utils.types import Type
 
 
-class ProcessEntry(NamedTuple):
+class ProcessItem(NamedTuple):
     name: str
     pid: int
     image: Optional[Image] = None
 
 
 @dataclass
-class AddressEntry:
+class AddressItem:
     name: str
     address: int
     value: bytes = b''
@@ -23,7 +23,7 @@ class AddressEntry:
 
 
 @dataclass
-class PointerChain:
+class PointerItem:
     module_name: str
     start: int
     target: int

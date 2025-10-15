@@ -1,16 +1,15 @@
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer, pyqtSlot
-from memspy.utils.entry import AddressEntry
-from memspy.utils import PointerChain
+from memspy.utils.types import AddressItem, PointerItem
 from memspy.scanner_engine.process_reader import MemoryScanner
 
 
 class WorkspaceManager(QObject):
-    updateAddressSignal = pyqtSignal(AddressEntry)
+    updateAddressSignal = pyqtSignal(AddressItem)
 
     def __init__(self, parent=None, update_rate: int = 500):
         super(WorkspaceManager, self).__init__(parent)
-        self.__saved_addresses: list[AddressEntry] = []
-        self.__saved_pointers: list[PointerChain] = []
+        self.__saved_addresses: list[AddressItem] = []
+        self.__saved_pointers: list[PointerItem] = []
 
         self.__scanner = MemoryScanner()
 
@@ -29,12 +28,12 @@ class WorkspaceManager(QObject):
                 address.value = new_value
                 self.updateAddressSignal.emit(address)
 
-    @pyqtSlot(AddressEntry)
-    def add_address(self, address: AddressEntry) -> None:
+    @pyqtSlot(AddressItem)
+    def add_address(self, address: AddressItem) -> None:
         self.__saved_addresses.append(address)
 
-    @pyqtSlot(AddressEntry)
-    def delete_address(self, address: AddressEntry) -> None:
+    @pyqtSlot(AddressItem)
+    def delete_address(self, address: AddressItem) -> None:
         if address in self.__saved_addresses:
             self.__saved_addresses.remove(address)
 

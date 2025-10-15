@@ -1,6 +1,6 @@
 import pytest
 
-mb_mod = pytest.importorskip("gui.widgets.menus.menu_bar", reason="menu_bar.py not importable")
+mb_mod = pytest.importorskip("memspy.gui.widgets.menus.menu_bar", reason="menu_bar.py not importable")
 MenuBar = mb_mod.MenuBar
 
 

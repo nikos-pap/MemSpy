@@ -3,8 +3,7 @@ import bisect
 from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, pyqtSlot
 from PyQt6.QtGui import QBrush, QColor
 
-from memspy.utils import PointerChain
-from memspy.utils.types import Type
+from memspy.utils.types import Type, PointerItem
 from memspy.utils.types.converters import convert_from_bytes
 
 
@@ -18,7 +17,7 @@ class PointerScanTableModel(QAbstractTableModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         # Master data structures
-        self._data: dict[str, PointerChain] = {}
+        self._data: dict[str, PointerItem] = {}
         self._keys: list[str] = []
         self.value_type = Type.UInt32
         # initial headers
@@ -98,8 +97,8 @@ class PointerScanTableModel(QAbstractTableModel):
             ["Target Address", "Value"]
         )
 
-    @pyqtSlot(PointerChain)
-    def update_handle(self, ptr: PointerChain):
+    @pyqtSlot(PointerItem)
+    def update_handle(self, ptr: PointerItem):
         """
         Insert or update a PointerChain.
         """

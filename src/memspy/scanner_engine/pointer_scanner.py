@@ -5,7 +5,7 @@ from numba import cuda
 from memspy.scanner_engine.process_reader import MemoryScanner
 from typing import Optional
 from memspy.scanner_engine.scanner_utils import pointer_scanner_tools as pst
-from memspy.utils.entry import PointerChain
+from memspy.utils.types import PointerItem
 
 # warnings.simplefilter("ignore", category=NumbaWarning)
 
@@ -29,7 +29,7 @@ class PointerScanner:
                     base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
-            yield PointerChain(base_address_name, module_address, -1, [base_address_offset] + offsets)
+            yield PointerItem(base_address_name, module_address, -1, [base_address_offset] + offsets)
 
     def preprocess_pointers(self):
         regions = self.regions.copy()
