@@ -3,7 +3,7 @@ from sys import byteorder
 from memspy.utils.types import Type
 
 
-def convert_to_bytes(value: str, to_type: Type) -> bytes:
+def convert_to_bytes(value: str | int | float, to_type: Type) -> bytes:
     t = b''
     match to_type:
         case Type.String:

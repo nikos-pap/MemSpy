@@ -7,7 +7,7 @@ class WorkspaceManager(QObject):
     updateAddressSignal = pyqtSignal(AddressItem)
 
     def __init__(self, parent=None, update_rate: int = 500):
-        super(WorkspaceManager, self).__init__(parent)
+        super().__init__(parent)
         self.__saved_addresses: list[AddressItem] = []
         self.__saved_pointers: list[PointerItem] = []
 

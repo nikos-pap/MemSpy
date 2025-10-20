@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 )
 
 from memspy.backend import Backend
-from memspy.gui.widgets.trees.saved_addresses_tree import AddressTreeContainer
+from memspy.gui.widgets.trees.workspace_tree import AddressTreeContainer
 from memspy.gui.widgets.controls.scan_controls import ScanControls
 from memspy.gui.widgets.tables.paged_table import PagedTable
 from memspy.gui.widgets.tables.pointer_table import PointerScanTable

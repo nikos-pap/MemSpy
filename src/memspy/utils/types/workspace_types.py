@@ -4,6 +4,7 @@ from PIL.Image import Image
 from dataclasses import dataclass, field
 from numpy.typing import DTypeLike
 from memspy.utils.types import Type
+from enum import Enum, auto
 
 
 class ProcessItem(NamedTuple):
@@ -30,3 +31,19 @@ class PointerItem:
     offsets: list[int] = field(default_factory=list)
     value: bytes | None = None
     value_type: Type = Type.UInt32
+
+
+@dataclass
+class WorkspaceItem:
+    name: str
+    address: int
+    value: bytes = b''
+    offsets: list[int] = field(default_factory=list)
+    frozen: bool = False
+    value_type: Type = Type.UInt32
+
+
+class WorkspaceDataType(Enum):
+    POINTER = auto()
+    GROUP = auto()
+    ADDRESS = auto()
