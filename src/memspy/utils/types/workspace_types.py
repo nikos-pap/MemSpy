@@ -6,6 +6,8 @@ from numpy.typing import DTypeLike
 from memspy.utils.types import Type
 from enum import Enum, auto
 
+from memspy.utils.types.converters import convert_from_bytes
+
 
 class ProcessItem(NamedTuple):
     name: str
@@ -37,10 +39,19 @@ class PointerItem:
 class WorkspaceItem:
     name: str
     address: int
-    value: bytes = b''
+    value: Optional[bytes] = b''
     offsets: list[int] = field(default_factory=list)
     frozen: bool = False
     value_type: Type = Type.UInt32
+
+    def get_value(self) -> str:
+        return str(convert_from_bytes(self.value, self.value_type))
+
+
+@dataclass
+class WorkspaceGroupItem:
+    name: str
+    items: list[WorkspaceItem] = field(default_factory=list)
 
 
 class WorkspaceDataType(Enum):

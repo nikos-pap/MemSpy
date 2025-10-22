@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
 )
 
 from memspy.backend import Backend
-from memspy.gui.widgets.trees.workspace_tree import AddressTreeContainer
+from memspy.gui.widgets.trees.workspace_tree import WorkspaceContainer
 from memspy.gui.widgets.controls.scan_controls import ScanControls
 from memspy.gui.widgets.tables.paged_table import PagedTable
 from memspy.gui.widgets.tables.pointer_table import PointerScanTable
@@ -67,8 +67,8 @@ class MemoryScannerUI(QMainWindow):
         self.search_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_table_dock.setWidget(self.search_address_table)
 
-        self.saved_address_tree = AddressTreeContainer(self)
-        self.saved_table_dock = QDockWidget("Saved Address Table", self)
+        self.saved_address_tree = WorkspaceContainer(self)
+        self.saved_table_dock = QDockWidget("Workspace", self)
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.saved_table_dock.setWidget(self.saved_address_tree)
 
@@ -104,8 +104,8 @@ class MemoryScannerUI(QMainWindow):
         dock_container.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.search_pointer_dock
         )
-        dock_container.tabifyDockWidget(self.search_table_dock, self.saved_table_dock)
         dock_container.tabifyDockWidget(self.search_table_dock, self.search_pointer_dock)
+        dock_container.tabifyDockWidget(self.search_table_dock, self.saved_table_dock)
         # noinspection PyTypeChecker
         dock_container.setDockOptions(
             QMainWindow.DockOption.AllowNestedDocks |
@@ -139,12 +139,12 @@ class MemoryScannerUI(QMainWindow):
         listener.progressSignal.connect(self.progress_bar.setValue)
         listener.scanCompletedSignal.connect(self.__finished_scan)
         listener.processExitedSignal.connect(self.__process_closed_handle)
-        listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
+        # listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
 
         self.search_address_table.nextPageSignal.connect(data_thread.next_page_handle)
         self.search_address_table.previousPageSignal.connect(data_thread.prev_page_handle)
-        self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
+        # self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.__menu_bar.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.__menu_bar.saved_table_action)
         self.fix_dock_close_event(self.search_pointer_dock, self.__menu_bar.search_pointer_action)
@@ -153,12 +153,12 @@ class MemoryScannerUI(QMainWindow):
         self.__scan_controls.new_scan_btn.clicked.connect(lambda: self.__scan_command(ScanType.ADDRESS_SCAN))
         self.__scan_controls.filter_btn.clicked.connect(lambda: self.__scan_command(ScanType.FILTER_SCAN))
 
-        self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
-        self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
-        self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
-        self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
-        self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
-        self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
+        # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
+        # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
+        # self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
+        # self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
+        # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
+        # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
 
         self.__menu_bar.openSettingsSignal.connect(self.__open_settings)
         self.__menu_bar.search_table_action.triggered.connect(
@@ -224,7 +224,7 @@ class MemoryScannerUI(QMainWindow):
         self.setWindowIcon(icon or QIcon())
         if self.__scan_controls.initialise_scan_navigation():
             self.__toggle_scan_button()
-        self.saved_address_tree.clear_tree()
+        # self.saved_address_tree.clear_tree()
 
     @pyqtSlot(int)
     def __process_closed_handle(self, code: int) -> None:
