@@ -67,10 +67,10 @@ class MemoryScannerUI(QMainWindow):
         self.search_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_table_dock.setWidget(self.search_address_table)
 
-        self.saved_address_tree = WorkspaceContainer(self)
+        self.workspace_container = WorkspaceContainer(self)
         self.saved_table_dock = QDockWidget("Workspace", self)
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
-        self.saved_table_dock.setWidget(self.saved_address_tree)
+        self.saved_table_dock.setWidget(self.workspace_container)
 
         self.search_pointer_table = PointerScanTable(self)
         self.search_pointer_dock = QDockWidget("Pointer Scan Table", self)
@@ -142,9 +142,11 @@ class MemoryScannerUI(QMainWindow):
         # listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
 
+        self.backend.workspace_worker.updateAddressSignal.connect(self.workspace_container.update_address)
+
         self.search_address_table.nextPageSignal.connect(data_thread.next_page_handle)
         self.search_address_table.previousPageSignal.connect(data_thread.prev_page_handle)
-        # self.search_address_table.addressActivated.connect(self.saved_address_tree.add_address)
+        self.search_address_table.addressActivated.connect(self.workspace_container.add_address)
         self.fix_dock_close_event(self.search_table_dock, self.__menu_bar.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.__menu_bar.saved_table_action)
         self.fix_dock_close_event(self.search_pointer_dock, self.__menu_bar.search_pointer_action)
@@ -156,7 +158,7 @@ class MemoryScannerUI(QMainWindow):
         # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
         # self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
-        # self.saved_address_tree.tree_view.addAddressSignal.connect(self.backend.save_address)
+        self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
         # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
         # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
 

@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 
 from memspy.ui_table_models.search_table_model import SortedPagedTableModel
-from memspy.utils.types import Type
+from memspy.utils.types import Type, WorkspaceItem
 from logging import Logger, getLogger
 
 
@@ -18,7 +18,7 @@ class PagedTable(QWidget):
     freezeSignal = pyqtSignal(int)
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
-    addressActivated = pyqtSignal(dict)
+    addressActivated = pyqtSignal(WorkspaceItem)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -141,7 +141,8 @@ class PagedTable(QWidget):
             if model.headerData(col, Qt.Orientation.Horizontal) == "Address":
                 addr_str = model.data(model.index(index.row(), col), Qt.ItemDataRole.DisplayRole)
                 if addr_str:
-                    self.addressActivated.emit({'addr': int(addr_str, 16), 'value': '', 'desc': '', 'frozen': False, 'type': Type.UInt32})
+                    wi = WorkspaceItem(address=int(addr_str, 16), value=None, value_type=Type.UInt32, frozen=False, offsets=[], name=addr_str)
+                    self.addressActivated.emit(wi)
                 break
 
     def clear(self):

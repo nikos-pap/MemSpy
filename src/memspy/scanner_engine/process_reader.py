@@ -3,12 +3,14 @@ import os
 from ctypes import wintypes
 from logging import getLogger, Logger
 from typing import Any, Generator, Optional
+
+from PIL.ImageChops import offset
 from numpy.typing import NDArray
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from memspy.scanner_engine.region import Region
 from memspy.scanner_engine.scanner_utils.scanner_tools import find_matches, match_condition
-from memspy.utils.types import Type
+from memspy.utils.types import Type, WorkspaceItem
 from memspy.utils.condition import Condition
 
 
@@ -350,6 +352,26 @@ class MemoryScanner:
                 current_size += region.size
 
         yield None
+
+    def evaluate_pointer(self, item: WorkspaceItem) -> list[int]:
+        start = item.address
+        values = []
+        last_idx = len(item.offsets) - 1
+        if not item.offsets:
+            item.value = self.read_bytes(start, item.value_type.size())
+            return []
+        for i, offset in enumerate(item.offsets):
+            start += offset
+            if i == last_idx:
+                item.value = self.read_bytes(start, item.value_type.size())
+            else:
+                start = self.read_bytes(start, 8)
+                if start is None:
+                    item.value = None
+                    break
+                start = int.from_bytes(start, byteorder='little')
+            values.append(start)
+        return values
 
     def read_bytes(self, address: int, size: int) -> bytes | None:
         if not self.handle:

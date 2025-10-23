@@ -1,6 +1,7 @@
+from logging import getLogger, Logger
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QTreeView,
@@ -19,17 +20,20 @@ from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
 
 class WorkspaceTree(QTreeView):
     pathChanged = pyqtSignal(str)
+    addAddressSignal = pyqtSignal(WorkspaceItem)
 
     # Custom roles for backing data (always raw)
     _ROLE_KIND = Qt.ItemDataRole.UserRole + 1
-    _ROLE_VALUE_BYTES = Qt.ItemDataRole.UserRole + 2
-    _ROLE_ADDR_INT = Qt.ItemDataRole.UserRole + 3
-    _ROLE_VALUE_TYPE = Qt.ItemDataRole.UserRole + 4
-    _ROLE_OFFSETS = Qt.ItemDataRole.UserRole + 5
-    _ROLE_FROZEN = Qt.ItemDataRole.UserRole + 6
+    # _ROLE_VALUE_BYTES = Qt.ItemDataRole.UserRole + 2
+    # _ROLE_ADDR_INT = Qt.ItemDataRole.UserRole + 3
+    # _ROLE_VALUE_TYPE = Qt.ItemDataRole.UserRole + 4
+    # _ROLE_OFFSETS = Qt.ItemDataRole.UserRole + 5
+    # _ROLE_FROZEN = Qt.ItemDataRole.UserRole + 6
 
     _KIND_GROUP = "group"
     _KIND_ITEM = "item"
+
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -66,7 +70,7 @@ class WorkspaceTree(QTreeView):
                 self._append_item_row(parent, it)
         self.expandAll()
 
-    def _prompt_add_group(self) -> None:
+    def prompt_add_group(self) -> None:
         name, ok = QInputDialog.getText(self, "Add Group", "Group name:")
         if not ok or not name.strip():
             return
@@ -84,19 +88,30 @@ class WorkspaceTree(QTreeView):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         wi = dlg.get_workspace_item()
+        self.add_item(wi)
+
+    def add_item(self, wi: WorkspaceItem) -> None:
+        """
+        Add a WorkspaceItem directly (no UI prompt), mirroring the dialog-based add.
+        - If a GROUP is selected, the item is added under that group.
+        - Otherwise, the item is added at the root.
+        - Expands the parent and the tree for visibility.
+        """
         if wi is None:
             return
 
         parent_group = self._selected_group_or_root()
         if parent_group is None:
-            self._model.appendRow(self._mk_item_row(wi))  # stray at root allowed
+            # allow stray item at root
+            self._model.appendRow(self._mk_item_row(wi))
         else:
-            self._append_item_row(parent_group, wi)  # child of GROUP
-            # expand in the view (not on the item)
+            # child of GROUP
+            self._append_item_row(parent_group, wi)
             index = self._model.indexFromItem(parent_group)
             if index.isValid():
                 self.expand(index)
-
+        self.__logger.debug(f'Added item "{wi}"')
+        self.addAddressSignal.emit(wi)
         self.expandAll()
 
     def remove_selected(self) -> None:
@@ -129,42 +144,60 @@ class WorkspaceTree(QTreeView):
             it.setEditable(False)
         return [name_item] + empty
 
-    def _mk_item_row(self, wi: WorkspaceItem) -> List[QStandardItem]:
-        # Always keep raw bytes
-        raw_value = wi.value if isinstance(wi.value, (bytes, bytearray)) else bytes(wi.value or b"")
+    def refresh_values_for_address(self, address: int) -> None:
+        """
+        Re-evaluate Value column for every ITEM whose WorkspaceItem.address == address.
+        Uses direct indices, no custom constants.
+        """
+        model = self._model
+        rows = [QModelIndex()]  # start from root
 
-        # Display-only conversion: convert_from_bytes(value: bytes, value_type: Type)
-        try:
-            display_val = convert_from_bytes(raw_value, wi.value_type)
-        except Exception:
-            display_val = None  # permissive; UI stays responsive
+        while rows:
+            parent = rows.pop()
+            for r in range(model.rowCount(parent)):
+                name_index = model.index(r, 0, parent)  # column 0 = Name
+                kind = name_index.data(self._ROLE_KIND)
 
+                if kind == self._KIND_GROUP:
+                    rows.append(name_index)
+                    continue
+                if kind != self._KIND_ITEM:
+                    continue
+
+                wi = name_index.data(Qt.ItemDataRole.UserRole)
+                if not wi:
+                    continue
+                try:
+                    if int(wi.address) != int(address):
+                        continue
+                except Exception:
+                    continue
+
+                # trigger refresh on Value column (assumed column 2)
+                val_index = model.index(r, 2, parent)
+                model.dataChanged.emit(val_index, val_index,
+                                       [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
+
+    def _mk_item_row(self, wi: WorkspaceItem) -> list[QStandardItem]:
+        """
+        Create a row representing a single WorkspaceItem.
+        Only the WorkspaceItem object is stored in the item data.
+        """
+        # Keep the WorkspaceItem directly
         name_it = QStandardItem(wi.name)
         name_it.setEditable(False)
         name_it.setData(self._KIND_ITEM, self._ROLE_KIND)
-
-        # Keep the ORIGINAL object on the row
         name_it.setData(wi, Qt.ItemDataRole.UserRole)
 
-        # Backing data for convenience
-        name_it.setData(bytes(raw_value), self._ROLE_VALUE_BYTES)
-        name_it.setData(int(wi.address), self._ROLE_ADDR_INT)
-        name_it.setData(wi.value_type, self._ROLE_VALUE_TYPE)
-        name_it.setData(list(wi.offsets or []), self._ROLE_OFFSETS)
-        name_it.setData(bool(wi.frozen), self._ROLE_FROZEN)
-
-        # Items are draggable but cannot accept children
-        name_it.setFlags(
-            Qt.ItemFlag.ItemIsEnabled
-            | Qt.ItemFlag.ItemIsSelectable
-            | Qt.ItemFlag.ItemIsDragEnabled
-        )
-
+        # Display fields
         addr_it = QStandardItem(hex(int(wi.address)))
         addr_it.setEditable(False)
 
-        # Show converted value; fallback if conversion failed
-        val_it = QStandardItem(str(display_val) if display_val is not None else f"{len(raw_value)} bytes")
+        try:
+            display_val = convert_from_bytes(wi.value, wi.value_type)
+        except TypeError:
+            display_val = None
+        val_it = QStandardItem(str(display_val) if display_val is not None else "")
         val_it.setEditable(False)
 
         frozen_it = QStandardItem("Yes" if wi.frozen else "No")
@@ -210,6 +243,7 @@ class WorkspaceTree(QTreeView):
 
 
 class WorkspaceContainer(QWidget):
+
     """Toolbar + WorkspaceTree + status label."""
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -232,9 +266,19 @@ class WorkspaceContainer(QWidget):
         # Wiring
         self.tree.pathChanged.connect(self.status.setText)
 
+
+
+    @pyqtSlot(int)
+    def update_address(self, address: int) -> None:
+        self.tree.refresh_values_for_address(address)
+
+    @pyqtSlot(WorkspaceItem)
+    def add_address(self, workspace_item: WorkspaceItem) -> None:
+        self.tree.add_item(workspace_item)
+
     def _add_actions(self):
         act_group = QAction("Add Group", self)
-        act_group.triggered.connect(self.tree._prompt_add_group)
+        act_group.triggered.connect(self.tree.prompt_add_group)
         self.toolbar.addAction(act_group)
 
         act_item = QAction("Add Item", self)

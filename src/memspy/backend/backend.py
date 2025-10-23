@@ -6,6 +6,7 @@ from typing import NamedTuple
 import psutil
 from tempfile import TemporaryDirectory
 from memspy.backend.dataview_manager import MemoryViewThread
+from memspy.backend.workspace_manager import WorkspaceManager
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
 from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
@@ -83,6 +84,13 @@ class Backend(QObject):
         self.__memory_thread.started.connect(self.memory_worker.run)
         self.__memory_thread.start()
 
+        # Workspace update Thread
+        self.__workspace_thread = QThread(self)
+        self.workspace_worker: WorkspaceManager = WorkspaceManager()
+        self.workspace_worker.moveToThread(self.__workspace_thread)
+        self.__workspace_thread.started.connect(self.workspace_worker.run)
+        self.__workspace_thread.start()
+
         self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir.name)
         self.__scanner.start()
 
@@ -101,6 +109,7 @@ class Backend(QObject):
         """Initialize memory scanning for a given process ID."""
         msg = Message(MessageType.SET_PROCESS, [pid])
         self.memory_worker.set_process(pid)
+        self.workspace_worker.set_process(pid)
         self.__scanner_queue_in.put(msg)
 
     @pyqtSlot('quint64', bytes)
@@ -166,11 +175,10 @@ class Backend(QObject):
         if self.__scanner.is_alive():
             self.__scanner.join()
         self.memory_worker.exitSignal.emit()
+        self.workspace_worker.exitSignal.emit()
 
         if self.__thread.isRunning():
             self.__thread.wait()
-        if self.__memory_thread.isRunning():
-            self.__memory_thread.wait()
 
     def get_running_processes(self) -> list[NamedTuple]:
         """Retrieve and cache running processes and their icons."""

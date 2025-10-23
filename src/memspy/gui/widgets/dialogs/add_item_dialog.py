@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import List, Optional
+from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QBrush
@@ -19,26 +17,13 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 
-# You already have this enum: utils.types.Type
 from memspy.utils.types import Type, WorkspaceItem
 
-# IMPORTANT:
-# Adjust this import to wherever your WorkspaceItem class lives.
-# It must match the dataclass you showed (name, address, value, offsets, frozen, value_type, get_value()).
-# from utils.types import WorkspaceItem  # <-- change path if needed
-
-# We simply call resolve_pointer(wi) as you specified.
-# Provide it in your project (signature: resolve_pointer(WorkspaceItem) -> list[int]).
-# The function must:
-#   - return the intermediate addresses for each offset, in order
-#   - set wi.value (bytes) to the final read value
 try:
     from pointer_resolver import resolve_pointer  # <-- change path if needed
-except Exception:  # do not crash if it's not present yet
-    def resolve_pointer(item: WorkspaceItem) -> List[int]:
+except ImportError:
+    def resolve_pointer(item: WorkspaceItem) -> list[int]:
         item.value = None
-        # Placeholder that returns no intermediate addresses and does not touch wi.value.
-        # Replace with your real implementation.
         return []
 
 
@@ -105,10 +90,9 @@ class AddItemDialog(QDialog):
         self._value_num_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
 
         # OK / Cancel
-        self._bbox = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
-            parent=self,
-        )
+        self._bbox = QDialogButtonBox(parent=self)
+        self._bbox.addButton(QDialogButtonBox.StandardButton.Ok)
+        self._bbox.addButton(QDialogButtonBox.StandardButton.Cancel)
 
         # --- Layout ----------------------------------------------------------
         form = QFormLayout()
@@ -234,7 +218,7 @@ class AddItemDialog(QDialog):
             return None
 
         # Collect offsets
-        offsets: List[int] = []
+        offsets: list[int] = []
         for r in range(self._table.rowCount()):
             cell = self._table.item(r, 0)
             try:

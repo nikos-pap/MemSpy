@@ -22,9 +22,10 @@ class MemoryViewThread(QObject):
     updateTotalsSignal = pyqtSignal(int)
     addressPageSignal = pyqtSignal(int)
 
+    __logger: Logger = getLogger(__qualname__)
+
     def __init__(self, save_dir: str, update_rate: int = 500, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.__logger: Logger = getLogger(self.__class__.__name__)
 
         self.__history: History = History()
         self.__mapped_data_reader: MappedFileReader = MappedFileReader()
