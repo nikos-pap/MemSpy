@@ -7,40 +7,39 @@ def evaluate_pointer(item: WorkspaceItem, scanner: MemoryScanner) -> list[int]:
     values = []
     last_idx = len(item.offsets)-1
     for i, offset in enumerate(item.offsets):
-        if start is None:
-            item.value = None
-            break
         start += offset
         if i == last_idx:
-            val = scanner.read_bytes(start, item.value_type.size())
-            item.value = val #Comment if you don't want to set the item value to what was evaluated
+            item.value = scanner.read_bytes(start, item.value_type.size())
         else:
-            val = scanner.read_bytes(start, 8)
-            start = None if val is None else int.from_bytes(val, byteorder='little')
-        values.append(val)
+            start = scanner.read_bytes(start, 8)
+            if start is None:
+                item.value = None
+                break
+            start = int.from_bytes(start, byteorder='little')
+        values.append(start)
     return values
 
 if __name__ == '__main__':
     scanner = MemoryScanner()
     scanner.change_process(0xd50)
-    wsitem = WorkspaceItem('Java', 0x7FFA5B770000, b'0x0', [0x0001AE90, 0xA0, 0x3A8, 0x718], False, Type.UInt32)
+    wsitem = WorkspaceItem('Java', 0x7FF9C1AC0000, b'0x0', [0x00C6B9B8, 0x360, 0x3A8, 0x718], False, Type.UInt32)
     vals = evaluate_pointer(wsitem, scanner)
     print(evaluate_pointer(wsitem, scanner))
     print(wsitem.value)
 
     print("-------------------------")
 
-    wsitem = WorkspaceItem('Java', 0x7FFA5B770000, b'0x0', [0x0001AE90, 0xA1, 0x3A8, 0x718], False, Type.UInt32) #From 0xA0 to 0xA1
+    wsitem = WorkspaceItem('Java', 0x7FF9C1AC0000, b'0x0', [0x00C6B9B8, 0x361, 0x3A8, 0x718], False, Type.UInt32)
     vals = evaluate_pointer(wsitem, scanner)
     print(evaluate_pointer(wsitem, scanner))
     print(wsitem.value)
 
     '''
-    Invalid access to memory at address: 0xe0000002112f81ea
-    Invalid access to memory at address: 0xe0000002112f81ea
-    [b'@oLQ\x11\x02\x00\x00', b'@B~/\x11\x02\x00\x00', b'\x10\xef\xcf\xdf\xee\x00\x00\x00', b'\x06\x00\x00\x00']
-    b'0x0'
+    [2272834450288, 2272834503232, 1025957162768, 1025957164584]
+    b'\t\x00\x00\x00'
     -------------------------
-    [b'@oLQ\x11\x02\x00\x00', b'B~/\x11\x02\x00\x00\xe0', None]
+    [2272834450288, 8878259778]
     None
+    Invalid access to memory at address: 0x2112f81ea
+    Invalid access to memory at address: 0x2112f81ea
     '''
