@@ -6,6 +6,7 @@ from typing import Optional, BinaryIO
 import pickle
 from numpy.typing import NDArray, DTypeLike
 
+from memspy.utils.pointer_scan import PointerScanInfo
 from memspy.utils.types import ScanType
 
 
@@ -51,20 +52,22 @@ class FileWriter:
         self.filepath = self.__file.name
         self.dtype = dtype
 
-    def write(self, data: NDArray, scan_type: Optional[ScanType]) -> None:
+    def write(self, data: NDArray, scan_type: Optional[ScanType], scan_info: Optional[PointerScanInfo] = None) -> None:
         """
         Writes data to file.
 
         Args:
             scan_type: Optional[ScanType] the scan type.
             data: [NDArray] the nparray data to write to the file.
-
+            scan_info: Optional[PointerScanInfo] the scan info.
         Returns:
             None:
         """
         if not self.__file:
             raise RuntimeError("File not set or closed.")
         if scan_type == ScanType.POINTER_SCAN:
+            # noinspection PyTypeChecker
+            pickle.dump(scan_info, self.__file)
             for d in data:
                 # noinspection PyTypeChecker
                 pickle.dump(d, self.__file)
