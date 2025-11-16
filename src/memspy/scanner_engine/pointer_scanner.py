@@ -35,53 +35,65 @@ class PointerScanner:
 
     def preprocess_pointers(self):
         regions = self.regions.copy()
-        ranges: np.ndarray | list = self.ranges.copy()
+        alive = np.ones(len(regions), dtype=bool)
 
-        f = True
-        while f:
-            f = False
+        # Build initial ranges
+        ranges = np.empty((len(regions), 3), dtype=np.uint64)
+        for i, r in enumerate(regions):
+            ranges[i, 0] = r.base_address
+            ranges[i, 1] = r.base_address + r.size
+            ranges[i, 2] = r.id
+
+        while True:
+            removed_any = False
+
+            # Process only alive regions
             for i, region in enumerate(regions):
-                region.pointers_filter(ranges)
-                region.check_loops()
-                if len(region.pointers) == 0:
-                    f = True
-                    regions[i] = None
-            if f:
-                regions = [region for region in regions if region]
-                ranges = np.array([
-                    [region.base_address, region.base_address + region.size, region.id]
-                    for region in regions
-                ], dtype=np.uint64)
+                if not alive[i]:
+                    continue
 
-        self.regions = regions
+                region.pointers_filter(ranges)
+
+                # Loop check
+                if region.pointers.size == 0 or np.all(region.pointers[:, 3] == region.id):
+                    alive[i] = False
+                    removed_any = True
+
+            # If nothing was removed, we're done
+            if not removed_any:
+                break
+
+            # Rebuild ranges *once*
+            idx = np.where(alive)[0]
+            ranges = np.empty((idx.size, 3), dtype=np.uint64)
+            for j, i in enumerate(idx):
+                r = regions[i]
+                ranges[j, 0] = r.base_address
+                ranges[j, 1] = r.base_address + r.size
+                ranges[j, 2] = r.id
+
+        # Store the compacted lists
+        self.regions = [r for r, ok in zip(regions, alive) if ok]
         self.ranges = ranges
 
     def get_addresses(self):
-        addresses = []
-        for region in self.regions:
-            addresses.extend(region.pointers)
-        return np.array(addresses, dtype=np.uint64)
+        return np.concatenate(
+            [region.pointers.astype(np.uint64, copy=False) for region in self.regions]
+        )
 
     def get_pointer_map(self, use_gpu: bool):
-        # for region in self.scanner.read_memory(element_size=8):
-        #     self.regions.append(region)
-        #     self.ranges.append([region.base_address, region.base_address + region.size, region.id])
-
-        # for region in self.regions:
-        #     region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
-        #     region.pointers_annotate_regions(self.ranges, True)
         print("Getting process regions", end=' ')
         start = time.time()
         self.regions = []
         self.ranges = []
-        for region in self.scanner.get_regions(element_size=8):
+        for region in self.scanner.get_regions():
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
 
         for region in self.regions:
             self.scanner.read_memory_by_region(region)
             if region.data:
-                region.data2values(self.ranges, np.uint64, use_gpu=use_gpu and cuda.is_available(), step_enable=True)
+                region.data2values(self.ranges, np.uint64, use_gpu=use_gpu and cuda.is_available())
         print(f'{time.time() - start:2f}')
         print("Preprocessing pointers", end=' ')
         start = time.time()

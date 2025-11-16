@@ -281,7 +281,7 @@ class MemoryScanner:
                     break
         return modules
 
-    def get_regions(self, chunk_size=2**25, element_size=4) -> Generator[Region, Any, None]:
+    def get_regions_old(self, chunk_size=2**25, element_size=4) -> Generator[Region, Any, None]:
         if not self.handle:
             self.__logger.error("Failed to open process. Try running as Administrator.")
             return None
@@ -326,6 +326,68 @@ class MemoryScanner:
                     region_id += 1
             address += memory_info.RegionSize
         return None
+
+    def get_regions(self, chunk_size_multiplier=min(2 ** 13, (2 ** 13) * PAGE_SIZE)) -> Generator[Region, None, None]:
+        """
+        Yields Region objects in chunks aligned to PAGE_SIZE.
+        Data is empty (b''), only base_address, size, name, and id are set.
+        """
+        if not self.handle:
+            self.__logger.warning("Failed to open process. Try running as Administrator.")
+            return
+
+        chunk_size = chunk_size_multiplier * PAGE_SIZE
+
+        memory_info = MemoryBasicInformation()
+        address = 0
+        region_id = 0
+
+        allowed = (
+                PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE |
+                PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY
+        )
+        blocked = PAGE_NOACCESS | PAGE_GUARD
+
+        MAX_USER_ADDR = 0x7FFFFFFFFFFF  # Windows x64 max user space address
+
+        while address < MAX_USER_ADDR:
+            size = VirtualQueryEx(
+                self.handle,
+                ctypes.c_void_p(address),
+                ctypes.byref(memory_info),
+                ctypes.sizeof(memory_info)
+            )
+            if size == 0:
+                break
+
+            base_addr = ctypes.cast(memory_info.BaseAddress, ctypes.c_void_p).value
+            region_size = memory_info.RegionSize
+
+            if memory_info.State == MEM_COMMIT:
+                protection = memory_info.Protect
+                if (protection & allowed) and not (protection & blocked):
+
+                    # Try to get the module name
+                    module_name_buf = ctypes.create_unicode_buffer(MAX_PATH)
+                    module_base = ctypes.c_void_p(memory_info.AllocationBase)
+                    if GetModuleFileNameEx(self.handle, module_base, module_name_buf, MAX_PATH) > 0:
+                        region_name = os.path.basename(module_name_buf.value)
+                    else:
+                        region_name = None
+
+                    chunk_offset = 0
+                    while chunk_offset < region_size:
+                        read_start = base_addr + chunk_offset
+                        remaining = region_size - chunk_offset
+                        read_size = min(chunk_size, remaining)
+
+                        yield Region( base_address=read_start, size=read_size, name=region_name, data=b'', id=region_id)
+
+                        chunk_offset += chunk_size  # Move to next chunk
+
+                    region_id += 1
+
+            address += memory_info.RegionSize
 
     def scan_value(
             self,
