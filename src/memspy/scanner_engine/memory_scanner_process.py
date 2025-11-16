@@ -134,6 +134,7 @@ class MemoryScannerProcess(Process):
 
         elif typ == MessageType.EXIT:
             self.__logger.debug('Exiting')
+            self.__scanner.trim_process()
 
     def __start_scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType = ScanType.ADDRESS_SCAN) -> None:
         """Initialize a new scan generator, note start time, and notify start."""

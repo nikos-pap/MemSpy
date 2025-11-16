@@ -40,7 +40,6 @@ PAGE_GUARD = 0x100
 
 PAGE_SIZE = 0x1000
 
-
 # ——— Structures ———
 class ProcessMemoryCountersEx(ctypes.Structure):
     _fields_ = [
@@ -136,6 +135,10 @@ Module32Next = kernel32.Module32Next
 Module32Next.restype = ctypes.wintypes.BOOL
 Module32Next.argtypes = [wintypes.HANDLE, ctypes.POINTER(MODULEENTRY32)]
 
+SetProcessWorkingSetSize = kernel32.SetProcessWorkingSetSize
+SetProcessWorkingSetSize.argtypes = [
+    wintypes.HANDLE, ctypes.c_size_t, ctypes.c_size_t
+]
 
 # ——— Helper: enable SeDebugPrivilege ———
 def enable_debug_privilege():
@@ -186,7 +189,11 @@ class MemoryScanner:
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
         self.hSnapshot = CreateToolHelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
 
-    def read_memory(self, chunk_size_multiplier=min(2**13, (2**13)*PAGE_SIZE)):
+    def trim_process(self):
+        if not SetProcessWorkingSetSize(self.handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1)):
+            raise ctypes.WinError()
+
+    def read_memory(self, chunk_size_multiplier=2**20):
         """
         Reads process memory region by region in chunks that are multiples of PAGE_SIZE.
         No overlap between chunks.
@@ -281,57 +288,7 @@ class MemoryScanner:
                     break
         return modules
 
-    def get_regions_old(self, chunk_size=2**25, element_size=4) -> Generator[Region, Any, None]:
-        if not self.handle:
-            self.__logger.error("Failed to open process. Try running as Administrator.")
-            return None
-
-        memory_info = MemoryBasicInformation()
-        address = 0
-        region_id = 0
-        overlap = element_size - 1
-
-        while address < 0x7FFFFFFFFFFF:  # Max user space address (Windows x64)
-            size = VirtualQueryEx(self.handle, ctypes.c_void_p(address), ctypes.byref(memory_info),
-                                  ctypes.sizeof(memory_info))
-            if size == 0:
-                break
-
-            base_addr = ctypes.cast(memory_info.BaseAddress, ctypes.c_void_p).value
-            region_size = memory_info.RegionSize
-
-            if memory_info.State == MEM_COMMIT:  # MEM_COMMIT
-                if memory_info.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY):
-                    module_name = ctypes.create_unicode_buffer(MAX_PATH)
-                    module_base = ctypes.c_void_p(memory_info.AllocationBase)
-
-                    if GetModuleFileNameEx(self.handle, module_base, module_name, MAX_PATH) > 0:
-                        region_name = os.path.basename(module_name.value)
-                    else:
-                        region_name = None
-
-                    chunk_offset = 0
-                    while chunk_offset < region_size:
-                        # First chunk has no overlap
-                        if chunk_offset == 0:
-                            read_start = base_addr
-                            read_size = min(chunk_size, region_size)
-                        else:
-                            read_start = base_addr + chunk_offset - overlap
-                            read_size = min(chunk_size + overlap, region_size - chunk_offset + overlap)
-
-                        yield Region(base_address=read_start, size=read_size, name=region_name, data=b'', id=region_id)
-
-                        chunk_offset += chunk_size
-                    region_id += 1
-            address += memory_info.RegionSize
-        return None
-
-    def get_regions(self, chunk_size_multiplier=min(2 ** 13, (2 ** 13) * PAGE_SIZE)) -> Generator[Region, None, None]:
-        """
-        Yields Region objects in chunks aligned to PAGE_SIZE.
-        Data is empty (b''), only base_address, size, name, and id are set.
-        """
+    def get_regions(self, chunk_size_multiplier=2**20) -> Generator[Region, None, None]:
         if not self.handle:
             self.__logger.warning("Failed to open process. Try running as Administrator.")
             return
