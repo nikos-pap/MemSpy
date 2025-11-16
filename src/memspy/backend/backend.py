@@ -112,29 +112,11 @@ class Backend(QObject):
         self.workspace_worker.set_process(pid)
         self.__scanner_queue_in.put(msg)
 
-    @pyqtSlot('quint64', bytes)
-    def set_value(self, address: int, value: bytes) -> None:
-        """Edit a memory address value."""
-        pass
-        # msg = Message(MessageType.EDIT_ADDRESS, [address, value])
-        # self.proc_queue_in.put(msg)
-
     @pyqtSlot('quint64', bytes, bool)
     def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
         pass
         # message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
         # self.proc_queue_in.put(Message(message, [address, value]))
-
-    @pyqtSlot('quint64')
-    def save_address(self, address: int) -> None:
-        pass
-        # self.proc_queue_in.put(Message(MessageType.SAVE_ADDRESS, [address]))
-
-    @pyqtSlot('quint64')
-    def unsave_address(self, address: int) -> None:
-        pass
-        # message = Message(MessageType.UNSAVE_ADDRESS, [address])
-        # self.proc_queue_in.put()
 
     def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType) -> None:
         if scan_type == ScanType.ADDRESS_SCAN:

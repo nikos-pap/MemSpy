@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 from numba import cuda
 # import warnings
@@ -68,7 +70,8 @@ class PointerScanner:
         # for region in self.regions:
         #     region.data2values(self.ranges, np.uint64, use_gpu = True, condition = Condition.BETWEEN, step_enable=False)
         #     region.pointers_annotate_regions(self.ranges, True)
-        print("Getting process regions")
+        print("Getting process regions", end=' ')
+        start = time.time()
         self.regions = []
         self.ranges = []
         for region in self.scanner.get_regions(element_size=8):
@@ -79,9 +82,11 @@ class PointerScanner:
             self.scanner.read_memory_by_region(region)
             if region.data:
                 region.data2values(self.ranges, np.uint64, use_gpu=use_gpu and cuda.is_available(), step_enable=True)
-
-        print("Preprocessing pointers")
+        print(f'{time.time() - start:2f}')
+        print("Preprocessing pointers", end=' ')
+        start = time.time()
         self.preprocess_pointers()
+        print(f'{time.time() - start:2f}')
 
     def pointer_scan(self, target_address: int, depth: int = 3, max_offset: int = 1024, negative_offsets_enabled: bool = False, randomness: float = 0):
         sr = 0
@@ -89,20 +94,34 @@ class PointerScanner:
             if region.base_address <= target_address <= region.base_address + region.size:
                 sr = region.id
                 break
-        print("Getting addresses")
+        print("Getting addresses", end=' ')
+        start = time.time()
         addresses = self.get_addresses()
-        print("Searching unique regions")
+        print(f'{time.time() - start:2f}')
+        print("Searching unique regions", end=' ')
+        start = time.time()
         unique_regions = pst.preprocess_unique_transitions(addresses)
-        print("Making a regions 'graph'")
+        print(f'{time.time() - start:2f}')
+        print("Making a regions 'graph'", end=' ')
+        start = time.time()
         region_graph = pst.build_region_graph(unique_regions)
-        print("Getting valid regions for depth %d" % depth)
+        print(f'{time.time() - start:2f}')
+        print(f"Getting valid regions for depth {depth}", end=' ')
+        start = time.time()
         reachable_regions = pst.dfs_regions(graph=region_graph, start_region=sr, max_depth=depth)
-        print("Getting filtered addresses")
+        print(f'{time.time() - start:2f}')
+        print("Getting filtered addresses", end=' ')
+        start = time.time()
         filtered_addresses = pst.filter_addresses_by_regions(addresses, reachable_regions)
-        print("Performing DFS")
+        print(f'{time.time() - start:2f}')
+        print("Performing DFS", end=' ')
+        start = time.time()
         results = pst.dfs_indexed(filtered_addresses, target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
+        print(f'{time.time() - start:2f}')
         print("Finalize the pointers list")
         for pointer in self.make_pointers_list(results):
+            print(pointer)
             pointer.target = target_address
             yield [pointer], 0
+        print('Finished')
         yield None

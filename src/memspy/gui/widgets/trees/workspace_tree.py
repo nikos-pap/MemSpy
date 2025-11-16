@@ -9,13 +9,16 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QInputDialog,
-    QLabel, QDialog,
+    QLabel, QDialog, QAbstractItemView,
 )
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
+from PyQt6.QtGui import QStandardItem
 
-from memspy.utils.types import Type, WorkspaceItem, WorkspaceGroupItem
-from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
+from memspy.gui.models import WorkspaceModel
+from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem
+from memspy.utils.types.converters import convert_from_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
+
+VALUE_INDEX = 2
 
 
 class WorkspaceTree(QTreeView):
@@ -41,9 +44,9 @@ class WorkspaceTree(QTreeView):
         self.setUniformRowHeights(True)
         self.setHeaderHidden(False)
 
-        self._model = QStandardItemModel(self)
-        self._model.setHorizontalHeaderLabels(["Name", "Address", "Value", "Frozen", "Type", "Offsets"])
-        self.setModel(self._model)
+        self.model = WorkspaceModel(self)
+        # self._model.setHorizontalHeaderLabels(["Name", "Address", "Value", "Frozen", "Type", "Offsets"])
+        self.setModel(self.model)
 
         # Drag/drop: internal move; only groups accept children; root accepts drops
         self.setDragEnabled(True)
@@ -54,6 +57,9 @@ class WorkspaceTree(QTreeView):
 
         # Keep status/path in sync
         self.selectionModel().selectionChanged.connect(self._emit_path)
+        self.model.itemChanged.connect(self._on_item_changed)
+
+        self.setEditTriggers(QAbstractItemView.EditTrigger.DoubleClicked)
 
         # Expand by default
         self.setExpandsOnDoubleClick(True)
@@ -61,10 +67,10 @@ class WorkspaceTree(QTreeView):
     # ---------------- Public API ----------------
 
     def load_from_groups(self, groups: List[WorkspaceGroupItem]) -> None:
-        self._model.removeRows(0, self._model.rowCount())
+        self.model.removeRows(0, self.model.rowCount())
         for g in groups:
             group_items = self._mk_group_row(g.name)
-            self._model.appendRow(group_items)
+            self.model.appendRow(group_items)
             parent = group_items[0]
             for it in g.items:
                 self._append_item_row(parent, it)
@@ -77,10 +83,10 @@ class WorkspaceTree(QTreeView):
         target = self._selected_group_or_root()
         group_items = self._mk_group_row(name.strip())
         if target is None:
-            self._model.appendRow(group_items)
+            self.model.appendRow(group_items)
         else:
             target.appendRow(group_items)
-            target.setChild(group_items[0].row(), 0).setEditable(False)  # keep consistent
+            target.setChild(group_items[0].row(), 0)  # .setEditable(False)  # keep consistent
         self.expandAll()
 
     def open_add_item_dialog(self) -> None:
@@ -103,11 +109,11 @@ class WorkspaceTree(QTreeView):
         parent_group = self._selected_group_or_root()
         if parent_group is None:
             # allow stray item at root
-            self._model.appendRow(self._mk_item_row(wi))
+            self.model.appendRow(self._mk_item_row(wi))
         else:
             # child of GROUP
             self._append_item_row(parent_group, wi)
-            index = self._model.indexFromItem(parent_group)
+            index = self.model.indexFromItem(parent_group)
             if index.isValid():
                 self.expand(index)
         self.__logger.debug(f'Added item "{wi}"')
@@ -118,25 +124,53 @@ class WorkspaceTree(QTreeView):
         sel = self.selectionModel().selectedRows()
         # Remove from deepest rows first to avoid index shifts
         for index in sorted(sel, key=lambda i: i.model().itemFromIndex(i).index().row(), reverse=True):
-            item = self._model.itemFromIndex(index)
+            item = self.model.itemFromIndex(index)
             parent = item.parent()
             if parent:
                 parent.removeRow(item.row())
             else:
-                self._model.removeRow(item.row())
+                self.model.removeRow(item.row())
 
     # ---------------- Helpers ----------------
 
+    @pyqtSlot(QStandardItem)
+    def _on_item_changed(self, item: QStandardItem) -> None:
+        """
+        If the edited item is a 'WorkspaceItem' name (column 0),
+        propagate the new text to the WorkspaceItem stored in UserRole.
+        """
+        # only handle edits to the 'Name' column for real items
+        if item.column() != 0:
+            return
+        if item.data(self._ROLE_KIND) != self._KIND_ITEM:
+            return
+
+        wi = item.data(Qt.ItemDataRole.UserRole)
+        if wi is None:
+            return  # nothing to update
+
+        new_name = item.data(Qt.ItemDataRole.EditRole)
+        # Fallback to item.text() if needed
+        if new_name is None:
+            new_name = item.text()
+
+        # No-op if unchanged
+        if wi.name != new_name:
+            wi.name = new_name
+
+        self.__logger.debug(f'Changed name in item "{wi}"')
+
     def _mk_group_row(self, name: str) -> List[QStandardItem]:
         name_item = QStandardItem(name)
-        name_item.setEditable(False)
+        name_item.setEditable(True)
         name_item.setData(self._KIND_GROUP, self._ROLE_KIND)
         # Groups can be dragged and accept drops (may have children)
         name_item.setFlags(
             Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsEditable
             | Qt.ItemFlag.ItemIsSelectable
             | Qt.ItemFlag.ItemIsDragEnabled
-            | Qt.ItemFlag.ItemIsDropEnabled
+            # | Qt.ItemFlag.ItemIsDropEnabled
         )
         # Sibling column items
         empty = [QStandardItem("") for _ in range(5)]
@@ -149,7 +183,7 @@ class WorkspaceTree(QTreeView):
         Re-evaluate Value column for every ITEM whose WorkspaceItem.address == address.
         Uses direct indices, no custom constants.
         """
-        model = self._model
+        model = self.model
         rows = [QModelIndex()]  # start from root
 
         while rows:
@@ -165,16 +199,14 @@ class WorkspaceTree(QTreeView):
                     continue
 
                 wi = name_index.data(Qt.ItemDataRole.UserRole)
-                if not wi:
-                    continue
-                try:
-                    if int(wi.address) != int(address):
-                        continue
-                except Exception:
+                self.__logger.debug(f'Re-evaluating item "{wi}"')
+                if not wi or int(wi.address) != int(address):
                     continue
 
                 # trigger refresh on Value column (assumed column 2)
                 val_index = model.index(r, 2, parent)
+                with self.model.suppress_edit():
+                    model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
                 model.dataChanged.emit(val_index, val_index,
                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
 
@@ -185,7 +217,7 @@ class WorkspaceTree(QTreeView):
         """
         # Keep the WorkspaceItem directly
         name_it = QStandardItem(wi.name)
-        name_it.setEditable(False)
+        name_it.setEditable(True)
         name_it.setData(self._KIND_ITEM, self._ROLE_KIND)
         name_it.setData(wi, Qt.ItemDataRole.UserRole)
 
@@ -198,7 +230,7 @@ class WorkspaceTree(QTreeView):
         except TypeError:
             display_val = None
         val_it = QStandardItem(str(display_val) if display_val is not None else "")
-        val_it.setEditable(False)
+        val_it.setEditable(True)
 
         frozen_it = QStandardItem("Yes" if wi.frozen else "No")
         frozen_it.setEditable(False)
@@ -216,14 +248,14 @@ class WorkspaceTree(QTreeView):
         if parent_group is not None and parent_group.data(self._ROLE_KIND) == self._KIND_GROUP:
             parent_group.appendRow(self._mk_item_row(wi))
         else:
-            self._model.appendRow(self._mk_item_row(wi))
+            self.model.appendRow(self._mk_item_row(wi))
 
     def _selected_group_or_root(self) -> Optional[QStandardItem]:
         """Return selected GROUP item or None (meaning root)."""
         sel = self.selectionModel().selectedRows()
         if not sel:
             return None
-        item = self._model.itemFromIndex(sel[0])
+        item = self.model.itemFromIndex(sel[0])
         if item and item.data(self._ROLE_KIND) == self._KIND_GROUP:
             return item
         return None
@@ -233,7 +265,7 @@ class WorkspaceTree(QTreeView):
         if not sel:
             self.pathChanged.emit("")
             return
-        item = self._model.itemFromIndex(sel[0])
+        item = self.model.itemFromIndex(sel[0])
         names = []
         while item:
             names.append(item.text())
@@ -243,6 +275,8 @@ class WorkspaceTree(QTreeView):
 
 
 class WorkspaceContainer(QWidget):
+
+    __logger: Logger = getLogger(__qualname__)
 
     """Toolbar + WorkspaceTree + status label."""
     def __init__(self, parent: Optional[QWidget] = None):
@@ -266,10 +300,9 @@ class WorkspaceContainer(QWidget):
         # Wiring
         self.tree.pathChanged.connect(self.status.setText)
 
-
-
-    @pyqtSlot(int)
+    @pyqtSlot('quint64')
     def update_address(self, address: int) -> None:
+        self.__logger.debug(f'update_address: {address}')
         self.tree.refresh_values_for_address(address)
 
     @pyqtSlot(WorkspaceItem)

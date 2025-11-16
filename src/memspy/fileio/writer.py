@@ -2,7 +2,11 @@ import os
 import tempfile
 from os import PathLike
 from typing import Optional, BinaryIO
+
+import pickle
 from numpy.typing import NDArray, DTypeLike
+
+from memspy.utils.types import ScanType
 
 
 class FileWriter:
@@ -14,6 +18,7 @@ class FileWriter:
         filepath: Optional file path as a string.
         __file: Optional binary file object.
     """
+
     def __init__(self, out_dir: str | PathLike = tempfile.gettempdir()) -> None:
         self.dtype: Optional[DTypeLike] = None
         self.filepath: Optional[str] = None
@@ -46,11 +51,12 @@ class FileWriter:
         self.filepath = self.__file.name
         self.dtype = dtype
 
-    def write(self, data: NDArray) -> None:
+    def write(self, data: NDArray, scan_type: Optional[ScanType]) -> None:
         """
         Writes data to file.
 
         Args:
+            scan_type: Optional[ScanType] the scan type.
             data: [NDArray] the nparray data to write to the file.
 
         Returns:
@@ -58,7 +64,13 @@ class FileWriter:
         """
         if not self.__file:
             raise RuntimeError("File not set or closed.")
-        self.__file.write(data.tobytes(order="C"))
+        if scan_type == ScanType.POINTER_SCAN:
+            for d in data:
+                # noinspection PyTypeChecker
+                pickle.dump(d, self.__file)
+        else:
+            result = data.tobytes(order="C")
+            self.__file.write(result)
         self.__file.flush()
 
     def close(self) -> None:

@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QModelIndex, pyqtSlot
 import csv
 from memspy.utils.types import Type, PointerItem
-from memspy.ui_table_models import PointerScanTableModel
+from memspy.gui.models import PointerScanTableModel
 
 
 def parse_raw_bytes(raw_hex: str) -> bytes:

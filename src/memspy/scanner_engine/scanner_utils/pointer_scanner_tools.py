@@ -183,6 +183,7 @@ def preprocess_unique_transitions(addresses):
 
 def filter_addresses_by_regions(addresses, reachable_regions):
     valid_regions = set(reachable_regions)
+    # print(addresses)
     a_col = addresses[:, 1]
     b_col = addresses[:, 3]
     mask = np.isin(a_col, list(valid_regions)) & np.isin(b_col, list(valid_regions))

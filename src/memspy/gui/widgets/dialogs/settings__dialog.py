@@ -129,7 +129,7 @@ class SettingsDialog(QDialog):
     def __load_pointer_scan_settings(self) -> None:
         opts: PointerScanSettings = self.manager.pointer_scan_data
         self.negative_offsets.setChecked(opts.negative_offsets)
-        idx = opts[opts.device]
+        idx = opts.device
         if idx >= 0:
             self.device.setCurrentIndex(idx)
         self.depth.setValue(opts.depth)

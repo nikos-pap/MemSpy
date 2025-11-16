@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
 
-from memspy.ui_table_models.search_table_model import SortedPagedTableModel
+from memspy.gui.models import SortedPagedTableModel
 from memspy.utils.types import Type, WorkspaceItem
 from logging import Logger, getLogger
 

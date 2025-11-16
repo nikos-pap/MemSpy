@@ -1,5 +1,6 @@
 import re
 
+
 def is_uint64_hex(s: str, allow_prefix: bool = True) -> bool:
     # 1) Optionally strip "0x"/"0X"
     if allow_prefix:

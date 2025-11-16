@@ -139,7 +139,6 @@ class MemoryScannerUI(QMainWindow):
         listener.progressSignal.connect(self.progress_bar.setValue)
         listener.scanCompletedSignal.connect(self.__finished_scan)
         listener.processExitedSignal.connect(self.__process_closed_handle)
-        # listener.updateSavedSignal.connect(self.saved_address_tree.tree_view.update_saved_addresses)
         listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
 
         self.backend.workspace_worker.updateAddressSignal.connect(self.workspace_container.update_address)
@@ -155,10 +154,11 @@ class MemoryScannerUI(QMainWindow):
         self.__scan_controls.new_scan_btn.clicked.connect(lambda: self.__scan_command(ScanType.ADDRESS_SCAN))
         self.__scan_controls.filter_btn.clicked.connect(lambda: self.__scan_command(ScanType.FILTER_SCAN))
 
+        # Workspace Signals
         # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
-        # self.saved_address_tree.tree_view.setValueSignal.connect(self.backend.set_value)
         self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
+        self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
         # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
         # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
 

@@ -1,3 +1,4 @@
+import logging
 import time
 from multiprocessing import Process, Queue
 from typing import Iterator, Optional
@@ -46,9 +47,11 @@ class MemoryScannerProcess(Process):
         self.__scanning: bool = False
         self.__logger: Optional[Logger] = None
         self.__scan_start: float = 0.0
+        self.__scan_type: Optional[ScanType] = None
 
     def run(self) -> None:
         self.__logger = getLogger(self.__class__.__name__)
+        getLogger("numba.cuda.cudadrv.driver").setLevel(logging.ERROR)
         total = 0
         """Main loop: process commands and stream scan results."""
         while True:
@@ -83,9 +86,10 @@ class MemoryScannerProcess(Process):
                     total = 0
                 elif result:
                     addresses, progress = result
-                    self.__file_writer.write(addresses)
+                    self.__file_writer.write(addresses, self.__scan_type)
                     total += len(addresses)
-                    self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
+                    self.__logger.debug(f'Progress: {progress} ')
+                    # self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
 
     def __handle_message(self, msg: Message) -> None:
         typ = msg.message_type
@@ -171,13 +175,16 @@ class MemoryScannerProcess(Process):
             current += len(data)
         yield None
 
-    def __start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: int) -> None:
+    def __start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
         if self.__scanning:
             self.__logger.error('Cannot have two scans running together.')
             return
-        self.__pointer_scanner.get_pointer_map(bool(use_gpu))
-        self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=address, depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.6)
         self.__scanning = True
+        self.__file_writer.close()
+        self.__scan_start = time.time()
+        self.__file_writer.temp_file(Type.UInt32.mem_dtype)
+        self.__pointer_scanner.get_pointer_map(use_gpu)
+        self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=address, depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.6)
         self.__scan_type = ScanType.POINTER_SCAN
 
     def __finish_scan(self) -> None:

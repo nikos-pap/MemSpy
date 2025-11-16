@@ -40,4 +40,4 @@ class Settings(Mapping, ABC):
         return getattr(cls, '__dataclass_fields__').keys()
 
     def items(self):
-        return getattr(self, '__dataclass_fields__').items()
+        return asdict(self).items()

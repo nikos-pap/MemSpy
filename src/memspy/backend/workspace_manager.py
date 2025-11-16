@@ -6,7 +6,7 @@ from memspy.scanner_engine.process_reader import MemoryScanner
 
 
 class WorkspaceManager(QObject):
-    updateAddressSignal = pyqtSignal(int)
+    updateAddressSignal = pyqtSignal('quint64')
     exitSignal = pyqtSignal()
 
     __logger: Logger = getLogger(__qualname__)
@@ -35,6 +35,10 @@ class WorkspaceManager(QObject):
             if prev_value != item.value:
                 self.__logger.debug(f"Workspace item {item.address}: {item.value}")
                 self.updateAddressSignal.emit(item.address)
+
+    @pyqtSlot('quint64', bytes)
+    def set_value(self, address: int, value: bytes) -> None:
+        self.__scanner.write_bytes(address, value)
 
     @pyqtSlot(WorkspaceItem)
     def add_address(self, wi: WorkspaceItem) -> None:
