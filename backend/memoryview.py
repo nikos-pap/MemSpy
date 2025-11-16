@@ -3,6 +3,7 @@ from multiprocessing import Process, Queue
 from utils.message import Message, empty
 from pymem import Pymem
 from sys import exit
+from time import sleep
 
 
 class MemoryView(Process):
@@ -55,6 +56,7 @@ class MemoryView(Process):
 			except MemoryReadError as e:
 				print(e)
 			proc_message = empty
+			sleep(0.01)  # Small delay to prevent excessive CPU usage
 
 	def collect_values(self):
 		return [address.value for address in self.selected_addresses]
