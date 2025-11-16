@@ -15,6 +15,7 @@ from memspy.utils.types import ScanType, Type
 from memspy.utils.condition import Condition
 from memspy.scanner_engine.process_reader import MemoryScanner
 from memspy.scanner_engine.pointer_scanner import PointerScanner
+from memspy.utils.pointer_scan import PointerScanInfo
 
 
 class MemoryScannerProcess(Process):
@@ -48,9 +49,11 @@ class MemoryScannerProcess(Process):
         self.__logger: Optional[Logger] = None
         self.__scan_start: float = 0.0
         self.__scan_type: Optional[ScanType] = None
+        self.__scan_info: PointerScanInfo = PointerScanInfo(0, 0)
 
     def run(self) -> None:
         self.__logger = getLogger(self.__class__.__name__)
+        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
         getLogger("numba.cuda.cudadrv.driver").setLevel(logging.ERROR)
         total = 0
         """Main loop: process commands and stream scan results."""
@@ -86,10 +89,12 @@ class MemoryScannerProcess(Process):
                     total = 0
                 elif result:
                     addresses, progress = result
-                    self.__file_writer.write(addresses, self.__scan_type)
+                    if self.__scan_type == ScanType.POINTER_SCAN:
+                        self.__scan_info.entries = len(addresses)
+                    self.__file_writer.write(addresses, self.__scan_type, self.__scan_info)
                     total += len(addresses)
                     self.__logger.debug(f'Progress: {progress} ')
-                    # self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
+                    self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
 
     def __handle_message(self, msg: Message) -> None:
         typ = msg.message_type
@@ -184,6 +189,7 @@ class MemoryScannerProcess(Process):
         self.__scan_start = time.time()
         self.__file_writer.temp_file(Type.UInt32.mem_dtype)
         self.__pointer_scanner.get_pointer_map(use_gpu)
+        self.__scan_info = PointerScanInfo(0, depth)
         self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=address, depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.0)
         self.__scan_type = ScanType.POINTER_SCAN
 

@@ -18,7 +18,7 @@ class PointerScanner:
         self.regions = []
         self.ranges = []
 
-    def make_pointers_list(self, results):
+    def make_pointers_list(self, results, target: int):
         modules = self.scanner.get_modules()
         for base_address, chain in results:
             base_address_name = None
@@ -31,7 +31,7 @@ class PointerScanner:
                     base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
-            yield PointerItem(base_address_name, module_address, -1, [base_address_offset] + offsets)
+            yield PointerItem(base_address_name, module_address, target, [base_address_offset] + offsets)
 
     def preprocess_pointers(self):
         regions = self.regions.copy()
@@ -131,9 +131,6 @@ class PointerScanner:
         results = pst.dfs_indexed(filtered_addresses, target_address, max_depth=depth, offset_range=max_offset, negatives=negative_offsets_enabled, randomness=randomness)
         print(f'{time.time() - start:2f}')
         print("Finalize the pointers list")
-        for pointer in self.make_pointers_list(results):
-            print(pointer)
-            pointer.target = target_address
-            yield [pointer], 0
+        yield [pointer for pointer in self.make_pointers_list(results, target_address)], 0
         print('Finished')
         yield None
