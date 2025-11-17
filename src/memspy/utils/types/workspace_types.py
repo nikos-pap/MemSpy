@@ -33,6 +33,7 @@ class PointerItem:
     offsets: list[int] = field(default_factory=list)
     value: bytes | None = None
     value_type: Type = Type.UInt32
+    is_valid = True
 
 
 @dataclass

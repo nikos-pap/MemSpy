@@ -170,13 +170,6 @@ class PointerScanConfigDialog(QDialog):
     def parameters(self) -> PointerScanParameters:
         return self._build_parameters()
 
-    def set_type_list(self, type_list: list[Type]) -> None:
-        self._type_combo.clear()
-        self._type_items.clear()
-        for enum_member in type_list:
-            self._type_combo.addItem(enum_member.label)
-            self._type_items.append(enum_member)
-
     def set_module_list(self, module_list: list[ModuleInfo]) -> None:
         self._module_combo.clear()
         self._module_items.clear()

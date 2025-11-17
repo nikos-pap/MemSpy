@@ -1,8 +1,8 @@
 import os
 
 import psutil
-from PyQt6.QtCore import pyqtSignal, Qt, QPoint
-from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog
+from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot
+from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView
 
 from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
@@ -31,7 +31,6 @@ def list_modules_for_pid(pid: int) -> list[ModuleInfo]:
         mods.add(path)
 
         start, end = int(m.addr, 16), int(m.addr, 16) + m.rss
-        start_s, end_s = str(start), str(end)
 
         if main_name == path:
             result.insert(0, ModuleInfo(path, start, end))
@@ -63,22 +62,21 @@ class PointerScanTableWidget(QWidget):
     # Context-menu driven actions (you decide what to do when they fire)
     rowInsertRequested = pyqtSignal()
     rowValueUpdateRequested = pyqtSignal(int)  # row index
+    nextPageRequested = pyqtSignal()
+    previousPageRequested = pyqtSignal()
 
     def __init__(
         self,
         parent: QWidget | None = None,
-        headers: list[str] | None = None,
-        pid: int | None = None
+        pid: int | None = None,
+        *args, **kwargs
     ) -> None:
-        super().__init__(parent)
+        super().__init__(parent, *args, **kwargs)
 
-        # ---- store data needed for dialog ----
-        # self._type_list: list[Any] = list(type_list) if type_list is not None else []
-        # self._module_list: list[str] = list(module_list) if module_list is not None else []
         self.pid = pid
         # ---- table ----
         self._table_view = QTableView(self)
-        self._model = PointerScanTableModel(headers=headers, parent=self)
+        self._model = PointerScanTableModel(parent=self)
         self._table_view.setModel(self._model)
         self._configure_view()
 
@@ -91,16 +89,31 @@ class PointerScanTableWidget(QWidget):
         top_bar.addStretch(1)
         top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignRight)
 
+        self.__previous_page_button = QPushButton("Previous page", self)
+        self.__next_page_button = QPushButton("Next page", self)
+
+        bottom_bar = QHBoxLayout()
+        bottom_bar.setContentsMargins(0, 0, 0, 0)
+        # bottom_bar.addStretch(1)
+        bottom_bar.addWidget(self.__previous_page_button)
+        bottom_bar.addWidget(self.__next_page_button)
+
         # ---- main layout ----
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
         layout.setSpacing(4)
         layout.addLayout(top_bar)
         layout.addWidget(self._table_view)
+        layout.addLayout(bottom_bar)
+
+        self.__connect_signals()
 
     # -------------------------------------------------------
     # Internal helpers
     # -------------------------------------------------------
+    def __connect_signals(self) -> None:
+        self.__next_page_button.clicked.connect(self.nextPageRequested)
+        self.__previous_page_button.clicked.connect(self.previousPageRequested)
 
     def _configure_view(self) -> None:
         self._table_view.setSortingEnabled(True)
@@ -111,6 +124,10 @@ class PointerScanTableWidget(QWidget):
         # Right-click popup
         self._table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table_view.customContextMenuRequested.connect(self._show_context_menu)
+
+        self._table_view.verticalHeader().setVisible(True)
+        self._table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._table_view.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def _show_context_menu(self, pos: QPoint) -> None:
         """
@@ -168,6 +185,15 @@ class PointerScanTableWidget(QWidget):
     # Public API
     # -------------------------------------------------------
 
+    def set_max_depth(self, depth: int) -> None:
+        self._model.set_max_depth(depth)
+
+    @pyqtSlot(int, list)
+    def set_page(self, page_num: int, items: list[PointerItem]):
+        self._model.clear()
+        self._model.set_items(items)
+        self._model.set_page(page_num)
+
     def model(self) -> PointerScanTableModel:
         return self._model
 
@@ -194,7 +220,7 @@ class PointerScanTableWidget(QWidget):
         """
         Append a single PointerItem-like object as a new row.
         """
-        self._model.append_pointer_item(item)
+        self._model.add_item(item)
 
     def pointer_item_at(self, row_index: int) -> PointerItem | None:
         """
@@ -202,15 +228,9 @@ class PointerScanTableWidget(QWidget):
         """
         return self._model.pointer_item_at(row_index)
 
-    def update_pointer_value(self, row_index: int, value: PointerItem) -> None:
+    @pyqtSlot(int, int)
+    def update_pointer_value(self, page: int, row_index: int) -> None:
         """
         Update only the value cell for a given row and keep the object in sync.
         """
-        self._model.update_pointer_value(row_index, value)
-
-
-    def set_module_list(self, module_list: list[str]) -> None:
-        """
-        Update available target modules for the scan dialog.
-        """
-        self._module_list = list(module_list)
+        self._model.update_row(page, row_index)

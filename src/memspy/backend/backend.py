@@ -37,19 +37,12 @@ class QueueWorker(QObject):
                 if msg.message_type == MessageType.EXIT:
                     self.__logger.debug(f"Exiting")
                     break
-                # elif msg.message_type == MessageType.POINTER_CHAIN_UPDATED:  # memoryview
-                #     pointer = msg.message[0]
-                #     self.pointerUpdateSignal.emit(pointer)
                 elif msg.message_type == MessageType.SET_PROGRESS:  # scanner
                     self.progressSignal.emit(msg.message[0])
-                # elif msg.message_type == MessageType.SAVED_VALUE_CHANGED:  # memoryview Process
-                #     self.updateSavedSignal.emit(msg.message[0], msg.message[1])
                 elif msg.message_type == MessageType.START_SCAN:
                     self.scanStartedSignal.emit(msg.message)
                 elif msg.message_type == MessageType.SCAN_COMPLETED:  # scanner
                     self.scanCompletedSignal.emit()
-                # elif msg.message_type == MessageType.PROCESS_EXITED:  # memoryview
-                #     self.processExitedSignal.emit(msg.message)
                 else:
                     self.__logger.debug(f"Unhandled message: {msg}")
         except Exception as e:

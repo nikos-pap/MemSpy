@@ -199,9 +199,10 @@ class MemoryScannerProcess(Process):
         self.__scanning = False
         self.__current_scan = None
         elapsed = time.time() - self.__scan_start
+        file_name = self.__file_writer.filepath
         self.__file_writer.close()
         self.__file_reader.close()
-        self.__queue_out.put(Message(MessageType.SCAN_COMPLETED), False)
+        self.__queue_out.put(Message(MessageType.SCAN_COMPLETED, [file_name]), False)
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [100]), False)
         self.__logger.debug(f'Scan finished in {elapsed:.3f} seconds')
 

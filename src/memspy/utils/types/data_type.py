@@ -71,3 +71,6 @@ class Type(Enum):
             return np.isfinite(v)
 
         return True
+
+    def __repr__(self):
+        return f"Type.{self.label}"

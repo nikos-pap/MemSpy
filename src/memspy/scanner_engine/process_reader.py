@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 from memspy.scanner_engine.region import Region
 from memspy.scanner_engine.scanner_utils.scanner_tools import find_matches, match_condition
-from memspy.utils.types import Type, WorkspaceItem
+from memspy.utils.types import Type, WorkspaceItem, PointerItem
 from memspy.utils.condition import Condition
 
 
@@ -140,6 +140,7 @@ SetProcessWorkingSetSize.argtypes = [
     wintypes.HANDLE, ctypes.c_size_t, ctypes.c_size_t
 ]
 
+
 # ——— Helper: enable SeDebugPrivilege ———
 def enable_debug_privilege():
     hToken = wintypes.HANDLE()
@@ -190,7 +191,7 @@ class MemoryScanner:
         self.hSnapshot = CreateToolHelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
 
     def trim_process(self):
-        if not SetProcessWorkingSetSize(self.handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1)):
+        if self.handle and not SetProcessWorkingSetSize(self.handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1)):
             raise ctypes.WinError()
 
     def read_memory(self, chunk_size_multiplier=2**20):
@@ -388,6 +389,31 @@ class MemoryScanner:
                 if start is None:
                     item.value = None
                     break
+                start = int.from_bytes(start, byteorder='little')
+            values.append(start)
+        return values
+
+    def update_pointer(self, item: PointerItem) -> list[int]:
+        start = item.start
+        values = []
+        last_idx = len(item.offsets) - 1
+        if not item.offsets:
+            item.value = self.read_bytes(start, item.value_type.size())
+            if item.value is None:
+                item.is_valid = False
+            return []
+        for i, offset in enumerate(item.offsets):
+            start += offset
+            if i == last_idx:
+                item.value = self.read_bytes(start, item.value_type.size())
+                if item.value is None:
+                    item.is_valid = False
+            else:
+                start = self.read_bytes(start, 8)
+                if start is None:
+                    item.value = None
+                    item.is_valid = False
+                    return values
                 start = int.from_bytes(start, byteorder='little')
             values.append(start)
         return values
