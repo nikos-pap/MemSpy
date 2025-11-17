@@ -63,6 +63,14 @@ class PointerScanTableModel(QAbstractTableModel):
             bottom_right = self.index(row, self.columnCount() - 1)
             self.dataChanged.emit(top_left, bottom_right, [Qt.ItemDataRole.DisplayRole])
 
+    @property
+    def page_num(self) -> int:
+        return self.__page_num
+
+    @property
+    def page_size(self) -> int:
+        return self.__page_size
+
     # ---------------------------------------------------------
     # Qt model implementation
     # ---------------------------------------------------------
@@ -135,8 +143,6 @@ class PointerScanTableModel(QAbstractTableModel):
             if section == value_col:
                 return "Value"
         elif orientation == Qt.Orientation.Vertical:
-            # show a 1-based line number, taking paging into account
-            # global_row = page * size + section
             global_row = self.__page_num * self.__page_size + section
             return str(global_row + 1)
 

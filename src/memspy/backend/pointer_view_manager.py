@@ -1,4 +1,6 @@
 import pickle
+import shutil
+import tempfile
 from logging import getLogger, Logger
 from typing import BinaryIO
 from typing import Optional
@@ -16,6 +18,7 @@ class PointerManager(QObject):
     loadPageSignal = pyqtSignal(int, list)
     updateMaxDepthSignal = pyqtSignal(int)
     loadFileSignal = pyqtSignal(int)
+    setTotalsSignal = pyqtSignal(int)
     exitSignal = pyqtSignal()
 
     __logger: Logger = getLogger(__qualname__)
@@ -23,9 +26,8 @@ class PointerManager(QObject):
     def __init__(self, scanner: MemoryScanner, page_size: int = 100, update_rate: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.__history: list = []
         self.__file: Optional[BinaryIO] = None
-        self.current_page: int = -1
+        self.__current_page: int = -1
         self.__scanner = scanner
         self.__page_buffer: list[PointerItem] = []
         self.__file_info: Optional[PointerScanInfo] = None
@@ -49,48 +51,60 @@ class PointerManager(QObject):
             if pointer.is_valid:
                 self.__scanner.update_pointer(pointer)
             if previous_value != pointer.value:
-                self.updateValueSignal.emit(self.current_page, index)
+                self.updateValueSignal.emit(self.__current_page, index)
 
     def set_file(self, file_name: str) -> None:
         self.__file = open(file_name, 'rb')
         self.__file_info = pickle.load(self.__file)
-        self.current_page = -1
+        self.__current_page = -1
+        self.setTotalsSignal.emit(self.__file_info.entries)
         self.updateMaxDepthSignal.emit(self.__file_info.max_depth)
         self.get_next_page()
 
     def get_next_page(self) -> None:
-        start = (self.current_page + 1) * self.__page_size
+        start = (self.__current_page + 1) * self.__page_size
         if start >= self.__file_info.entries:
             return
-        self.current_page += 1
-        if self.current_page >= len(self.__page_indexes):
+        self.__current_page += 1
+        if self.__current_page >= len(self.__page_indexes):
             self.__page_indexes.append(self.__file.tell())
         else:
-            self.__page_indexes[self.current_page] = self.current_page
+            self.__page_indexes[self.__current_page] = self.__current_page
         self.__page_buffer = []
         self.load_page(start)
 
     def get_previous_page(self) -> None:
-        if self.current_page == 0:
+        if self.__current_page == 0:
             return
-        self.current_page -= 1
-        pos = self.__page_indexes[self.current_page]
+        self.__current_page -= 1
+        pos = self.__page_indexes[self.__current_page]
         self.__file.seek(pos)
         self.__page_buffer = []
-        self.load_page(self.current_page * self.__page_size)
+        self.load_page(self.__current_page * self.__page_size)
 
     def load_page(self, start) -> None:
         end = min(start + self.__page_size, self.__file_info.entries)
         for _ in range(start, end):
             self.__page_buffer.append(pickle.load(self.__file))
-        self.loadPageSignal.emit(self.current_page, self.__page_buffer)
+        self.loadPageSignal.emit(self.__current_page, self.__page_buffer)
 
     def set_process(self, pid: int) -> None:
         self.__scanner.change_process(pid)
 
+    def export_file(self, path: str) -> None:
+        shutil.copyfile(self.__file.name, path)
+
+    def import_file(self, path: str) -> None:
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+        shutil.copyfile(path, tmp_path)
+        self.set_file(tmp_path)
+
     @pyqtSlot()
     def __handle_exit(self) -> None:
-        self.__file.close()
+        if self.__file and not self.__file.closed:
+            self.__file.close()
         self.__logger.debug('Exit message received.')
         self.__timer.stop()
         QThread.currentThread().quit()

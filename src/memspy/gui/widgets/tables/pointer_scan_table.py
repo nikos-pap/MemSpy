@@ -1,8 +1,10 @@
 import os
+from logging import getLogger, Logger
 
 import psutil
 from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot
-from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView
+from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView, \
+    QLabel, QFileDialog
 
 from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
@@ -64,6 +66,10 @@ class PointerScanTableWidget(QWidget):
     rowValueUpdateRequested = pyqtSignal(int)  # row index
     nextPageRequested = pyqtSignal()
     previousPageRequested = pyqtSignal()
+    saveFileRequested = pyqtSignal(str)
+    loadFileRequested = pyqtSignal(str)
+
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(
         self,
@@ -79,18 +85,26 @@ class PointerScanTableWidget(QWidget):
         self._model = PointerScanTableModel(parent=self)
         self._table_view.setModel(self._model)
         self._configure_view()
+        self.__totals = 0
 
         # ---- top bar with button ----
-        self._scan_button = QPushButton("Pointer scan...", self)
+        self._scan_button = QPushButton("Pointer Scan", self)
         self._scan_button.clicked.connect(self._open_scan_dialog)
+
+        self.__export_button = QPushButton("Export", self)
+        self.__import_button = QPushButton("Import", self)
 
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
         top_bar.addStretch(1)
+        top_bar.addWidget(self.__export_button, 0, Qt.AlignmentFlag.AlignLeft)
+        top_bar.addWidget(self.__import_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignRight)
 
         self.__previous_page_button = QPushButton("Previous page", self)
         self.__next_page_button = QPushButton("Next page", self)
+
+        self.__totals_label = QLabel(self)
 
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(0, 0, 0, 0)
@@ -104,6 +118,7 @@ class PointerScanTableWidget(QWidget):
         layout.setSpacing(4)
         layout.addLayout(top_bar)
         layout.addWidget(self._table_view)
+        layout.addWidget(self.__totals_label)
         layout.addLayout(bottom_bar)
 
         self.__connect_signals()
@@ -114,6 +129,8 @@ class PointerScanTableWidget(QWidget):
     def __connect_signals(self) -> None:
         self.__next_page_button.clicked.connect(self.nextPageRequested)
         self.__previous_page_button.clicked.connect(self.previousPageRequested)
+        self.__export_button.clicked.connect(self.__choose_save_path)
+        self.__import_button.clicked.connect(self.__choose_load_path)
 
     def _configure_view(self) -> None:
         self._table_view.setSortingEnabled(True)
@@ -181,6 +198,27 @@ class PointerScanTableWidget(QWidget):
             print(params)
             self.pointerScanRequested.emit(params)
 
+    def __choose_save_path(self) -> None:
+        dlg = QFileDialog(self)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        dlg.setFileMode(QFileDialog.FileMode.AnyFile)
+        dlg.setNameFilter("Data Files (*.dat);;All Files (*)")
+
+        if dlg.exec():
+            path = dlg.selectedFiles()[0]
+            self.__logger.debug(path)
+            self.saveFileRequested.emit(path)
+
+    def __choose_load_path(self) -> None:
+        dlg = QFileDialog(self)
+        dlg.setAcceptMode(QFileDialog.AcceptMode.AcceptOpen)
+        dlg.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dlg.setNameFilter("Data Files (*.dat);;All Files (*)")
+
+        if dlg.exec():
+            path = dlg.selectedFiles()[0]
+            self.loadFileRequested.emit(path)
+
     # -------------------------------------------------------
     # Public API
     # -------------------------------------------------------
@@ -193,6 +231,11 @@ class PointerScanTableWidget(QWidget):
         self._model.clear()
         self._model.set_items(items)
         self._model.set_page(page_num)
+        start = self._model.page_num * self._model.page_size
+        self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
+
+    def set_totals(self, totals: int) -> None:
+        self.__totals = totals
 
     def model(self) -> PointerScanTableModel:
         return self._model
