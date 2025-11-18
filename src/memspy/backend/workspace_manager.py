@@ -8,6 +8,7 @@ from memspy.scanner_engine.process_reader import MemoryScanner
 class WorkspaceManager(QObject):
     updateAddressSignal = pyqtSignal('quint64')
     exitSignal = pyqtSignal()
+    setProccessSignal = pyqtSignal(int)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -51,6 +52,7 @@ class WorkspaceManager(QObject):
 
     def set_process(self, pid: int) -> None:
         self.__scanner.change_process(pid)
+        self.setProccessSignal.emit(pid)
 
     @pyqtSlot()
     def __handle_exit(self) -> None:
