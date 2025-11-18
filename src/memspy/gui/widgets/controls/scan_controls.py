@@ -40,7 +40,6 @@ class ScanControls(QHBoxLayout):
         self.process_box.blockSignals(True)
         self.process_box.clear()
         self.process_box.insertItem(0, "-- Select Process --", -1)
-        # processes = self.backend.get_running_processes()
 
         for name, pid, image in processes:
             label = format_item(name, pid)
@@ -186,10 +185,10 @@ class ScanControls(QHBoxLayout):
     def __validate_input(self):
         text = self.search_input.text()
         t = self.typeCombo.currentData()
-        if text != '' and not t.check(text):
+        if len(text) > 0 and not t.check(text):
             self.search_input.setStyleSheet('background-color: #f6989d;')
         else:
-            self.search_input.setStyleSheet('')
+            self.search_input.setStyleSheet('background-color: none;')
 
     def __condition_changed_command(self, _):
         if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:

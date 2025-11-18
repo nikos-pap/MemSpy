@@ -17,7 +17,6 @@ from memspy.gui.widgets.menus.menu_bar import MenuBar
 from memspy.gui.widgets.dialogs.settings__dialog import SettingsDialog, SettingsManager
 
 from memspy.utils.types import ScanType
-# from utils.settings import PointerScanSettings
 
 
 class MemoryScannerUI(QMainWindow):

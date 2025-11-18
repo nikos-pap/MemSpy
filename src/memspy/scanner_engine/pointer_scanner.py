@@ -2,19 +2,13 @@ import time
 
 import numpy as np
 from numba import cuda
-# import warnings
-# from numba.core.errors import NumbaWarning
-from memspy.scanner_engine.process_reader import MemoryScanner, SCANNER
-from typing import Optional
+from memspy.scanner_engine.process_reader import SCANNER
 from memspy.scanner_engine.scanner_utils import pointer_scanner_tools as pst
 from memspy.utils.types import PointerItem
 
-# warnings.simplefilter("ignore", category=NumbaWarning)
-
 
 class PointerScanner:
-    def __init__(self, scanner: Optional['MemoryScanner'] = None):
-        # self.scanner = scanner
+    def __init__(self):
         self.regions = []
         self.ranges = []
 

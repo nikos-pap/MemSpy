@@ -42,7 +42,7 @@ class MemoryScannerProcess(Process):
 
         self.__file_writer: FileWriter = FileWriter(write_dir)
         self.__file_reader: FileStreamReader = FileStreamReader()
-        self.__pointer_scanner: PointerScanner = PointerScanner(SCANNER)
+        self.__pointer_scanner: PointerScanner = PointerScanner()
         self.__current_scan: Optional[Iterator[Optional[tuple[NDArray, int]]]] = None
         self.__scanning: bool = False
         self.__logger: Optional[Logger] = None

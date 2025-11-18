@@ -64,13 +64,14 @@ class PointerManager(QObject):
     def get_next_page(self) -> None:
         start = (self.__current_page + 1) * self.__page_size
         if start >= self.__file_info.entries:
+            self.loadPageSignal.emit(0, [])
             return
         self.__current_page += 1
         if self.__current_page >= len(self.__page_indexes):
             self.__page_indexes.append(self.__file.tell())
         else:
             self.__page_indexes[self.__current_page] = self.__current_page
-        self.__page_buffer = []
+
         self.load_page(start)
 
     def get_previous_page(self) -> None:
@@ -79,17 +80,15 @@ class PointerManager(QObject):
         self.__current_page -= 1
         pos = self.__page_indexes[self.__current_page]
         self.__file.seek(pos)
-        self.__page_buffer = []
+
         self.load_page(self.__current_page * self.__page_size)
 
     def load_page(self, start) -> None:
+        self.__page_buffer = []
         end = min(start + self.__page_size, self.__file_info.entries)
         for _ in range(start, end):
             self.__page_buffer.append(pickle.load(self.__file))
         self.loadPageSignal.emit(self.__current_page, self.__page_buffer)
-
-    # def set_process(self, pid: int) -> None:
-    #     self.__scanner.change_process(pid)
 
     def export_file(self, path: str) -> None:
         shutil.copyfile(self.__file.name, path)
@@ -111,7 +110,7 @@ class PointerManager(QObject):
             for _ in range(pointer_info.entries):
                 pointer: PointerItem = pickle.load(f)
                 SCANNER.update_pointer(pointer)
-                if pointer.is_valid:
+                if pointer.is_valid and pointer.value == (1689).to_bytes(4, byteorder='little'):
                     valid_pointers.append(pointer)
 
         self.__logger.debug(f'valid pointers: {len(valid_pointers)}')

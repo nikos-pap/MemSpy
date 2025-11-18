@@ -4,7 +4,6 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
 from multiprocessing import Queue
 from typing import NamedTuple
 import psutil
-from tempfile import TemporaryDirectory
 from memspy.backend.dataview_manager import MemoryViewThread
 from memspy.backend.workspace_manager import WorkspaceManager
 from memspy.scanner_engine import SCANNER
@@ -13,6 +12,7 @@ from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
 from bisect import insort
 from memspy.utils.message import Message
+from memspy.utils.settings import CONFIG
 from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem
 from memspy.utils.condition import Condition
 
@@ -58,7 +58,7 @@ class Backend(QObject):
 
     def __init__(self):
         super().__init__()
-        self.__save_dir: TemporaryDirectory = TemporaryDirectory()
+        self.__save_dir: str = CONFIG.tempFolderPath
 
         # Communication queues
         self.__scanner_queue_out: Queue = Queue()
@@ -73,7 +73,7 @@ class Backend(QObject):
 
         # Data update Thread
         self.__memory_thread = QThread(self)
-        self.memory_worker: MemoryViewThread = MemoryViewThread(self.__save_dir.name)
+        self.memory_worker: MemoryViewThread = MemoryViewThread(self.__save_dir)
         self.memory_worker.moveToThread(self.__memory_thread)
         self.__memory_thread.started.connect(self.memory_worker.run)
         self.__memory_thread.start()
@@ -85,7 +85,7 @@ class Backend(QObject):
         self.__workspace_thread.started.connect(self.workspace_worker.run)
         self.__workspace_thread.start()
 
-        self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir.name)
+        self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir)
         self.__scanner.start()
 
         # Cached process list
@@ -103,8 +103,6 @@ class Backend(QObject):
         """Initialize memory scanning for a given process ID."""
         msg = Message(MessageType.SET_PROCESS, [pid])
         SCANNER.change_process(pid)
-        # self.memory_worker.set_process(pid)
-        # self.workspace_worker.set_process(pid)
         self.__scanner_queue_in.put(msg)
 
     @pyqtSlot('quint64', bytes, bool)

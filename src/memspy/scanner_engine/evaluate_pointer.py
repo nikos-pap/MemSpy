@@ -10,8 +10,8 @@ if __name__ == '__main__':
     print(modules)
     print(modules['GameAssembly.dll'])
     wsitem = WorkspaceItem('GameAssembly.dll', modules['GameAssembly.dll'], b'0x0', [0x4C34B38, 0x308, 0x110], False, Type.UInt32)
-    vals = scanner.evaluate_pointer(wsitem)
-    print(vals)
+
+    print(scanner.evaluate_pointer(wsitem))
     print(wsitem.value)
     #
     # print("-------------------------")

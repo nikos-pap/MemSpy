@@ -30,7 +30,7 @@ class WorkspaceManager(QObject):
     def __update_values(self):
         for item in self.__saved_items:
             prev_value = item.value
-            new_value = SCANNER.evaluate_pointer(item)
+            SCANNER.evaluate_pointer(item)
             if prev_value != item.value:
                 self.__logger.debug(f"Workspace item {item.address}: {item.value}")
                 self.updateAddressSignal.emit(item.address)

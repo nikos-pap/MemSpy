@@ -20,18 +20,6 @@ from PyQt6.QtWidgets import (
 from memspy.scanner_engine import SCANNER
 from memspy.utils.types import Type, WorkspaceItem
 
-try:
-    from pointer_resolver import resolve_pointer  # <-- change path if needed
-except ImportError:
-    def resolve_pointer(item: WorkspaceItem) -> list[int]:
-        item.value = None
-        return []
-
-
-def _fmt_addr(value: int) -> str:
-    # Matches your mockup style: uppercase hex without 0x
-    return f"{value:X}"
-
 
 class AddItemDialog(QDialog):
     """
@@ -195,12 +183,8 @@ class AddItemDialog(QDialog):
             # basic validation failed; do not close
             return
         # Resolve pointers and update the preview one last time
-        _ = SCANNER.evaluate_pointer(wi)  # expected to set wi.value
-        try:
-            self._value_num_label.setText(wi.get_value())
-        except Exception:
-            # Do not block acceptance just because conversion is not wired yet
-            self._value_num_label.setText("-")
+        SCANNER.evaluate_pointer(wi)  # expected to set wi.value
+        self._value_num_label.setText(wi.get_value())
         self._result_item = wi
         self.accept()
 
@@ -318,7 +302,7 @@ class AddItemDialog(QDialog):
                 # Your converters produce the display string.
                 self._value_num_label.setText(wi.get_value())
                 self._value_num_label.setStyleSheet("")
-            except Exception:
+            except ValueError:
                 self._value_num_label.setText("-")
                 self._value_num_label.setStyleSheet("color: red;")
 

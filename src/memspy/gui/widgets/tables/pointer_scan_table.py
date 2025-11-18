@@ -236,7 +236,10 @@ class PointerScanTableWidget(QWidget):
         self._model.set_items(items)
         self._model.set_page(page_num)
         start = self._model.page_num * self._model.page_size
-        self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
+        if start <= 0:
+            self.__totals_label.setText('')
+        else:
+            self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
 
     def set_totals(self, totals: int) -> None:
         self.__totals = totals

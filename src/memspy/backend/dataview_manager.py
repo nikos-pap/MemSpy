@@ -47,12 +47,6 @@ class MemoryViewThread(QObject):
         self.__timer.timeout.connect(self.__update_values)
         self.__timer.start()
 
-    # def set_process(self, pid: int) -> None:
-    #     self.__logger.debug(f'Setting process {pid}')
-    #     self.__scanner.change_process(pid)
-    #     self.current_page_number: int = 0
-    #     self.__mapped_data_reader.reset()
-
     @pyqtSlot()
     def __on_set_process(self) -> None:
         self.current_page_number: int = 0
