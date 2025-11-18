@@ -19,7 +19,7 @@ class PointerScanner:
         self.ranges = []
 
     def make_pointers_list(self, results, target: int):
-        modules = self.scanner.get_modules()
+        self.scanner.update_modules()
         for base_address, chain in results:
             base_address_name = None
             base_address_offset = 0
@@ -27,7 +27,7 @@ class PointerScanner:
             for region in self.regions:
                 if region.base_address <= base_address <= region.base_address + region.size:
                     base_address_name = region.name
-                    module_address = modules[base_address_name]
+                    module_address = self.scanner.modules[base_address_name]
                     base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
