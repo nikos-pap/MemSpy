@@ -67,7 +67,7 @@ class MemoryScannerUI(QMainWindow):
         self.search_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_table_dock.setWidget(self.search_address_table)
 
-        self.workspace_container = WorkspaceContainer(self)
+        self.workspace_container = WorkspaceContainer(self.backend.scanner, self)
         self.saved_table_dock = QDockWidget("Workspace", self)
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.saved_table_dock.setWidget(self.workspace_container)

@@ -124,6 +124,10 @@ class Backend(QObject):
     def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
         self.__scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, max_offset, negative_offsets_enabled, use_gpu]))
 
+    @property
+    def scanner(self):
+        return self.__scanner
+
     @pyqtSlot(list)
     def __start_operation(self, operation_data: list) -> None:
         if operation_data[-2] != ScanType.ADDRESS_SCAN:
