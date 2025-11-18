@@ -110,7 +110,7 @@ class AddItemDialog(QDialog):
         self._table.itemChanged.connect(self._on_offset_edited)
         self._table.itemSelectionChanged.connect(self._on_table_selection_changed)
         self._table.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeMode.ResizeToContents
+            1, QHeaderView.ResizeMode.ResizeToContents
         )
         self._bbox.accepted.connect(self._on_accept)
         self._bbox.rejected.connect(self.reject)
