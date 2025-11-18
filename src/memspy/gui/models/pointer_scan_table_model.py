@@ -104,12 +104,12 @@ class PointerScanTableModel(QAbstractTableModel):
             return item.module_name
 
         if col == 1:
-            return f"0x{item.start:08X} + {item.offsets[0]}"
+            return f"0x{item.start:08X} + 0x{item.offsets[0]:X}"
 
         if offset_start <= col < offset_end:
-            idx = col - offset_start
+            idx = col - offset_start + 1
             if idx < len(item.offsets):
-                return f"0x{item.offsets[idx + 1]:X}"
+                return f"0x{item.offsets[idx]:X}"
             return ""
 
         if col == target_col:
