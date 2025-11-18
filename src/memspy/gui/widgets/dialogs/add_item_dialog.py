@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 
+from memspy.scanner_engine import MemoryScanner
 from memspy.utils.types import Type, WorkspaceItem
 
 try:
@@ -55,11 +56,12 @@ class AddItemDialog(QDialog):
       - get_workspace_item() returns the WorkspaceItem (or None if validation failed)
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, scanner: MemoryScanner, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Item")
 
         self.setMinimumSize(390, 310)
+        self.scanner = scanner
 
         # --- Widgets ---------------------------------------------------------
         self._name_edit = QLineEdit(self)
@@ -194,7 +196,7 @@ class AddItemDialog(QDialog):
             # basic validation failed; do not close
             return
         # Resolve pointers and update the preview one last time
-        _ = resolve_pointer(wi)  # expected to set wi.value
+        _ = self.scanner.evaluate_pointer(wi)  # expected to set wi.value
         try:
             self._value_num_label.setText(wi.get_value())
         except Exception:
@@ -261,7 +263,7 @@ class AddItemDialog(QDialog):
             return
 
         # Ask resolver for the deref chain (may be shorter than rows if the chain breaks)
-        intermediates = resolve_pointer(wi)  # expected: list[Optional[int]]
+        intermediates = self.scanner.evaluate_pointer(wi)  # expected: list[Optional[int]]
 
         rows = self._table.rowCount()
         base = wi.address
