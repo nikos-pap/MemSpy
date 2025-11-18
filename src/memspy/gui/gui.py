@@ -159,7 +159,7 @@ class MemoryScannerUI(QMainWindow):
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
         self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
         self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
-        self.backend.workspace_worker.setProccessSignal(self.workspace_container.tree.set_process)
+        self.backend.workspace_worker.setProccessSignal.connect(self.workspace_container.tree.set_process)
         self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
         # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
         # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
