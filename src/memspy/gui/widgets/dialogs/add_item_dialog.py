@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
-    QComboBox,
+    QComboBox, QHeaderView,
 )
 
 from memspy.scanner_engine import SCANNER
@@ -109,6 +109,9 @@ class AddItemDialog(QDialog):
         self._rm_offset_btn.clicked.connect(self._on_remove_offset)
         self._table.itemChanged.connect(self._on_offset_edited)
         self._table.itemSelectionChanged.connect(self._on_table_selection_changed)
+        self._table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
         self._bbox.accepted.connect(self._on_accept)
         self._bbox.rejected.connect(self.reject)
 
@@ -171,7 +174,7 @@ class AddItemDialog(QDialog):
         # Normalize offset text immediately (accepts '0x..' or hex string or decimal)
         try:
             offset = self._parse_int(item.text())
-            item.setText(str(offset))
+            item.setText(hex(offset))
         except ValueError:
             # Revert to 0 on invalid input
             item.setText("0")
