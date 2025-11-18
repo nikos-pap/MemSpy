@@ -147,7 +147,6 @@ class PointerScanTableWidget(QWidget):
         self._table_view.customContextMenuRequested.connect(self._show_context_menu)
 
         self._table_view.verticalHeader().setVisible(True)
-        self._table_view.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._table_view.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def _show_context_menu(self, pos: QPoint) -> None:
@@ -236,7 +235,7 @@ class PointerScanTableWidget(QWidget):
         self._model.set_items(items)
         self._model.set_page(page_num)
         start = self._model.page_num * self._model.page_size
-        if start <= 0:
+        if self.__totals <= 0:
             self.__totals_label.setText('')
         else:
             self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
