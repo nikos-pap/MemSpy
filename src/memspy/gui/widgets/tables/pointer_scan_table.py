@@ -140,12 +140,15 @@ class PointerScanTableWidget(QWidget):
         self._table_view.setSortingEnabled(True)
         self._table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self._table_view.setSelectionMode(QTableView.SelectionMode.SingleSelection)
-        self._table_view.horizontalHeader().setStretchLastSection(True)
+        # self._table_view.horizontalHeader().setStretchLastSection(True)
 
         # Right-click popup
         self._table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table_view.customContextMenuRequested.connect(self._show_context_menu)
 
+        self._table_view.horizontalHeader().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )
         self._table_view.verticalHeader().setVisible(True)
         self._table_view.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
