@@ -110,14 +110,14 @@ class PointerScanTableModel(QAbstractTableModel):
             idx = col - offset_start
             if idx < len(item.offsets):
                 return f"0x{item.offsets[idx]:X}"
-            return "Invalid"
+            return ""
 
         if col == target_col:
             return f"0x{item.target:08X}"
 
         if col == value_col:
             if item.value is None:
-                return ""
+                return "Invalid"
             v = convert_from_bytes(item.value, item.value_type)
             return str(v)
         return None
