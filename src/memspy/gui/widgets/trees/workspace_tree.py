@@ -39,13 +39,13 @@ class WorkspaceTree(QTreeView):
 
     __logger: Logger = getLogger(__qualname__)
 
-    def __init__(self, scanner: MemoryScanner, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         self.setEditTriggers(QTreeView.EditTrigger.NoEditTriggers)
         self.setUniformRowHeights(True)
         self.setHeaderHidden(False)
 
-        self.__scanner = scanner
+        self.__scanner = MemoryScanner()
 
         self.model = WorkspaceModel(self)
         # self._model.setHorizontalHeaderLabels(["Name", "Address", "Value", "Frozen", "Type", "Offsets"])
@@ -288,12 +288,11 @@ class WorkspaceContainer(QWidget):
     def __init__(self, scanner: MemoryScanner, parent: Optional[QWidget] = None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
-        self.scanner = scanner
 
         self.toolbar = QToolBar("Actions", self)
         layout.addWidget(self.toolbar)
 
-        self.tree = WorkspaceTree(scanner, self)
+        self.tree = WorkspaceTree(self)
         layout.addWidget(self.tree)
 
         self.status = QLabel("")
@@ -315,9 +314,6 @@ class WorkspaceContainer(QWidget):
     @pyqtSlot(WorkspaceItem)
     def add_address(self, workspace_item: WorkspaceItem) -> None:
         self.tree.add_item(workspace_item)
-
-    def set_process(self, pid: int) -> None:
-        self.scanner.change_process(pid)
 
     def _add_actions(self):
         act_group = QAction("Add Group", self)
