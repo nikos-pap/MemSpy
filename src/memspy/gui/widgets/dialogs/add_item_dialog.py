@@ -262,7 +262,7 @@ class AddItemDialog(QDialog):
             # --- read offset ---
             off_item = self._table.item(r, 0)
             try:
-                off_val = hex(self._parse_int(off_item if off_item else 0))
+                off_val = self._parse_int(off_item.text() if off_item else 0)
             except ValueError:
                 off_val = 0
 
