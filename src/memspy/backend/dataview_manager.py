@@ -9,6 +9,7 @@ from memspy.fileio import MappedFileReader, FileWriter, FileStreamReader
 from memspy.utils.operation import Operation, GenericOperation
 from memspy.scanner_engine.process_reader import MemoryScanner
 from memspy.backend.history import History
+from memspy.utils.types import ScanType
 
 
 class MemoryViewThread(QObject):
@@ -111,7 +112,7 @@ class MemoryViewThread(QObject):
         while len(data) > 0:
             array = np.frombuffer(data, dtype=self.__data_writer.dtype)
             mask = np.array([filter_str in f'{elem:#x}' for elem in array['num'][:]], dtype=bool)
-            self.__data_writer.write(array[mask])
+            self.__data_writer.write(array[mask], scan_type=ScanType.FILTER_SCAN)
             data = self.__data_reader.read_elements(100_000)
 
         self.__data_reader.close()

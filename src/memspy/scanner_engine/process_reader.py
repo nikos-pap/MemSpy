@@ -180,6 +180,7 @@ class MemoryScanner:
             enable_debug_privilege()
         self.handle: wintypes.HANDLE | None = None
         self.hSnapshot: wintypes.HANDLE | None = None
+        self.modules = dict()
 
     def change_process(self, pid: int):
         # clean up previous handle
@@ -275,7 +276,7 @@ class MemoryScanner:
 
             region.data = memoryview(buffer)[:bytes_read.value]
 
-    def get_modules(self):
+    def update_modules(self):
         me32 = MODULEENTRY32()
         me32.dwSize = ctypes.sizeof(MODULEENTRY32)
         modules = dict()
@@ -287,7 +288,7 @@ class MemoryScanner:
 
                 if not Module32Next(self.hSnapshot, ctypes.byref(me32)):
                     break
-        return modules
+        self.modules = modules
 
     def get_regions(self, chunk_size_multiplier=2**20) -> Generator[Region, None, None]:
         if not self.handle:
@@ -374,7 +375,12 @@ class MemoryScanner:
         yield None
 
     def evaluate_pointer(self, item: WorkspaceItem) -> list[int]:
-        start = item.address
+        self.update_modules()
+        if item.module_name not in self.modules:
+            start = item.address
+        else:
+            start = self.modules[item.module_name]
+        item.start = start
         values = []
         last_idx = len(item.offsets) - 1
         if not item.offsets:
@@ -394,7 +400,11 @@ class MemoryScanner:
         return values
 
     def update_pointer(self, item: PointerItem) -> list[int]:
-        start = item.start
+        if item.module_name not in self.modules:
+            start = item.start
+        else:
+            start = self.modules[item.module_name]
+        item.start = start
         values = []
         last_idx = len(item.offsets) - 1
         if not item.offsets:
@@ -406,6 +416,7 @@ class MemoryScanner:
             start += offset
             if i == last_idx:
                 item.value = self.read_bytes(start, item.value_type.size())
+                item.target = start
                 if item.value is None:
                     item.is_valid = False
             else:

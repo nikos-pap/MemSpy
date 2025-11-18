@@ -44,6 +44,7 @@ class WorkspaceItem:
     offsets: list[int] = field(default_factory=list)
     frozen: bool = False
     value_type: Type = Type.UInt32
+    module_name: None | str = None
 
     def get_value(self) -> str:
         return str(convert_from_bytes(self.value, self.value_type))
