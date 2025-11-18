@@ -56,6 +56,7 @@ class AddItemDialog(QDialog):
         self._type_combo = QComboBox(self)
         for t in Type:
             self._type_combo.addItem(t.name, t)
+        self._type_combo.setCurrentText(Type.UInt32.label)
 
         # Offsets table (3 columns): Offset | Pointer | Value
         self._table = QTableWidget(0, 3, self)
