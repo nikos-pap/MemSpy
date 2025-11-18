@@ -14,7 +14,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QStandardItem
 
 from memspy.gui.models import WorkspaceModel
-from memspy.scanner_engine import MemoryScanner
 from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem
 from memspy.utils.types.converters import convert_from_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
@@ -44,8 +43,6 @@ class WorkspaceTree(QTreeView):
         self.setEditTriggers(QTreeView.EditTrigger.NoEditTriggers)
         self.setUniformRowHeights(True)
         self.setHeaderHidden(False)
-
-        self.__scanner = MemoryScanner()
 
         self.model = WorkspaceModel(self)
         # self._model.setHorizontalHeaderLabels(["Name", "Address", "Value", "Frozen", "Type", "Offsets"])
@@ -93,7 +90,7 @@ class WorkspaceTree(QTreeView):
         self.expandAll()
 
     def open_add_item_dialog(self) -> None:
-        dlg = AddItemDialog(self.__scanner, self)
+        dlg = AddItemDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         wi = dlg.get_workspace_item()
@@ -263,9 +260,6 @@ class WorkspaceTree(QTreeView):
             return item
         return None
 
-    def set_process(self, pid: int) -> None:
-        self.__scanner.change_process(pid)
-
     def _emit_path(self) -> None:
         sel = self.selectionModel().selectedRows()
         if not sel:
@@ -285,7 +279,7 @@ class WorkspaceContainer(QWidget):
     __logger: Logger = getLogger(__qualname__)
 
     """Toolbar + WorkspaceTree + status label."""
-    def __init__(self, scanner: MemoryScanner, parent: Optional[QWidget] = None):
+    def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
 

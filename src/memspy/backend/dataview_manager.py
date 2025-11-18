@@ -7,7 +7,7 @@ from logging import Logger, getLogger
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot, QThread, QTimer
 from memspy.fileio import MappedFileReader, FileWriter, FileStreamReader
 from memspy.utils.operation import Operation, GenericOperation
-from memspy.scanner_engine.process_reader import MemoryScanner
+from memspy.scanner_engine.process_reader import SCANNER
 from memspy.backend.history import History
 from memspy.utils.types import ScanType
 
@@ -34,8 +34,6 @@ class MemoryViewThread(QObject):
 
         self.__data_writer: FileWriter = FileWriter(save_dir)
 
-        self.__scanner: MemoryScanner = MemoryScanner()
-
         self.current_page_number: int = 0
 
         self.__page_buffer: Optional[NDArray] = None
@@ -49,9 +47,14 @@ class MemoryViewThread(QObject):
         self.__timer.timeout.connect(self.__update_values)
         self.__timer.start()
 
-    def set_process(self, pid: int) -> None:
-        self.__logger.debug(f'Setting process {pid}')
-        self.__scanner.change_process(pid)
+    # def set_process(self, pid: int) -> None:
+    #     self.__logger.debug(f'Setting process {pid}')
+    #     self.__scanner.change_process(pid)
+    #     self.current_page_number: int = 0
+    #     self.__mapped_data_reader.reset()
+
+    @pyqtSlot()
+    def __on_set_process(self) -> None:
         self.current_page_number: int = 0
         self.__mapped_data_reader.reset()
 
@@ -67,7 +70,7 @@ class MemoryViewThread(QObject):
             self.__initialized_value_mask = np.zeros_like(page, dtype=bool)
 
         for index, (address, value) in enumerate(page):
-            current_data = self.__scanner.read_bytes(int(address), value.itemsize)
+            current_data = SCANNER.read_bytes(int(address), value.itemsize)
             if (self.__page_buffer[index].tobytes() != current_data or not self.__initialized_value_mask[index]) and current_data is not None:
                 self.__page_buffer[index] = current_data
                 self.dataReadySignal.emit(int(address), current_data, value.tobytes())

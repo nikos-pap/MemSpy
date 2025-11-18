@@ -7,6 +7,7 @@ import psutil
 from tempfile import TemporaryDirectory
 from memspy.backend.dataview_manager import MemoryViewThread
 from memspy.backend.workspace_manager import WorkspaceManager
+from memspy.scanner_engine import SCANNER
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
 from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
@@ -101,8 +102,9 @@ class Backend(QObject):
     def init_process_reader(self, pid: int) -> None:
         """Initialize memory scanning for a given process ID."""
         msg = Message(MessageType.SET_PROCESS, [pid])
-        self.memory_worker.set_process(pid)
-        self.workspace_worker.set_process(pid)
+        SCANNER.change_process(pid)
+        # self.memory_worker.set_process(pid)
+        # self.workspace_worker.set_process(pid)
         self.__scanner_queue_in.put(msg)
 
     @pyqtSlot('quint64', bytes, bool)

@@ -13,7 +13,7 @@ from memspy.utils.message import Message
 from memspy.utils.types import MessageType
 from memspy.utils.types import ScanType, Type
 from memspy.utils.condition import Condition
-from memspy.scanner_engine.process_reader import MemoryScanner
+from memspy.scanner_engine.process_reader import SCANNER
 from memspy.scanner_engine.pointer_scanner import PointerScanner
 from memspy.utils.pointer_scan import PointerScanInfo
 
@@ -42,8 +42,7 @@ class MemoryScannerProcess(Process):
 
         self.__file_writer: FileWriter = FileWriter(write_dir)
         self.__file_reader: FileStreamReader = FileStreamReader()
-        self.__scanner: MemoryScanner = MemoryScanner()
-        self.__pointer_scanner: PointerScanner = PointerScanner(self.__scanner)
+        self.__pointer_scanner: PointerScanner = PointerScanner(SCANNER)
         self.__current_scan: Optional[Iterator[Optional[tuple[NDArray, int]]]] = None
         self.__scanning: bool = False
         self.__logger: Optional[Logger] = None
@@ -71,12 +70,12 @@ class MemoryScannerProcess(Process):
                 self.__logger.debug('Exit message received.')
                 break
 
-            if self.__scanner.process_exited():
+            if SCANNER.process_exited():
                 self.__logger.debug(f'Process Exited.')
-                self.__scanner.close()
+                SCANNER.close()
 
             if self.__scanning and self.__current_scan:
-                if self.__scanner.process_exited():
+                if SCANNER.process_exited():
                     self.__logger.error(f'Process Exited during Scan.')
                     self.__cancel_scan()
                     continue
@@ -102,26 +101,24 @@ class MemoryScannerProcess(Process):
         if typ == MessageType.SET_PROCESS:
             self.__cancel_scan()
             pid = data[0]
-            if not self.__scanner:
-                self.__scanner = MemoryScanner()
             if pid == -1:
-                self.__scanner.close()
+                SCANNER.close()
                 self.__logger.debug('Process detached')
             else:
-                self.__scanner.change_process(pid)
+                SCANNER.change_process(pid)
                 self.__logger.debug(f'Process set to {pid}')
 
-            if self.__scanner.process_exited():
-                self.__scanner.close()
+            if SCANNER.process_exited():
+                SCANNER.close()
 
         elif typ == MessageType.START_SCAN:
-            if not self.__scanner:
+            if not SCANNER:
                 self.__logger.debug('Scanner not initialized!')
                 return
             value, condition, data_type = data
             self.__start_scan(value, condition, data_type)
         elif typ == MessageType.START_FILTER_SCAN:
-            if not self.__scanner:
+            if not SCANNER:
                 self.__logger.debug('Scanner not initialized!')
                 return
             value, condition, filepath, data_type = data
@@ -134,7 +131,7 @@ class MemoryScannerProcess(Process):
 
         elif typ == MessageType.EXIT:
             self.__logger.debug('Exiting')
-            self.__scanner.trim_process()
+            SCANNER.trim_process()
 
     def __start_scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType = ScanType.ADDRESS_SCAN) -> None:
         """Initialize a new scan generator, note start time, and notify start."""
@@ -143,7 +140,7 @@ class MemoryScannerProcess(Process):
 
         self.__file_writer.close()
 
-        self.__current_scan = self.__scanner.scan_value(values=values, condition=condition, dtype=data_type)
+        self.__current_scan = SCANNER.scan_value(values=values, condition=condition, dtype=data_type)
 
         self.__scanning = True
         self.__scan_start = time.time()
@@ -176,7 +173,7 @@ class MemoryScannerProcess(Process):
 
         while len(data) > 0:
             self.__logger.debug(f'{len(data)} bytes read. {current} bytes read total')
-            yield self.__scanner.filter_values(data, value, condition, data_type), (current // total) * 100
+            yield SCANNER.filter_values(data, value, condition, data_type), (current // total) * 100
             data = np.frombuffer(self.__file_reader.read_elements(chunk_size), dtype=dtype)
             current += len(data)
         yield None

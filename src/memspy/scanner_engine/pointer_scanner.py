@@ -4,7 +4,7 @@ import numpy as np
 from numba import cuda
 # import warnings
 # from numba.core.errors import NumbaWarning
-from memspy.scanner_engine.process_reader import MemoryScanner
+from memspy.scanner_engine.process_reader import MemoryScanner, SCANNER
 from typing import Optional
 from memspy.scanner_engine.scanner_utils import pointer_scanner_tools as pst
 from memspy.utils.types import PointerItem
@@ -14,12 +14,12 @@ from memspy.utils.types import PointerItem
 
 class PointerScanner:
     def __init__(self, scanner: Optional['MemoryScanner'] = None):
-        self.scanner = scanner
+        # self.scanner = scanner
         self.regions = []
         self.ranges = []
 
     def make_pointers_list(self, results, target: int):
-        self.scanner.update_modules()
+        SCANNER.update_modules()
         for base_address, chain in results:
             base_address_name = None
             base_address_offset = 0
@@ -27,7 +27,7 @@ class PointerScanner:
             for region in self.regions:
                 if region.base_address <= base_address <= region.base_address + region.size:
                     base_address_name = region.name
-                    module_address = self.scanner.modules[base_address_name]
+                    module_address = SCANNER.modules[base_address_name]
                     base_address_offset = int(base_address - module_address)
                     break
             offsets = [c[1] for c in chain][::-1]
@@ -86,12 +86,12 @@ class PointerScanner:
         start = time.time()
         self.regions = []
         self.ranges = []
-        for region in self.scanner.get_regions():
+        for region in SCANNER.get_regions():
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
 
         for region in self.regions:
-            self.scanner.read_memory_by_region(region)
+            SCANNER.read_memory_by_region(region)
             if region.data:
                 region.data2values(self.ranges, np.uint64, use_gpu=use_gpu and cuda.is_available())
         print(f'{time.time() - start:2f}')

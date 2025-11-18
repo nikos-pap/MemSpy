@@ -458,7 +458,8 @@ class MemoryScanner:
 
     def write_bytes(self, address: int, value: bytes) -> bool:
         if not self.handle:
-            raise ctypes.WinError(ctypes.get_last_error())
+            self.__logger.error(f'No open process ({ctypes.WinError(ctypes.get_last_error())})')
+            return False
 
         # Create a ctypes buffer from the data
         buffer = ctypes.create_string_buffer(value)
@@ -478,7 +479,7 @@ class MemoryScanner:
 
         # Optionally, ensure all bytes were written
         if bytes_written.value != len(value):
-            raise RuntimeError(f"Only wrote {bytes_written.value} out of {len(value)} bytes.")
+            self.__logger.error(f"Only wrote {bytes_written.value} out of {len(value)} bytes.")
         return True
 
     def filter_values(self, array: NDArray, values: tuple[bytes, bytes], condition: Condition, data_type: Type = Type.UInt32) -> NDArray:
@@ -528,3 +529,6 @@ class MemoryScanner:
         if not psapi.GetProcessMemoryInfo(self.handle, ctypes.byref(cnt), cnt.cb):
             raise ctypes.WinError(ctypes.get_last_error())
         return max(cnt.WorkingSetSize, cnt.PrivateUsage, cnt.PagefileUsage, cnt.PeakWorkingSetSize, cnt.PeakPagefileUsage)
+
+
+SCANNER: MemoryScanner = MemoryScanner()

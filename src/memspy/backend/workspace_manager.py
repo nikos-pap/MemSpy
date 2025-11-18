@@ -2,7 +2,7 @@ from logging import Logger, getLogger
 
 from PyQt6.QtCore import QObject, pyqtSignal, QTimer, pyqtSlot, QThread
 from memspy.utils.types import WorkspaceItem
-from memspy.scanner_engine.process_reader import MemoryScanner
+from memspy.scanner_engine.process_reader import SCANNER
 
 
 class WorkspaceManager(QObject):
@@ -15,8 +15,6 @@ class WorkspaceManager(QObject):
     def __init__(self, parent=None, update_rate: int = 500):
         super().__init__(parent)
         self.__saved_items: list[WorkspaceItem] = []
-
-        self.__scanner = MemoryScanner()
 
         self.__timer = QTimer(self)
         self.__timer.setInterval(update_rate)
@@ -32,14 +30,14 @@ class WorkspaceManager(QObject):
     def __update_values(self):
         for item in self.__saved_items:
             prev_value = item.value
-            new_value = self.__scanner.evaluate_pointer(item)
+            new_value = SCANNER.evaluate_pointer(item)
             if prev_value != item.value:
                 self.__logger.debug(f"Workspace item {item.address}: {item.value}")
                 self.updateAddressSignal.emit(item.address)
 
     @pyqtSlot('quint64', bytes)
     def set_value(self, address: int, value: bytes) -> None:
-        self.__scanner.write_bytes(address, value)
+        SCANNER.write_bytes(address, value)
 
     @pyqtSlot(WorkspaceItem)
     def add_address(self, wi: WorkspaceItem) -> None:
@@ -49,10 +47,6 @@ class WorkspaceManager(QObject):
     def delete_address(self, wi: WorkspaceItem) -> None:
         if wi in self.__saved_items:
             self.__saved_items.remove(wi)
-
-    def set_process(self, pid: int) -> None:
-        self.__scanner.change_process(pid)
-        self.setProccessSignal.emit(pid)
 
     @pyqtSlot()
     def __handle_exit(self) -> None:

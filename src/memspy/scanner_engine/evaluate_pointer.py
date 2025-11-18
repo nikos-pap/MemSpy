@@ -1,3 +1,4 @@
+# TODO Remove this file
 from memspy.scanner_engine import MemoryScanner
 from memspy.utils.types import WorkspaceItem, Type
 

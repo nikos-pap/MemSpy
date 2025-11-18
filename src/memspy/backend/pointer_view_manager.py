@@ -7,11 +7,10 @@ from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, QTimer
 
-from memspy.scanner_engine import MemoryScanner
+from memspy.scanner_engine import SCANNER
 from memspy.utils.pointer_scan import PointerScanInfo
 from memspy.utils.settings import CONFIG
 from memspy.utils.types import PointerItem
-from memspy.utils.types.converters import convert_from_bytes
 
 
 class PointerManager(QObject):
@@ -25,12 +24,11 @@ class PointerManager(QObject):
 
     __logger: Logger = getLogger(__qualname__)
 
-    def __init__(self, scanner: MemoryScanner, page_size: int = 100, update_rate: int = 1000, *args, **kwargs):
+    def __init__(self, page_size: int = 100, update_rate: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.__file: Optional[BinaryIO] = None
         self.__current_page: int = -1
-        self.__scanner = scanner
         self.__page_buffer: list[PointerItem] = []
         self.__file_info: Optional[PointerScanInfo] = None
         self.__page_size = page_size
@@ -51,7 +49,7 @@ class PointerManager(QObject):
         for index, pointer in enumerate(self.__page_buffer):
             previous_value = pointer.value
             if pointer.is_valid:
-                self.__scanner.update_pointer(pointer)
+                SCANNER.update_pointer(pointer)
             if previous_value != pointer.value:
                 self.updateValueSignal.emit(self.__current_page, index)
 
@@ -90,8 +88,8 @@ class PointerManager(QObject):
             self.__page_buffer.append(pickle.load(self.__file))
         self.loadPageSignal.emit(self.__current_page, self.__page_buffer)
 
-    def set_process(self, pid: int) -> None:
-        self.__scanner.change_process(pid)
+    # def set_process(self, pid: int) -> None:
+    #     self.__scanner.change_process(pid)
 
     def export_file(self, path: str) -> None:
         shutil.copyfile(self.__file.name, path)
@@ -112,7 +110,7 @@ class PointerManager(QObject):
             max_depth = pointer_info.max_depth
             for _ in range(pointer_info.entries):
                 pointer: PointerItem = pickle.load(f)
-                self.__scanner.update_pointer(pointer)
+                SCANNER.update_pointer(pointer)
                 if pointer.is_valid:
                     valid_pointers.append(pointer)
 

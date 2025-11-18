@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
 )
 
-from memspy.scanner_engine import MemoryScanner
+from memspy.scanner_engine import SCANNER
 from memspy.utils.types import Type, WorkspaceItem
 
 try:
@@ -56,12 +56,11 @@ class AddItemDialog(QDialog):
       - get_workspace_item() returns the WorkspaceItem (or None if validation failed)
     """
 
-    def __init__(self, scanner: MemoryScanner, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Item")
 
         self.setMinimumSize(390, 310)
-        self.scanner = scanner
 
         # --- Widgets ---------------------------------------------------------
         self._name_edit = QLineEdit(self)
@@ -196,7 +195,7 @@ class AddItemDialog(QDialog):
             # basic validation failed; do not close
             return
         # Resolve pointers and update the preview one last time
-        _ = self.scanner.evaluate_pointer(wi)  # expected to set wi.value
+        _ = SCANNER.evaluate_pointer(wi)  # expected to set wi.value
         try:
             self._value_num_label.setText(wi.get_value())
         except Exception:
@@ -263,7 +262,7 @@ class AddItemDialog(QDialog):
             return
 
         # Ask resolver for the deref chain (may be shorter than rows if the chain breaks)
-        intermediates = self.scanner.evaluate_pointer(wi)  # expected: list[Optional[int]]
+        intermediates = SCANNER.evaluate_pointer(wi)  # expected: list[Optional[int]]
 
         rows = self._table.rowCount()
         base = wi.address
@@ -275,7 +274,7 @@ class AddItemDialog(QDialog):
             # --- read offset ---
             off_item = self._table.item(r, 0)
             try:
-                off_val = self._parse_int(off_item.text() if off_item else "0")
+                off_val = hex(self._parse_int(off_item if off_item else 0))
             except ValueError:
                 off_val = 0
 
@@ -287,7 +286,7 @@ class AddItemDialog(QDialog):
                 ptr_item = QTableWidgetItem()
                 ptr_item.setFlags(ptr_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self._table.setItem(r, 1, ptr_item)
-            ptr_item.setText(f"{base:X} + {off_val} = {next_addr:X}")
+            ptr_item.setText(f"{base:X} + {off_val:X} = {next_addr:X}")
 
             # --- Value column (resolver-only) ---
             val_item = self._table.item(r, 2)
