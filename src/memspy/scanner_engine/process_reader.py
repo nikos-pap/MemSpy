@@ -190,6 +190,8 @@ class MemoryScanner:
         # open new handle
         self.handle = OpenProcess(PROCESS_ALL_ACCESS, False, pid)
         self.hSnapshot = CreateToolHelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, pid)
+        if self.handle:
+            self.update_modules()
 
     def trim_process(self):
         if self.handle and not SetProcessWorkingSetSize(self.handle, ctypes.c_size_t(-1), ctypes.c_size_t(-1)):
@@ -448,7 +450,7 @@ class MemoryScanner:
         )
 
         if not success:
-            self.__logger.error(f"Invalid access to memory at address: {hex(address)}")
+            # self.__logger.error(f"Invalid access to memory at address: {hex(address)}")
             return None
 
         # Return the raw bytes read

@@ -58,16 +58,17 @@ class PointerScanTableWidget(QWidget):
         which you can handle in your own code.
     """
 
-    # You connect this to your real scan backend in your app.
+    # button actions
     pointerScanRequested = pyqtSignal(PointerScanParameters)
+    nextPageRequested = pyqtSignal()
+    previousPageRequested = pyqtSignal()
+    exportFileRequested = pyqtSignal(str)
+    importFileRequested = pyqtSignal(str)
+    filterPointersRequested = pyqtSignal()
 
     # Context-menu driven actions (you decide what to do when they fire)
     rowInsertRequested = pyqtSignal()
     rowValueUpdateRequested = pyqtSignal(int)  # row index
-    nextPageRequested = pyqtSignal()
-    previousPageRequested = pyqtSignal()
-    saveFileRequested = pyqtSignal(str)
-    loadFileRequested = pyqtSignal(str)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -91,14 +92,16 @@ class PointerScanTableWidget(QWidget):
         self._scan_button = QPushButton("Pointer Scan", self)
         self._scan_button.clicked.connect(self._open_scan_dialog)
 
-        self.__export_button = QPushButton("Export", self)
         self.__import_button = QPushButton("Import", self)
+        self.__export_button = QPushButton("Export", self)
+        self.__filter_pointers_button = QPushButton("Filter Pointers", self)
 
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
         top_bar.addStretch(1)
-        top_bar.addWidget(self.__export_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self.__import_button, 0, Qt.AlignmentFlag.AlignLeft)
+        top_bar.addWidget(self.__export_button, 0, Qt.AlignmentFlag.AlignLeft)
+        top_bar.addWidget(self.__filter_pointers_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignRight)
 
         self.__previous_page_button = QPushButton("Previous page", self)
@@ -131,6 +134,7 @@ class PointerScanTableWidget(QWidget):
         self.__previous_page_button.clicked.connect(self.previousPageRequested)
         self.__export_button.clicked.connect(self.__choose_save_path)
         self.__import_button.clicked.connect(self.__choose_load_path)
+        self.__filter_pointers_button.clicked.connect(self.filterPointersRequested)
 
     def _configure_view(self) -> None:
         self._table_view.setSortingEnabled(True)
@@ -207,7 +211,7 @@ class PointerScanTableWidget(QWidget):
         if dlg.exec():
             path = dlg.selectedFiles()[0]
             self.__logger.debug(path)
-            self.saveFileRequested.emit(path)
+            self.exportFileRequested.emit(path)
 
     def __choose_load_path(self) -> None:
         dlg = QFileDialog(self)
@@ -217,7 +221,7 @@ class PointerScanTableWidget(QWidget):
 
         if dlg.exec():
             path = dlg.selectedFiles()[0]
-            self.loadFileRequested.emit(path)
+            self.importFileRequested.emit(path)
 
     # -------------------------------------------------------
     # Public API

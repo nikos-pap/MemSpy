@@ -9,7 +9,9 @@ from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, QTimer
 
 from memspy.scanner_engine import MemoryScanner
 from memspy.utils.pointer_scan import PointerScanInfo
+from memspy.utils.settings import CONFIG
 from memspy.utils.types import PointerItem
+from memspy.utils.types.converters import convert_from_bytes
 
 
 class PointerManager(QObject):
@@ -95,11 +97,36 @@ class PointerManager(QObject):
         shutil.copyfile(self.__file.name, path)
 
     def import_file(self, path: str) -> None:
-        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp = tempfile.NamedTemporaryFile(dir=CONFIG.tempFolderPath, delete=False)
         tmp_path = tmp.name
         tmp.close()
         shutil.copyfile(path, tmp_path)
         self.set_file(tmp_path)
+
+    def clear_pointers(self) -> None:
+        path = self.__file.name
+        valid_pointers = []
+        max_depth = 0
+        with open(path, 'rb') as f:
+            pointer_info: PointerScanInfo = pickle.load(f)
+            max_depth = pointer_info.max_depth
+            for _ in range(pointer_info.entries):
+                pointer: PointerItem = pickle.load(f)
+                self.__scanner.update_pointer(pointer)
+                if pointer.is_valid and convert_from_bytes(pointer.value, pointer.value_type) == '1692':
+                    valid_pointers.append(pointer)
+
+        self.__logger.debug(f'valid pointers: {len(valid_pointers)}')
+        info = PointerScanInfo(len(valid_pointers), max_depth)
+        temp_file = tempfile.NamedTemporaryFile(dir=CONFIG.tempFolderPath, delete=False)
+        new_path = temp_file.name
+        temp_file.close()
+        with open(new_path, 'wb') as f:
+            pickle.dump(info, f)
+            for pointer in valid_pointers:
+                pickle.dump(pointer, f)
+
+        self.set_file(new_path)
 
     @pyqtSlot()
     def __handle_exit(self) -> None:
