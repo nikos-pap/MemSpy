@@ -3,12 +3,12 @@ from typing import Optional
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLineEdit, QPushButton, QLabel, QTableView, QHeaderView
+    QLineEdit, QPushButton, QLabel, QTableView, QHeaderView, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex
+from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex, QPoint
 
-from memspy.gui.models import SortedPagedTableModel
-from memspy.utils.types import Type, WorkspaceItem
+from memspy.gui.models import SearchTableModel
+from memspy.utils.types import Type, WorkspaceItem, SearchItem
 from logging import Logger, getLogger
 
 
@@ -27,8 +27,7 @@ class PagedTable(QWidget):
         self.setWindowTitle("Large Table with Filter + Pagination")
 
         self.page_size: int = 100
-        self.current_page: int = 0
-        self.model: SortedPagedTableModel = SortedPagedTableModel(self)
+        self.model: SearchTableModel = SearchTableModel(self)
         self.font: QFont = font or QFont()
         if not font:
             self.font.setPointSize(12)
@@ -89,6 +88,9 @@ class PagedTable(QWidget):
         self.model.rowsRemoved.connect(self._on_rows_changed)
         self.model.modelReset.connect(self._on_rows_changed)
 
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.__show_context_menu)
+
     def horizontalHeader(self):
         return self.table.horizontalHeader()
 
@@ -105,9 +107,18 @@ class PagedTable(QWidget):
         self.page_start = start
         self._on_rows_changed()
 
-    @pyqtSlot('quint64', bytes, bytes)
-    def handleUpdate(self, key: int, val: bytes, old_val: bytes):
-        self.model.handleUpdate(key, val, old_val)
+    def set_current_page(self, page: int):
+        self.model.set_current_page(page)
+
+    def set_items(self, items: list[SearchItem]) -> None:
+        self.model.set_items(items)
+        self._on_rows_changed()
+
+    @pyqtSlot(SearchItem, int)
+    def handleUpdate(self, item: SearchItem, index: int):
+        # TODO fix static type
+        item.display_type = Type.UInt32
+        self.model.handleUpdate(item, index)
         self.show_message()
 
     def setTotal(self, total: int) -> None:
@@ -129,6 +140,47 @@ class PagedTable(QWidget):
     def _on_rows_changed(self):
         # Whenever rows are added/removed/reset, update the variable
         self.page_end = self.page_start + self.model.rowCount()
+
+    def __show_context_menu(self, pos: QPoint) -> None:
+        # Get model index at the click position
+        index = self.table.indexAt(pos)
+
+        # If no valid index was clicked, you may ignore or still show menu
+        # index.isValid() tells you if a cell was hit
+        if not index.isValid():
+            return
+
+        menu = QMenu(self)
+
+        action_add_to_workspace = menu.addAction("Add to Workspace")
+        action_copy_address = menu.addAction("Copy Address")
+        action_copy_current = menu.addAction("Copy Current Value")
+        action_copy_previous = menu.addAction("Copy Previous Value")
+
+        global_pos = self.table.viewport().mapToGlobal(pos)
+        triggered = menu.exec(global_pos)
+
+        row = index.row()
+        address = index.sibling(row, 0).data()
+        current_value = index.sibling(row, 2).data()
+        previous_value = index.sibling(row, 1).data()
+
+        if triggered is action_add_to_workspace:
+            item = WorkspaceItem(address, int(address, 16), b'', value_type=Type.UInt32)
+            self.addressActivated.emit(item)
+            self.__logger.debug(f'Action: Add to Workspace {item}')
+        if triggered is action_copy_address:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(str(address))
+            self.__logger.debug(f'Action: Copy Address {address}')
+        if triggered is action_copy_previous:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(str(previous_value))
+            self.__logger.debug(f'Action: Copy Previous Value {previous_value}')
+        if triggered is action_copy_current:
+            clipboard = QApplication.clipboard()
+            clipboard.setText(str(current_value))
+            self.__logger.debug(f'Action: Copy Current Value {current_value}')
 
     def _forward_double_click(self, index: QModelIndex) -> None:
         """
@@ -155,11 +207,9 @@ class PagedTable(QWidget):
         self.clear_table()
 
     def next_page(self):
-        self.model.clear()
         self.nextPageSignal.emit()
 
     def prev_page(self):
-        self.model.clear()
         self.previousPageSignal.emit()
 
     def clear_table(self):

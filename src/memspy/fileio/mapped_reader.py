@@ -27,7 +27,7 @@ class MappedFileReader:
             self.__address_list = np.empty((0,), dtype=dtype)
         else:
             self.__address_list = np.memmap(filepath, dtype=dtype, mode="r")
-        self.__total_page_number = len(self.__address_list)
+        self.__total_page_number = len(self.__address_list) // self.__page_size
         self.__current_page_number = 0
         self.__logger.debug(f'File {filepath} loaded')
 
@@ -45,8 +45,8 @@ class MappedFileReader:
     def read_page(self) -> NDArray:
         if self.__address_list is None or len(self.__address_list) == 0:
             return np.empty((0, ), dtype=self.__dtype)
-        page_start = max(min(self.__page_size * self.__current_page_number, self.__total_page_number), 0)
-        page_end = min(self.__total_page_number, page_start + self.__page_size)
+        page_start = max(min(self.__page_size * self.__current_page_number, self.size), 0)
+        page_end = min(self.size, page_start + self.__page_size)
         return self.__address_list[page_start:page_end]
 
     def reload_file(self) -> None:

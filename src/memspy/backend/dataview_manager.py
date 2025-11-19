@@ -9,7 +9,7 @@ from memspy.fileio import MappedFileReader, FileWriter, FileStreamReader
 from memspy.utils.operation import Operation, GenericOperation
 from memspy.scanner_engine.process_reader import SCANNER
 from memspy.backend.history import History
-from memspy.utils.types import ScanType
+from memspy.utils.types import ScanType, SearchItem
 
 
 class MemoryViewThread(QObject):
@@ -19,9 +19,11 @@ class MemoryViewThread(QObject):
     filterValuesSignal = pyqtSignal(int)
     exitSignal = pyqtSignal()
     setFileSignal = pyqtSignal(str)
-    dataReadySignal = pyqtSignal('quint64', bytes, bytes)
+    dataReadySignal = pyqtSignal(SearchItem, int)
     updateTotalsSignal = pyqtSignal(int)
     addressPageSignal = pyqtSignal(int)
+    updatePageSignal = pyqtSignal(int)
+    updateItemsSignal = pyqtSignal(list)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -36,6 +38,8 @@ class MemoryViewThread(QObject):
 
         self.current_page_number: int = 0
 
+        self.__current_page: Optional[NDArray] = None
+
         self.__page_buffer: Optional[NDArray] = None
         self.__initialized_value_mask: Optional[NDArray] = None
 
@@ -47,27 +51,19 @@ class MemoryViewThread(QObject):
         self.__timer.timeout.connect(self.__update_values)
         self.__timer.start()
 
-    @pyqtSlot()
-    def __on_set_process(self) -> None:
-        self.current_page_number: int = 0
-        self.__mapped_data_reader.reset()
-
     def get_last_file(self) -> Optional[str]:
         if self.__history.empty():
             return None
         return self.__history.last.filepath
 
     def __update_values(self) -> None:
-        page = self.__mapped_data_reader.read_page()
-        if self.__page_buffer is None and len(page) > 0:
-            self.__page_buffer = np.empty_like(page, dtype=page.dtype['bytes'])
-            self.__initialized_value_mask = np.zeros_like(page, dtype=bool)
-
-        for index, (address, value) in enumerate(page):
+        if self.__current_page is None:
+            return
+        for index, (address, value) in enumerate(self.__current_page):
             current_data = SCANNER.read_bytes(int(address), value.itemsize)
             if (self.__page_buffer[index].tobytes() != current_data or not self.__initialized_value_mask[index]) and current_data is not None:
                 self.__page_buffer[index] = current_data
-                self.dataReadySignal.emit(int(address), current_data, value.tobytes())
+                self.dataReadySignal.emit(SearchItem(address=int(address), previous_value=value.tobytes(), next_value=current_data), index)
                 self.__initialized_value_mask[index] = True
 
         self.updateTotalsSignal.emit(self.__mapped_data_reader.size)
@@ -78,6 +74,18 @@ class MemoryViewThread(QObject):
         self.filterAddressSignal.connect(self.__filter)
         self.exitSignal.connect(self.__handle_exit)
 
+    def __send_items(self) -> None:
+        if self.__current_page is None:
+            return
+        data = [SearchItem(address=address, previous_value=value) for address, value in self.__current_page]
+        self.updateItemsSignal.emit(data)
+
+    def fetch_page(self) -> None:
+        self.__current_page = self.__mapped_data_reader.read_page()
+        if self.__page_buffer is None and len(self.__current_page) > 0:
+            self.__page_buffer = np.empty_like(self.__current_page, dtype=self.__current_page.dtype['bytes'])
+            self.__initialized_value_mask = np.zeros_like(self.__current_page, dtype=bool)
+
     # Signal handlers
     @pyqtSlot(Operation)
     def __handle_new_file(self, operation: GenericOperation) -> None:
@@ -87,12 +95,19 @@ class MemoryViewThread(QObject):
         self.__page_buffer = None
         self.__mapped_data_reader.set_file(operation.filepath, operation.dtype)
         self.__history.append(operation)
+        self.fetch_page()
+        self.updatePageSignal.emit(self.current_page_number)
+        self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
+        self.__send_items()
 
     @pyqtSlot()
     def __handle_scan_finished(self) -> None:
         self.__page_buffer = None
         self.__mapped_data_reader.reload_file()
+        self.fetch_page()
+        self.updatePageSignal.emit(self.current_page_number)
         self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
+        self.__send_items()
 
     @pyqtSlot(str)
     def __filter(self, filter_str: str) -> None:
@@ -116,19 +131,29 @@ class MemoryViewThread(QObject):
         self.__data_writer.close()
         self.__handle_new_file(self.__history.get_current_filter())
         self.__logger.debug(f'Filtered {self.__mapped_data_reader.size} elements')
-        self.filterValuesSignal.emit(self.__mapped_data_reader.size)
+        # self.filterValuesSignal.emit(self.__mapped_data_reader.size)
 
     @pyqtSlot()
     def next_page_handle(self) -> None:
+        page_num = self.current_page_number
         self.current_page_number = self.__mapped_data_reader.next_page()
-        self.__page_buffer = None
-        self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
+        if self.current_page_number != page_num:
+            self.__page_buffer = None
+            self.fetch_page()
+            self.updatePageSignal.emit(self.current_page_number)
+            self.__send_items()
+            self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
 
     @pyqtSlot()
     def prev_page_handle(self) -> None:
+        page_num = self.current_page_number
         self.current_page_number = self.__mapped_data_reader.prev_page()
-        self.__page_buffer = None
-        self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
+        if self.current_page_number != page_num:
+            self.__page_buffer = None
+            self.fetch_page()
+            self.updatePageSignal.emit(self.current_page_number)
+            self.__send_items()
+            self.addressPageSignal.emit(self.current_page_number * self.__mapped_data_reader.page_size)
 
     @pyqtSlot()
     def __handle_exit(self) -> None:

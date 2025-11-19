@@ -12,7 +12,7 @@ from memspy.backend import Backend
 from memspy.gui.widgets.trees.workspace_tree import WorkspaceContainer
 from memspy.gui.widgets.controls.scan_controls import ScanControls
 from memspy.gui.widgets.tables.paged_table import PagedTable
-from memspy.gui.widgets.tables.pointer_table import PointerScanTable
+from memspy.gui.widgets.tables.pointer_scan_table import PointerScanTableWidget
 from memspy.gui.widgets.menus.menu_bar import MenuBar
 from memspy.gui.widgets.dialogs.settings__dialog import SettingsDialog, SettingsManager
 
@@ -71,7 +71,7 @@ class MemoryScannerUI(QMainWindow):
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.saved_table_dock.setWidget(self.workspace_container)
 
-        self.search_pointer_table = PointerScanTable(self)
+        self.search_pointer_table: PointerScanTableWidget = PointerScanTableWidget(self)
         self.search_pointer_dock = QDockWidget("Pointer Scan Table", self)
         self.search_pointer_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_pointer_dock.setWidget(self.search_pointer_table)
@@ -132,13 +132,15 @@ class MemoryScannerUI(QMainWindow):
         data_thread.updateTotalsSignal.connect(self.__update_address_totals)
         data_thread.filterValuesSignal.connect(self.search_address_table.setFiltered)
         data_thread.addressPageSignal.connect(self.search_address_table.setPageRanges)
+        data_thread.updatePageSignal.connect(self.search_address_table.set_current_page)
+        data_thread.updateItemsSignal.connect(self.search_address_table.set_items)
 
         self.search_address_table.filterSignal.connect(self.__filter_command)
 
         listener.progressSignal.connect(self.progress_bar.setValue)
         listener.scanCompletedSignal.connect(self.__finished_scan)
         listener.processExitedSignal.connect(self.__process_closed_handle)
-        listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
+        # listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
 
         self.backend.workspace_worker.updateAddressSignal.connect(self.workspace_container.update_address)
 
@@ -250,8 +252,8 @@ class MemoryScannerUI(QMainWindow):
     def __scan_progress(self, total_addresses: int, total_pointers: int):
         self.search_address_table.setTotal(total_addresses)
         self.search_address_table.show_message()
-        self.search_pointer_table.setTotal(total_pointers)
-        self.search_pointer_table.show_message()
+        # self.search_pointer_table.setTotal(total_pointers)
+        # self.search_pointer_table.show_message()
 
     @pyqtSlot(str, str, bool, str, object)
     def __on_pointer_command(self, name, typ, is_ptr, base_hex, offsets):
@@ -260,7 +262,7 @@ class MemoryScannerUI(QMainWindow):
 
     @pyqtSlot(str)
     def __filter_command(self, pattern: str):
-        self.search_address_table.clear_table()
+        # self.search_address_table.clear_table()
         self.backend.memory_worker.filterAddressSignal.emit(pattern)
 
     @pyqtSlot(int)

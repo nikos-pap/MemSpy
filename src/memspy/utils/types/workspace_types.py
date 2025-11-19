@@ -16,6 +16,23 @@ class ProcessItem(NamedTuple):
 
 
 @dataclass
+class SearchItem:
+    address: Optional[int] = None
+    previous_value: Optional[bytes] = None
+    next_value: Optional[bytes] = None
+    display_type: Optional[Type] = None
+
+    def display_next(self) -> Optional[str]:
+        if self.next_value is None or self.display_type is None:
+            return None
+        return convert_from_bytes(self.next_value, self.display_type)
+
+    def display_previous(self) -> Optional[str]:
+        if self.previous_value is None or self.display_type is None:
+            return None
+        return convert_from_bytes(self.previous_value, self.display_type)
+
+@dataclass
 class AddressItem:
     name: str
     address: int
