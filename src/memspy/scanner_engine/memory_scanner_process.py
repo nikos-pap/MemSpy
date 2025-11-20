@@ -10,7 +10,7 @@ from memspy.fileio.reader import FileStreamReader
 from logging import getLogger, Logger
 from memspy.fileio.writer import FileWriter
 from memspy.utils.message import Message
-from memspy.utils.types import MessageType
+from memspy.utils.types import MessageType, PointerScanParameters
 from memspy.utils.types import ScanType, Type
 from memspy.utils.condition import Condition
 from memspy.scanner_engine.process_reader import SCANNER
@@ -53,7 +53,7 @@ class MemoryScannerProcess(Process):
     def run(self) -> None:
         self.__logger = getLogger(self.__class__.__name__)
         logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
-        getLogger("numba.cuda.cudadrv.driver").setLevel(logging.ERROR)
+        getLogger("numba").setLevel(logging.ERROR)
         total = 0
         """Main loop: process commands and stream scan results."""
         while True:
@@ -127,7 +127,7 @@ class MemoryScannerProcess(Process):
             self.__cancel_scan()
 
         elif typ == MessageType.START_POINTER_SCAN:
-            self.__start_pointer_scan(*data)
+            self.__start_pointer_scan(data)
 
         elif typ == MessageType.EXIT:
             self.__logger.debug('Exiting')
@@ -178,7 +178,7 @@ class MemoryScannerProcess(Process):
             current += len(data)
         yield None
 
-    def __start_pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
+    def __start_pointer_scan(self, parameters: PointerScanParameters) -> None:
         if self.__scanning:
             self.__logger.error('Cannot have two scans running together.')
             return
@@ -186,9 +186,13 @@ class MemoryScannerProcess(Process):
         self.__file_writer.close()
         self.__scan_start = time.time()
         self.__file_writer.temp_file(Type.UInt32.mem_dtype)
-        self.__pointer_scanner.get_pointer_map(use_gpu)
-        self.__scan_info = PointerScanInfo(0, depth)
-        self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=address, depth=depth, max_offset=max_offset, negative_offsets_enabled=negative_offsets_enabled, randomness=0.0)
+        self.__pointer_scanner.get_pointer_map(parameters.use_gpu)
+        self.__scan_info = PointerScanInfo(0, parameters.max_depth)
+        self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=parameters.address,
+                                                                  depth=parameters.max_depth,
+                                                                  max_offset=parameters.max_offset,
+                                                                  negative_offsets_enabled=parameters.negative_offsets_enabled,
+                                                                  randomness=0.0)
         self.__scan_type = ScanType.POINTER_SCAN
 
     def __finish_scan(self) -> None:
@@ -199,8 +203,9 @@ class MemoryScannerProcess(Process):
         file_name = self.__file_writer.filepath
         self.__file_writer.close()
         self.__file_reader.close()
-        self.__queue_out.put(Message(MessageType.SCAN_COMPLETED, [file_name]), False)
+        self.__queue_out.put(Message(MessageType.SCAN_COMPLETED, [file_name, self.__scan_type]), False)
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [100]), False)
+        self.__scan_type = None
         self.__logger.debug(f'Scan finished in {elapsed:.3f} seconds')
 
     def __cancel_scan(self) -> None:

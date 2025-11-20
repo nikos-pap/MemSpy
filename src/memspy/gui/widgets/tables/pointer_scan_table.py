@@ -1,47 +1,12 @@
-import os
 from logging import getLogger, Logger
 
-import psutil
 from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot
 from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView, \
     QLabel, QFileDialog
 
 from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
-from memspy.utils.types import PointerScanParameters, PointerItem, ModuleInfo
-
-
-def list_modules_for_pid(pid: int) -> list[ModuleInfo]:
-    p = psutil.Process(int(pid))
-    mods = set()  # path -> [min_start, max_end]
-    main_name = os.path.basename(p.exe())
-    print(main_name)
-
-    result = []
-
-    for m in p.memory_maps(grouped=False):
-        path = os.path.basename(m.path) or ""
-        if not path:
-            continue
-        # keep it "module-ish"; drop this filter if you want every mapped file
-        if not path.lower().endswith((".dll", ".exe")):
-            continue
-        # print(dir(m), m.count, m.index, m.perms, m.rss)
-        if path in mods:
-            continue
-
-        mods.add(path)
-
-        start, end = int(m.addr, 16), int(m.addr, 16) + m.rss
-
-        if main_name == path:
-            result.insert(0, ModuleInfo(path, start, end))
-        else:
-            result.append(ModuleInfo(path, start, end))
-
-    result[1:] = sorted(result[1:], key=lambda item: item.name)
-
-    return result
+from memspy.utils.types import PointerScanParameters, PointerItem
 
 
 class PointerScanTableWidget(QWidget):
@@ -75,12 +40,9 @@ class PointerScanTableWidget(QWidget):
     def __init__(
         self,
         parent: QWidget | None = None,
-        pid: int | None = None,
         *args, **kwargs
     ) -> None:
         super().__init__(parent, *args, **kwargs)
-
-        self.pid = pid
         # ---- table ----
         self._table_view = QTableView(self)
         self._model = PointerScanTableModel(parent=self)
@@ -192,7 +154,7 @@ class PointerScanTableWidget(QWidget):
         # module_list: list[str] = list(self._module_list)
 
         # if nothing was set explicitly, fetch from the hardcoded PID
-        module_list = list_modules_for_pid(self.pid)
+        module_list = []
 
         dlg = PointerScanConfigDialog(
             parent=self,

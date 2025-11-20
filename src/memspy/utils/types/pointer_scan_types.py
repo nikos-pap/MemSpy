@@ -17,6 +17,7 @@ class PointerScanParameters:
     alignment: int
     target_range: tuple[int, int]
     target_module: str | None
+    use_gpu: bool
 
 
 @dataclass

@@ -62,11 +62,9 @@ class PointerManager(QObject):
         self.get_next_page()
 
     def get_next_page(self) -> None:
-        self.blockSignals(True)
         start = (self.__current_page + 1) * self.__page_size
         if start >= self.__file_info.entries == 0:
             self.loadPageSignal.emit(0, [])
-            self.blockSignals(False)
             return
         self.__current_page += 1
         if self.__current_page >= len(self.__page_indexes):
@@ -75,19 +73,15 @@ class PointerManager(QObject):
             self.__page_indexes[self.__current_page] = self.__current_page
 
         self.load_page(start)
-        self.blockSignals(False)
 
     def get_previous_page(self) -> None:
-        self.blockSignals(True)
         if self.__current_page == 0:
-            self.blockSignals(False)
             return
         self.__current_page -= 1
         pos = self.__page_indexes[self.__current_page]
         self.__file.seek(pos)
 
         self.load_page(self.__current_page * self.__page_size)
-        self.blockSignals(False)
 
     def load_page(self, start) -> None:
 

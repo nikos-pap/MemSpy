@@ -5,6 +5,7 @@ from multiprocessing import Queue
 from typing import NamedTuple
 import psutil
 from memspy.backend.dataview_manager import MemoryViewThread
+from memspy.backend.pointer_view_manager import PointerManager
 from memspy.backend.workspace_manager import WorkspaceManager
 from memspy.scanner_engine import SCANNER
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
@@ -13,7 +14,7 @@ from memspy.backend import image_extractor
 from bisect import insort
 from memspy.utils.message import Message
 from memspy.utils.settings import CONFIG
-from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem
+from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem, PointerScanParameters
 from memspy.utils.condition import Condition
 
 
@@ -21,6 +22,7 @@ class QueueWorker(QObject):
     """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
     progressSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
+    pointerScanCompletedSignal = pyqtSignal(str)
     updateSavedSignal = pyqtSignal('quint64', bytes)
     pointerUpdateSignal = pyqtSignal(PointerItem)
     processExitedSignal = pyqtSignal(int)
@@ -43,7 +45,10 @@ class QueueWorker(QObject):
                 elif msg.message_type == MessageType.START_SCAN:
                     self.scanStartedSignal.emit(msg.message)
                 elif msg.message_type == MessageType.SCAN_COMPLETED:  # scanner
-                    self.scanCompletedSignal.emit()
+                    if len(msg.message) == 2 and msg.message[1] == ScanType.POINTER_SCAN:
+                        self.pointerScanCompletedSignal.emit(msg.message[0])
+                    else:
+                        self.scanCompletedSignal.emit()
                 else:
                     self.__logger.debug(f"Unhandled message: {msg}")
         except Exception as e:
@@ -85,6 +90,13 @@ class Backend(QObject):
         self.__workspace_thread.started.connect(self.workspace_worker.run)
         self.__workspace_thread.start()
 
+        # Pointer Scan Table Thread
+        self.__pointer_manager_thread = QThread(self)
+        self.pointer_scan_worker: PointerManager = PointerManager()
+        self.pointer_scan_worker.moveToThread(self.__pointer_manager_thread)
+        self.__pointer_manager_thread.started.connect(self.pointer_scan_worker.run)
+        self.__pointer_manager_thread.start()
+
         self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir)
         self.__scanner.start()
 
@@ -97,7 +109,8 @@ class Backend(QObject):
 
     def __connect_signals(self) -> None:
         self.listener.scanStartedSignal.connect(self.__start_operation)
-        self.listener.scanCompletedSignal.connect(self.memory_worker.scanFinishedSignal)
+        self.listener.scanCompletedSignal.connect(self.memory_worker.handle_scan_finished)
+        self.listener.pointerScanCompletedSignal.connect(self.pointer_scan_worker.set_file)
 
     def init_process_reader(self, pid: int) -> None:
         """Initialize memory scanning for a given process ID."""
@@ -121,8 +134,9 @@ class Backend(QObject):
     def stop_scan(self) -> None:
         self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
 
-    def pointer_scan(self, address: int, depth: int, max_offset: int, negative_offsets_enabled: bool, use_gpu: bool) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, [address, depth, max_offset, negative_offsets_enabled, use_gpu]))
+    @pyqtSlot(PointerScanParameters)
+    def pointer_scan(self, params: PointerScanParameters) -> None:
+        self.__scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, params))
 
     @property
     def scanner(self):
@@ -149,15 +163,22 @@ class Backend(QObject):
         self.__scanner_queue_in.put_nowait(exit_msg)
         while not self.__scanner_queue_out.empty():
             self.__scanner_queue_out.get()
+
         self.__scanner_queue_out.put_nowait(exit_msg)
+        self.memory_worker.exitSignal.emit()
+        self.workspace_worker.exitSignal.emit()
+        self.pointer_scan_worker.exitSignal.emit()
+
+        CONFIG.exit()
 
         if self.__scanner.is_alive():
             self.__scanner.join()
-        self.memory_worker.exitSignal.emit()
-        self.workspace_worker.exitSignal.emit()
-
         if self.__thread.isRunning():
             self.__thread.wait()
+        if self.__workspace_thread.isRunning():
+            self.__workspace_thread.wait()
+        if self.__pointer_manager_thread.isRunning():
+            self.__pointer_manager_thread.wait()
 
     def get_running_processes(self) -> list[NamedTuple]:
         """Retrieve and cache running processes and their icons."""

@@ -165,6 +165,19 @@ class MemoryScannerUI(QMainWindow):
         # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
         # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
 
+        # Pointer Scan Signals
+        self.search_pointer_table.pointerScanRequested.connect(self.backend.pointer_scan)
+        self.search_pointer_table.nextPageRequested.connect(self.backend.pointer_scan_worker.get_next_page)
+        self.search_pointer_table.previousPageRequested.connect(self.backend.pointer_scan_worker.get_previous_page)
+        self.search_pointer_table.exportFileRequested.connect(self.backend.pointer_scan_worker.export_file)
+        self.search_pointer_table.importFileRequested.connect(self.backend.pointer_scan_worker.import_file)
+        self.search_pointer_table.filterPointersRequested.connect(self.backend.pointer_scan_worker.clear_pointers)
+
+        self.backend.pointer_scan_worker.updateMaxDepthSignal.connect(self.search_pointer_table.set_max_depth)
+        self.backend.pointer_scan_worker.loadPageSignal.connect(self.search_pointer_table.set_page)
+        self.backend.pointer_scan_worker.updateValueSignal.connect(self.search_pointer_table.update_pointer_value)
+        self.backend.pointer_scan_worker.setTotalsSignal.connect(self.search_pointer_table.set_totals)
+
         self.__menu_bar.openSettingsSignal.connect(self.__open_settings)
         self.__menu_bar.search_table_action.triggered.connect(
             lambda: self.search_table_dock.setVisible(self.__menu_bar.search_table_action.isChecked()))

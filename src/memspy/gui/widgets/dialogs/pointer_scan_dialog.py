@@ -158,6 +158,7 @@ class PointerScanConfigDialog(QDialog):
             alignment=alignment,
             target_range=(target_start, target_end),
             target_module=target_module,
+            use_gpu=False
         )
 
     def _on_accept(self) -> None:

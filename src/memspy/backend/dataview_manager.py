@@ -14,7 +14,6 @@ from memspy.utils.types import ScanType, SearchItem
 
 class MemoryViewThread(QObject):
     scanFileCreatedSignal = pyqtSignal(Operation)
-    scanFinishedSignal = pyqtSignal()
     filterAddressSignal = pyqtSignal(str)
     filterValuesSignal = pyqtSignal(int)
     exitSignal = pyqtSignal()
@@ -70,7 +69,6 @@ class MemoryViewThread(QObject):
 
     def __connect_signals(self) -> None:
         self.scanFileCreatedSignal.connect(self.__handle_new_file)
-        self.scanFinishedSignal.connect(self.__handle_scan_finished)
         self.filterAddressSignal.connect(self.__filter)
         self.exitSignal.connect(self.__handle_exit)
 
@@ -101,7 +99,7 @@ class MemoryViewThread(QObject):
         self.__send_items()
 
     @pyqtSlot()
-    def __handle_scan_finished(self) -> None:
+    def handle_scan_finished(self) -> None:
         self.__page_buffer = None
         self.__mapped_data_reader.reload_file()
         self.fetch_page()
