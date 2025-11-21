@@ -100,7 +100,7 @@ def find_candidates(sorted_bs, b_map, current_x, offset_range, negatives):
     left_idx = bisect.bisect_left(sorted_bs, low)
     right_idx = bisect.bisect_right(sorted_bs, high)
     return [
-        (A, C, B, current_x - B)
+        (A, C, B, int(current_x) - int(B))
         for B in sorted_bs[left_idx:right_idx]
         for A, C in b_map[B]
     ]

@@ -252,7 +252,7 @@ class SettingsDialog(QDialog):
         f.addRow("Negative Offsets:", self.negative_offsets)
         self.device = QComboBox()
 
-        self.device.addItems([device['name'] for device in self.manager.devices])
+        self.device.addItems([device.name for device in self.manager.devices])
         f.addRow("Device:", self.device)
         self.device.setCurrentIndex(options.device)
         self.depth = QSpinBox()

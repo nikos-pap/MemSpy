@@ -188,11 +188,7 @@ class MemoryScannerProcess(Process):
         self.__file_writer.temp_file(Type.UInt32.mem_dtype)
         self.__pointer_scanner.get_pointer_map(parameters.use_gpu)
         self.__scan_info = PointerScanInfo(0, parameters.max_depth)
-        self.__current_scan = self.__pointer_scanner.pointer_scan(target_address=parameters.address,
-                                                                  depth=parameters.max_depth,
-                                                                  max_offset=parameters.max_offset,
-                                                                  negative_offsets_enabled=parameters.negative_offsets_enabled,
-                                                                  randomness=0.0)
+        self.__current_scan = self.__pointer_scanner.pointer_scan(parameters)
         self.__scan_type = ScanType.POINTER_SCAN
 
     def __finish_scan(self) -> None:

@@ -4,7 +4,7 @@ import numpy as np
 from numba import cuda
 from memspy.scanner_engine.process_reader import SCANNER
 from memspy.scanner_engine.scanner_utils import pointer_scanner_tools as pst
-from memspy.utils.types import PointerItem
+from memspy.utils.types import PointerItem, PointerScanParameters
 
 
 class PointerScanner:
@@ -94,7 +94,13 @@ class PointerScanner:
         self.preprocess_pointers()
         print(f'{time.time() - start:2f}')
 
-    def pointer_scan(self, target_address: int, depth: int = 3, max_offset: int = 1024, negative_offsets_enabled: bool = False, randomness: float = 0):
+    def pointer_scan(self, parameters: PointerScanParameters):
+        target_address = parameters.address
+        depth = parameters.max_depth
+        max_offset = parameters.max_offset
+        negative_offsets_enabled = parameters.negative_offsets_enabled
+        randomness = parameters.randomness
+
         sr = 0
         for region in self.regions:
             if region.base_address <= target_address <= region.base_address + region.size:
