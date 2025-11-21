@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QSize, QSettings
 from memspy.utils.devices import list_devices
 from memspy.utils.settings import PointerScanSettings, ScanSettings
+from memspy.utils.types.devices import Device
 
 
 class SettingsManager:
@@ -29,7 +30,7 @@ class SettingsManager:
     def __init__(self):
         self.settings = QSettings("MyCompany", "MyApp")
 
-        self.devices = list_devices()
+        self.devices: list[Device] = list_devices()
 
         self.default_pointer_scan_settings: PointerScanSettings = PointerScanSettings()
         self.default_scan_settings: ScanSettings = ScanSettings()

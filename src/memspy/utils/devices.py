@@ -5,6 +5,7 @@ import pywintypes
 import wmi
 from logging import getLogger, Logger
 
+from memspy.utils.types.devices import Device, DeviceType
 
 logger: Logger = getLogger('Device Manager')
 
@@ -39,25 +40,17 @@ def _list_gpus() -> list[str]:
     return gpu_list
 
 
-def list_devices() -> list[dict[str, str | int]]:
-    devices = []
+def list_devices() -> list[Device]:
+    devices: list[Device] = []
     # CPUs
     cpus = _list_cpus()
-    for idx, name in enumerate(cpus, start=1):
-        devices.append({
-            'type': 'CPU',
-            'index': idx,
-            'name': name
-        })
+    for idx, name in enumerate(cpus, start=0):
+        devices.append(Device(DeviceType.CPU, name, idx))
 
     # GPUs
     gpus = _list_gpus()
-    for idx, name in enumerate(gpus, start=1):
-        devices.append({
-            'type': 'GPU',
-            'index': idx,
-            'name': name
-        })
+    for idx, name in enumerate(gpus, start=0):
+        devices.append(Device(DeviceType.GPU, name, idx))
 
     # Print summary
     if not devices:
@@ -66,7 +59,7 @@ def list_devices() -> list[dict[str, str | int]]:
         text = 'Detected devices:'
 
         for dev in devices:
-            text += f"\n  [{dev['type']} {dev['index']}] {dev['name']}"
+            text += f"\n  [{dev.type.value} {dev.index}] {dev.name}"
 
         logger.info(text)
     return devices
