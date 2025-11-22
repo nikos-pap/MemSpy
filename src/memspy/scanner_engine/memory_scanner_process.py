@@ -16,6 +16,7 @@ from memspy.utils.condition import Condition
 from memspy.scanner_engine.process_reader import SCANNER
 from memspy.scanner_engine.pointer_scanner import PointerScanner
 from memspy.utils.pointer_scan import PointerScanInfo
+from memspy.utils.types.scan_types import ScanParameters
 
 
 class MemoryScannerProcess(Process):
@@ -69,7 +70,7 @@ class MemoryScannerProcess(Process):
                 msg: Message = Message(MessageType.EMPTY)
 
             if msg.message_type == MessageType.EXIT:
-                self.__logger.debug('Exit message received.')
+                self.__logger.debug('Exiting.')
                 break
 
             if SCANNER.process_exited():
@@ -113,14 +114,15 @@ class MemoryScannerProcess(Process):
             if not SCANNER:
                 self.__logger.debug('Scanner not initialized!')
                 return
-            value, condition, data_type = data
-            self.__start_scan(value, condition, data_type)
+            # value, condition, data_type = data
+            self.__logger.debug(f'Received Scan Request {data}')
+            self.__start_scan(data)
         elif typ == MessageType.START_FILTER_SCAN:
             if not SCANNER:
                 self.__logger.debug('Scanner not initialized!')
                 return
-            value, condition, filepath, data_type = data
-            self.__start_filter_scan(value, condition, filepath, data_type)
+            # value, condition, filepath, data_type = data
+            self.__start_filter_scan(data)
         elif typ == MessageType.CANCEL_SCAN:
             self.__cancel_scan()
 
@@ -131,35 +133,34 @@ class MemoryScannerProcess(Process):
             self.__logger.debug('Exiting')
             SCANNER.trim_process()
 
-    def __start_scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType = ScanType.ADDRESS_SCAN) -> None:
+    def __start_scan(self, parameters: ScanParameters) -> None:
         """Initialize a new scan generator, note start time, and notify start."""
-        if isinstance(values, bytes):
-            values = (values, b'')
-
         self.__file_writer.close()
 
-        self.__current_scan = SCANNER.scan_value(values=values, condition=condition, dtype=data_type)
+        self.__current_scan = SCANNER.scan_value(values=parameters.values, condition=parameters.condition, dtype=parameters.value_type)
 
         self.__scanning = True
         self.__scan_start = time.time()
-        dtype = data_type.mem_dtype
+        dtype = parameters.value_type.mem_dtype
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [0]), False)
         self.__file_writer.temp_file(dtype)
-        self.__queue_out.put(Message(MessageType.START_SCAN, [condition, dtype, self.__file_writer.filepath, scan_type, values]), False)
+        payload = ScanParameters(condition=parameters.condition, scan_type=parameters.scan_type, values=parameters.values, value_type=parameters.value_type)
+        payload.file_path = self.__file_writer.filepath
+        self.__queue_out.put(Message(MessageType.START_SCAN, payload), False)
         # TODO fix value length
         self.__logger.debug('Scan started')
 
-    def __start_filter_scan(self, values: tuple[bytes, bytes], condition: Condition, file_in: str, data_type: Type) -> None:
-        dtype = data_type.mem_dtype
+    def __start_filter_scan(self, parameters: ScanParameters) -> None:
+        dtype = parameters.value_type.mem_dtype
         self.__file_writer.close()
         self.__scanning = True
         self.__scan_start = time.time()
-        self.__file_reader.set_file(file_in, dtype.itemsize)
-        self.__current_scan = self.__filter_iterator(values, condition, data_type)
+        self.__file_reader.set_file(parameters.file_path, dtype.itemsize)
+        self.__current_scan = self.__filter_iterator(parameters.values, parameters.condition, parameters.value_type)
         self.__queue_out.put(Message(MessageType.SET_PROGRESS, [0]), False)
         self.__file_writer.temp_file(dtype)
-        self.__queue_out.put(
-            Message(MessageType.START_SCAN, [condition, dtype, self.__file_writer.filepath, ScanType.FILTER_SCAN, values]), False)
+        payload = ScanParameters(parameters.condition, scan_type=parameters.scan_type, values=parameters.values, value_type=parameters.value_type, file_path=self.__file_writer.filepath)
+        self.__queue_out.put(Message(MessageType.START_SCAN, payload), False)
         self.__logger.debug('Filter Scan started')
 
     def __filter_iterator(self, value: tuple[bytes, bytes], condition: Condition, data_type: Type, chunk_size: int = 10_000) -> Iterator[Optional[tuple[NDArray, int]]]:

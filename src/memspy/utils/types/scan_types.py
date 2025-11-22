@@ -1,7 +1,16 @@
 from dataclasses import dataclass
+from enum import Enum, auto
+from typing import Optional
 
 from memspy.utils.condition import Condition
 from memspy.utils.types import Type
+
+
+class ScanType(Enum):
+    POINTER_SCAN = auto()
+    ADDRESS_SCAN = auto()
+    FILTER_SCAN = auto()
+    VALUE_SCAN = auto()
 
 
 @dataclass
@@ -28,6 +37,8 @@ class ScanParameters:
     condition: Condition
     values: tuple[bytes, bytes]
     value_type: Type
+    scan_type: ScanType
+    file_path: Optional[str] = None
 
 
 @dataclass

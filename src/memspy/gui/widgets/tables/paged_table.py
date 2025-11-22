@@ -9,7 +9,10 @@ from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex, QPoint
 
 from memspy.gui.models import SearchTableModel
 from memspy.utils.types import Type, WorkspaceItem, SearchItem
+from memspy.gui.widgets.controls.scan_controls import ScanControls
 from logging import Logger, getLogger
+
+from memspy.utils.types.scan_types import ScanParameters, ScanType
 
 
 class PagedTable(QWidget):
@@ -19,6 +22,8 @@ class PagedTable(QWidget):
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
     addressActivated = pyqtSignal(WorkspaceItem)
+
+    scanRequested = pyqtSignal(ScanParameters)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -42,23 +47,20 @@ class PagedTable(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
+        font = QFont()
+        font.setPointSize(16)
+        self.__scan_controls = ScanControls(font=self.font)
 
         self.filter_input = QLineEdit()
         self.table = QTableView(self)
         self.table.setModel(self.model)
         self.table.setFont(self.font)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.info_label = QLabel()
         self.prev_button = QPushButton("Previous")
         self.next_button = QPushButton("Next")
 
-        # Filter input
-        self.filter_input.setPlaceholderText("Filter by address (column 1)...")
-        filter_layout = QHBoxLayout()
-        self.filter_button = QPushButton("Filter Addresses")
-        filter_layout.addWidget(self.filter_input)
-        filter_layout.addWidget(self.filter_button)
-
-        layout.addLayout(filter_layout)
+        layout.addLayout(self.__scan_controls)
 
         layout.addWidget(self.table)
         layout.addWidget(self.info_label)
@@ -74,8 +76,6 @@ class PagedTable(QWidget):
         self.__connect_signals()
 
     def __connect_signals(self):
-        # noinspection PyUnresolvedReferences
-        self.filter_button.clicked.connect(self.__handle_filter)
 
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button.clicked.connect(self.next_page)
@@ -90,6 +90,30 @@ class PagedTable(QWidget):
 
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.__show_context_menu)
+
+        # Scan Controls
+
+        self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
+        self.__scan_controls.filter_btn.clicked.connect(self.__handle_filter_scan)
+        # self.__scan_controls.filter_address_btn.clicked.connect(self.__handle_scan)
+
+    # Triggers
+    def __handle_scan(self):
+        self.__logger.debug(f'Scan Button Clicked')
+        parameters = self.__scan_controls.get_scan_parameters()
+        parameters.scan_type = ScanType.VALUE_SCAN
+        self.scanRequested.emit(parameters)
+
+    def __handle_filter_scan(self):
+        self.__logger.debug(f'Filter Value Button Clicked')
+        parameters = self.__scan_controls.get_scan_parameters()
+        parameters.scan_type = ScanType.FILTER_SCAN
+        self.scanRequested.emit(parameters)
+
+    def __handle__filter_scan(self):
+        parameters = self.__scan_controls.get_scan_parameters()
+        parameters.scan_type = ScanType.FILTER_SCAN
+        self.scanRequested.emit(parameters)
 
     def horizontalHeader(self):
         return self.table.horizontalHeader()
@@ -196,6 +220,15 @@ class PagedTable(QWidget):
                     wi = WorkspaceItem(address=int(addr_str, 16), value=None, value_type=Type.UInt32, frozen=False, offsets=[], name=addr_str)
                     self.addressActivated.emit(wi)
                 break
+
+    def initialise_scan_navigation(self) -> None:
+        self.__scan_controls.initialise_scan_navigation()
+
+    def enable_scan_navigation(self) -> None:
+        self.__scan_controls.enable_scan_navigation()
+
+    def disable_scan_navigation(self) -> None:
+        self.__scan_controls.disable_scan_navigation()
 
     def clear(self):
         self.filter_input.setText('')

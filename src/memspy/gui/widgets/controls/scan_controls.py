@@ -1,16 +1,13 @@
-import time
 from logging import getLogger, Logger
-from typing import NamedTuple
 
-from PIL.ImageQt import ImageQt
-from PyQt6.QtCore import QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap, QIcon
+from PyQt6.QtCore import  Qt, pyqtSignal
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QPushButton, QHBoxLayout
 
-from memspy.gui.widgets.controls.process_selector import ProcessSelector
 from memspy.utils.types import Type
 from memspy.utils.condition import Condition
 from memspy.utils.types.converters import convert_to_bytes
+from memspy.utils.types.scan_types import ScanParameters, ScanType
 
 
 class ScanControls(QHBoxLayout):
@@ -28,42 +25,63 @@ class ScanControls(QHBoxLayout):
         self.__connect_signals()
         self.__init_data()
 
-    def update_process_list_command(self, processes: list[NamedTuple]):
-        start = time.time()
+    def __setup_widgets(self) -> None:
+        self.typeCombo = QComboBox()
+        self.typeCombo.setFont(self.__font)
+        self.typeCombo.setFixedWidth(100)
 
-        def format_item(text: str, proc_id: int) -> str:
-            max_len = 15
-            if len(text) > max_len:
-                text = text[:max_len - 4] + "...."
-            return f"{text} ({proc_id})"
+        self.search_input = QLineEdit()
+        self.search_input.setFont(self.__font)
 
-        self.process_box.blockSignals(True)
-        self.process_box.clear()
-        self.process_box.insertItem(0, "-- Select Process --", -1)
+        self.search_input2 = QLineEdit()
+        self.search_input2.setFont(self.__font)
+        self.search_input2.hide()
 
-        for name, pid, image in processes:
-            label = format_item(name, pid)
-            if image:
-                try:
-                    # ensure RGBA for QPixmap
-                    if image.mode != "RGBA":
-                        image = image.convert("RGBA")
-                    pixmap = QPixmap.fromImage(ImageQt(image))
-                    icon = QIcon(pixmap)
-                except (AttributeError, TypeError, ValueError):
-                    # image wasn’t what we expected or conversion failed; ignore
-                    icon = None
+        self.condition_combo = QComboBox()
+        self.condition_combo.setFont(self.__font)
 
-                    # Add with icon if valid, otherwise text-only
-                if icon and not icon.isNull():
-                    self.process_box.addItem(icon, label, pid)
-                else:
-                    self.process_box.addItem(label, pid)
-            else:
-                self.process_box.addItem(label, pid)
-        self.process_box.refresh_items()
-        self.process_box.blockSignals(False)
-        self.__logger.debug(f"Loaded {len(self.process_box)} processes in {time.time() - start:.2f}s")
+        self.new_scan_btn = QPushButton("New Scan")
+        self.new_scan_btn.setFont(self.__font)
+        self.new_scan_btn.setEnabled(False)
+
+        self.filter_btn = QPushButton("Filter Values")
+        self.filter_btn.setFont(self.__font)
+        self.filter_btn.setEnabled(False)
+
+        self.filter_address_btn = QPushButton("Filter Addresses")
+        self.filter_address_btn.setFont(self.__font)
+        self.filter_address_btn.setEnabled(False)
+
+    def __setup_layout(self) -> None:
+        self.setSpacing(self.__horizontal_spacing)
+        self.addWidget(self.typeCombo)
+        self.addWidget(self.search_input)
+        self.addWidget(self.search_input2)
+        self.addWidget(self.condition_combo)
+        self.addWidget(self.new_scan_btn)
+        self.addWidget(self.filter_btn)
+        self.addWidget(self.filter_address_btn)
+
+    def __init_data(self) -> None:
+        for t in Type:
+            self.typeCombo.addItem(t.name, t)
+        for c in Condition:
+            self.condition_combo.addItem(c.name, c)
+        self.typeCombo.setCurrentIndex(6)
+
+    def __connect_signals(self) -> None:
+        # self.search_input.textChanged.connect(self.__validate_input)
+        # self.typeCombo.currentTextChanged.connect(self.__validate_input)
+        self.condition_combo.currentIndexChanged.connect(self.__condition_changed_command)
+        # self.new_scan_btn.clicked.connect(self.scanSignal)
+        # self.filter_btn.clicked.connect(self.filterScanSignal)
+
+    def __condition_changed_command(self, _):
+        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
+            self.search_input2.show()
+        else:
+            self.search_input2.hide()
+            self.search_input2.clear()
 
     def prepare_scan(self) -> tuple[bool, Condition, tuple[bytes, bytes], Type, str]:
         condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
@@ -130,57 +148,14 @@ class ScanControls(QHBoxLayout):
     def current_condition(self) -> Condition:
         return self.condition_combo.currentData()
 
-    def __setup_widgets(self) -> None:
-        self.process_box = ProcessSelector()
-
-        self.process_box.setFont(self.__font)
-        self.process_box.setIconSize(QSize(28, 28))
-        self.typeCombo = QComboBox()
-        self.typeCombo.setFont(self.__font)
-        self.typeCombo.setFixedWidth(100)
-
-        self.search_input = QLineEdit()
-        self.search_input.setFont(self.__font)
-
-        self.search_input2 = QLineEdit()
-        self.search_input2.setFont(self.__font)
-        self.search_input2.hide()
-
-        self.condition_combo = QComboBox()
-        self.condition_combo.setFont(self.__font)
-
-        self.new_scan_btn = QPushButton("New Scan")
-        self.new_scan_btn.setFont(self.__font)
-        self.new_scan_btn.setEnabled(False)
-
-        self.filter_btn = QPushButton("Filter Scan")
-        self.filter_btn.setFont(self.__font)
-        self.filter_btn.setEnabled(False)
-
-    def __setup_layout(self) -> None:
-        # self.process_layout = QHBoxLayout()
-        self.setSpacing(self.__horizontal_spacing)
-        self.addWidget(self.process_box)
-        self.addWidget(self.typeCombo)
-        self.addWidget(self.search_input)
-        self.addWidget(self.search_input2)
-        self.addWidget(self.condition_combo)
-        self.addWidget(self.new_scan_btn)
-        self.addWidget(self.filter_btn)
-
-    def __connect_signals(self) -> None:
-        self.search_input.textChanged.connect(self.__validate_input)
-        self.typeCombo.currentTextChanged.connect(self.__validate_input)
-        self.condition_combo.currentIndexChanged.connect(self.__condition_changed_command)
-        self.new_scan_btn.clicked.connect(self.scanSignal)
-        self.filter_btn.clicked.connect(self.filterScanSignal)
-
-    def __init_data(self) -> None:
-        for t in Type:
-            self.typeCombo.addItem(t.name, t)
-        for c in Condition:
-            self.condition_combo.addItem(c.name, c)
-        self.typeCombo.setCurrentIndex(6)
+    def get_scan_parameters(self):
+        data_type = self.current_type
+        condition = self.current_condition
+        if self.condition_combo.currentData() == Condition.BETWEEN:
+            values = (convert_to_bytes(self.search_input.text(), data_type), convert_to_bytes(self.search_input2.text(), data_type))
+        else:
+            values = (convert_to_bytes(self.search_input.text(), data_type), b'')
+        return ScanParameters(condition=condition, values=values, value_type=data_type, scan_type=ScanType.VALUE_SCAN)
 
     def __validate_input(self):
         text = self.search_input.text()
@@ -189,10 +164,3 @@ class ScanControls(QHBoxLayout):
             self.search_input.setStyleSheet('background-color: #f6989d;')
         else:
             self.search_input.setStyleSheet('background-color: none;')
-
-    def __condition_changed_command(self, _):
-        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
-            self.search_input2.show()
-        else:
-            self.search_input2.hide()
-            self.search_input2.clear()

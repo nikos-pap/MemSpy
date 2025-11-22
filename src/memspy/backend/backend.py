@@ -16,6 +16,7 @@ from memspy.utils.message import Message
 from memspy.utils.settings import CONFIG
 from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem, PointerScanParameters
 from memspy.utils.condition import Condition
+from memspy.utils.types.scan_types import ScanParameters
 
 
 class QueueWorker(QObject):
@@ -26,7 +27,7 @@ class QueueWorker(QObject):
     updateSavedSignal = pyqtSignal('quint64', bytes)
     pointerUpdateSignal = pyqtSignal(PointerItem)
     processExitedSignal = pyqtSignal(int)
-    scanStartedSignal = pyqtSignal(list)
+    scanStartedSignal = pyqtSignal(ScanParameters)
     __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, queue: Queue):
@@ -124,12 +125,12 @@ class Backend(QObject):
         # message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
         # self.proc_queue_in.put(Message(message, [address, value]))
 
-    def scan(self, values: tuple[bytes, bytes], condition: Condition, data_type: Type, scan_type: ScanType) -> None:
-        if scan_type == ScanType.ADDRESS_SCAN:
-            self.__scanner_queue_in.put(Message(MessageType.START_SCAN, [values, condition, data_type]))
-        elif scan_type == ScanType.FILTER_SCAN:
-            self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN,
-                                                [values, condition, self.memory_worker.get_last_file(), data_type]))
+    def scan(self, parameters: ScanParameters) -> None:
+        if parameters.scan_type == ScanType.VALUE_SCAN:
+            self.__scanner_queue_in.put(Message(MessageType.START_SCAN, parameters))
+        elif parameters.scan_type == ScanType.FILTER_SCAN:
+            parameters.file_path = self.memory_worker.get_last_file()
+            self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN, parameters))
 
     def stop_scan(self) -> None:
         self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
@@ -142,13 +143,12 @@ class Backend(QObject):
     def scanner(self):
         return self.__scanner
 
-    @pyqtSlot(list)
-    def __start_operation(self, operation_data: list) -> None:
-        if operation_data[-2] != ScanType.ADDRESS_SCAN:
-            operation_data[-2] = self.__history[-1]
-        else:
-            operation_data[-2] = None
-        operation = Operation(*operation_data)
+    @pyqtSlot(ScanParameters)
+    def __start_operation(self, operation_data: ScanParameters) -> None:
+        parent = None
+        if operation_data.scan_type != ScanType.VALUE_SCAN:
+            parent = self.__history[-1]
+        operation = Operation(condition=operation_data.condition, parent=parent, filepath=operation_data.file_path, dtype=operation_data.value_type.mem_dtype, values=operation_data.values)
         self.__logger.debug(f'Starting operation {operation}')
         self.__history.append(operation)
 
