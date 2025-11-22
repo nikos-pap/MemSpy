@@ -50,6 +50,6 @@ class WorkspaceManager(QObject):
 
     @pyqtSlot()
     def __handle_exit(self) -> None:
-        self.__logger.debug('Exit message received.')
+        self.__logger.debug('Exiting.')
         self.__timer.stop()
         QThread.currentThread().quit()

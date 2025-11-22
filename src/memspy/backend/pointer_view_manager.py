@@ -130,6 +130,6 @@ class PointerManager(QObject):
     def __handle_exit(self) -> None:
         if self.__file and not self.__file.closed:
             self.__file.close()
-        self.__logger.debug('Exit message received.')
+        self.__logger.debug('Exiting.')
         self.__timer.stop()
         QThread.currentThread().quit()

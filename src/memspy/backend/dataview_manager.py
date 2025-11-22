@@ -35,7 +35,7 @@ class MemoryViewThread(QObject):
 
         self.__data_writer: FileWriter = FileWriter(save_dir)
 
-        self.current_page_number: int = 0
+        self.current_page_number: int = -1
 
         self.__current_page: Optional[NDArray] = None
 
@@ -129,7 +129,6 @@ class MemoryViewThread(QObject):
         self.__data_writer.close()
         self.__handle_new_file(self.__history.get_current_filter())
         self.__logger.debug(f'Filtered {self.__mapped_data_reader.size} elements')
-        # self.filterValuesSignal.emit(self.__mapped_data_reader.size)
 
     @pyqtSlot()
     def next_page_handle(self) -> None:
@@ -155,7 +154,7 @@ class MemoryViewThread(QObject):
 
     @pyqtSlot()
     def __handle_exit(self) -> None:
-        self.__logger.debug('Exit message received.')
+        self.__logger.debug('Exiting.')
         self.__timer.stop()
         self.__mapped_data_reader.close()
         QThread.currentThread().quit()
