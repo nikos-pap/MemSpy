@@ -1,6 +1,6 @@
 import logging
 import time
-from multiprocessing import Process, Queue, Event
+from multiprocessing import Process, Queue
 from typing import Iterator, Optional
 
 import numpy as np
@@ -147,7 +147,6 @@ class MemoryScannerProcess(Process):
         payload = ScanParameters(condition=parameters.condition, scan_type=parameters.scan_type, values=parameters.values, value_type=parameters.value_type)
         payload.file_path = self.__file_writer.filepath
         self.__queue_out.put(Message(MessageType.START_SCAN, payload), False)
-        # TODO fix value length
         self.__logger.debug('Scan started')
 
     def __start_filter_scan(self, parameters: ScanParameters) -> None:

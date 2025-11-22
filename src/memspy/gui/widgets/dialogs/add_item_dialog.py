@@ -14,7 +14,8 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
-    QComboBox, QHeaderView,
+    QComboBox,
+    QHeaderView,
 )
 
 from memspy.scanner_engine import SCANNER
@@ -23,7 +24,7 @@ from memspy.utils.types import Type, WorkspaceItem
 
 class AddItemDialog(QDialog):
     """
-    Dialog to create a new WorkspaceItem.
+    Dialog to create or edit a WorkspaceItem.
 
     Fields:
       - Name (text)
@@ -38,17 +39,27 @@ class AddItemDialog(QDialog):
       - Live "Value:" label showing wi.get_value() after resolution
 
     On Accept:
-      - Builds WorkspaceItem
-      - Calls resolve_pointer(wi)
+      - Builds a new WorkspaceItem from fields
+      - Calls SCANNER.evaluate_pointer(wi)
       - Shows final value (converted via wi.get_value())
       - get_workspace_item() returns the WorkspaceItem (or None if validation failed)
+
+    If an existing WorkspaceItem is passed to __init__, fields are pre-filled
+    from that item.
     """
 
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        workspace_item: Optional[WorkspaceItem] = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Item")
 
         self.setMinimumSize(390, 310)
+
+        # keep reference to source item (for preset)
+        self._source_item: Optional[WorkspaceItem] = workspace_item
 
         # --- Widgets ---------------------------------------------------------
         self._name_edit = QLineEdit(self)
@@ -65,8 +76,10 @@ class AddItemDialog(QDialog):
         self._table.verticalHeader().setVisible(False)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self._table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked |
-                                    QTableWidget.EditTrigger.EditKeyPressed)
+        self._table.setEditTriggers(
+            QTableWidget.EditTrigger.DoubleClicked
+            | QTableWidget.EditTrigger.EditKeyPressed
+        )
         self._table.hide()  # hidden unless there is at least one offset
 
         # Buttons under the table
@@ -77,7 +90,9 @@ class AddItemDialog(QDialog):
         # Live value label
         self._value_label = QLabel("Value: ", self)
         self._value_num_label = QLabel("-", self)
-        self._value_num_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self._value_num_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
 
         # OK / Cancel
         self._bbox = QDialogButtonBox(parent=self)
@@ -116,12 +131,18 @@ class AddItemDialog(QDialog):
         self._bbox.accepted.connect(self._on_accept)
         self._bbox.rejected.connect(self.reject)
 
-        # NEW: recompute when form fields change so the Pointer column updates
+        # recompute when form fields change so the Pointer column updates
         self._addr_edit.textChanged.connect(self._recompute_preview)
-        self._type_combo.currentIndexChanged.connect(lambda _=None: self._recompute_preview())
+        self._type_combo.currentIndexChanged.connect(
+            lambda _=None: self._recompute_preview()
+        )
 
-        # Internal
+        # Internal result
         self._result_item: Optional[WorkspaceItem] = None
+
+        # If an existing WorkspaceItem is provided, preset the UI from it
+        if self._source_item is not None:
+            self._apply_preset_from_workspace_item(self._source_item)
 
     # ---------------------------- Public API ---------------------------------
 
@@ -194,6 +215,52 @@ class AddItemDialog(QDialog):
 
     # ---------------------------- Helpers ------------------------------------
 
+    def _apply_preset_from_workspace_item(self, wi: WorkspaceItem) -> None:
+        """
+        Pre-fill the dialog from an existing WorkspaceItem.
+        """
+        # Name
+        self._name_edit.setText(wi.name)
+
+        # Address (as hex with 0x so _parse_int treats it as hex)
+        self._addr_edit.setText(hex(wi.address))
+
+        # Type
+        idx = self._type_combo.findData(wi.value_type)
+        if idx >= 0:
+            self._type_combo.setCurrentIndex(idx)
+
+        # Offsets
+        self._table.setRowCount(0)
+        if wi.offsets:
+            for off in wi.offsets:
+                row = self._table.rowCount()
+                self._table.insertRow(row)
+
+                # Offset column (editable)
+                off_item = QTableWidgetItem(hex(off))
+                off_item.setFlags(off_item.flags() | Qt.ItemFlag.ItemIsEditable)
+                self._table.setItem(row, 0, off_item)
+
+                # Pointer column (RO)
+                ptr_item = QTableWidgetItem("")
+                ptr_item.setFlags(ptr_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._table.setItem(row, 1, ptr_item)
+
+                # Value column (RO)
+                val_item = QTableWidgetItem("")
+                val_item.setFlags(val_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                self._table.setItem(row, 2, val_item)
+
+            self._table.show()
+            self._rm_offset_btn.setEnabled(True)
+        else:
+            self._table.hide()
+            self._rm_offset_btn.setEnabled(False)
+
+        # Recompute preview based on preset data
+        self._recompute_preview()
+
     def _build_item(self) -> Optional[WorkspaceItem]:
         name = self._name_edit.text().strip()
         if not name:
@@ -211,7 +278,9 @@ class AddItemDialog(QDialog):
         for r in range(self._table.rowCount()):
             cell = self._table.item(r, 0)
             try:
-                offsets.append(self._parse_int(cell.text().strip() if cell else "0"))
+                offsets.append(
+                    self._parse_int(cell.text().strip() if cell else "0")
+                )
             except ValueError:
                 offsets.append(0)
 
@@ -262,7 +331,7 @@ class AddItemDialog(QDialog):
             # --- read offset ---
             off_item = self._table.item(r, 0)
             try:
-                off_val = self._parse_int(off_item.text() if off_item else 0)
+                off_val = self._parse_int(off_item.text() if off_item else "0")
             except ValueError:
                 off_val = 0
 
@@ -272,7 +341,9 @@ class AddItemDialog(QDialog):
             ptr_item = self._table.item(r, 1)
             if ptr_item is None:
                 ptr_item = QTableWidgetItem()
-                ptr_item.setFlags(ptr_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                ptr_item.setFlags(
+                    ptr_item.flags() & ~Qt.ItemFlag.ItemIsEditable
+                )
                 self._table.setItem(r, 1, ptr_item)
             ptr_item.setText(f"{base:X} + {off_val:X} = {next_addr:X}")
 
@@ -280,7 +351,9 @@ class AddItemDialog(QDialog):
             val_item = self._table.item(r, 2)
             if val_item is None:
                 val_item = QTableWidgetItem()
-                val_item.setFlags(val_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                val_item.setFlags(
+                    val_item.flags() & ~Qt.ItemFlag.ItemIsEditable
+                )
                 self._table.setItem(r, 2, val_item)
 
             have_deref = r < len(intermediates)
@@ -303,9 +376,8 @@ class AddItemDialog(QDialog):
             self._value_num_label.setStyleSheet("color: red;")
         else:
             try:
-                # Your converters produce the display string.
                 self._value_num_label.setText(wi.get_value())
-                self._value_num_label.setStyleSheet("")
+                self._value_num_label.setStyleSheet("color: white;")
             except ValueError:
                 self._value_num_label.setText("-")
                 self._value_num_label.setStyleSheet("color: red;")

@@ -95,7 +95,7 @@ class PagedTable(QWidget):
 
         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
         self.__scan_controls.filter_btn.clicked.connect(self.__handle_filter_scan)
-        # self.__scan_controls.filter_address_btn.clicked.connect(self.__handle_scan)
+        self.__scan_controls.filter_address_btn.clicked.connect(self.__handle_address_filter)
 
     # Triggers
     def __handle_scan(self):
@@ -106,11 +106,6 @@ class PagedTable(QWidget):
 
     def __handle_filter_scan(self):
         self.__logger.debug(f'Filter Value Button Clicked')
-        parameters = self.__scan_controls.get_scan_parameters()
-        parameters.scan_type = ScanType.FILTER_SCAN
-        self.scanRequested.emit(parameters)
-
-    def __handle__filter_scan(self):
         parameters = self.__scan_controls.get_scan_parameters()
         parameters.scan_type = ScanType.FILTER_SCAN
         self.scanRequested.emit(parameters)
@@ -154,8 +149,8 @@ class PagedTable(QWidget):
         self.filtered = value
         self.show_message()
 
-    def __handle_filter(self) -> None:
-        filter_str = self.filter_input.text().lower()
+    def __handle_address_filter(self) -> None:
+        filter_str = self.__scan_controls.search_input.text().lower()
         if filter_str != self.current_filter:
             self.current_filter = filter_str
             self.filterSignal.emit(filter_str)

@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 
 from memspy.backend import Backend
 from memspy.gui.widgets.controls.process_selector import ProcessSelector
-from memspy.gui.widgets.trees.workspace_tree import WorkspaceContainer
+from memspy.gui.widgets.tables.workspace_tree import WorkspaceContainer
 from memspy.gui.widgets.tables.paged_table import PagedTable
 from memspy.gui.widgets.tables.pointer_scan_table import PointerScanTableWidget
 from memspy.gui.widgets.menus.menu_bar import MenuBar
@@ -162,11 +162,8 @@ class MemoryScannerUI(QMainWindow):
         # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
         self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
-        self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
         # self.backend.workspace_worker.setProcessSignal.connect(self.workspace_container.tree.set_process)
-        self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
-        # self.saved_address_tree.tree_view.removeAddressSignal.connect(self.backend.unsave_address)
-        # self.saved_address_tree.tree_view.pointerRequested.connect(self.__on_pointer_command)
+        # self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
 
         # Pointer Scan Signals
         self.search_pointer_table.pointerScanRequested.connect(self.backend.pointer_scan)

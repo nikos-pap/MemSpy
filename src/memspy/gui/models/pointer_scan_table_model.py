@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 from PyQt6.QtCore import QAbstractTableModel, Qt, QModelIndex
 
 from memspy.utils.types import PointerItem
@@ -21,10 +23,19 @@ class PointerScanTableModel(QAbstractTableModel):
         self._max_depth: int = 0
         self.__page_num: int = -1
         self.__page_size: int = 100
+        self.__emit_value: bool = True
 
     # ---------------------------------------------------------
     # Public API
     # ---------------------------------------------------------
+    @contextmanager
+    def suppress_edit(self):
+        self.__emit_value = False
+        try:
+            yield
+        finally:
+            self.__emit_value = True
+
     def pointer_item_at(self, index: QModelIndex) -> PointerItem:
         return self._items[index.row()]
 

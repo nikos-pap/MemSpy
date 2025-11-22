@@ -43,4 +43,4 @@ def test_update_process_list_command_handles_icons(qtbot):
     ]
     layout.update_process_list_command(processes)
     # Expect sentinel + 2 processes
-    assert layout.process_box.count() == 1 + len(processes)
+    assert layout.__process_box.count() == 1 + len(processes)

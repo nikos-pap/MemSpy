@@ -121,6 +121,7 @@ class ScanControls(QHBoxLayout):
         self.search_input.setDisabled(False)
         self.condition_combo.setDisabled(False)
         self.filter_btn.setDisabled(False)
+        self.filter_address_btn.setDisabled(False)
 
     def toggle_scan_button(self) -> bool:
         if self.new_scan_btn.text() == 'Cancel Scan':
@@ -138,6 +139,7 @@ class ScanControls(QHBoxLayout):
         self.search_input.setDisabled(False)
         self.condition_combo.setDisabled(False)
         self.filter_btn.setDisabled(True)
+        self.filter_address_btn.setDisabled(True)
         return result
 
     @property

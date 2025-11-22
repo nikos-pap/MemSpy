@@ -1,21 +1,22 @@
 from logging import getLogger, Logger
 from typing import Optional, List
 
-from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QPoint
+from PyQt6.QtGui import QAction, QFont
 from PyQt6.QtWidgets import (
     QTreeView,
     QToolBar,
     QVBoxLayout,
     QWidget,
     QInputDialog,
-    QLabel, QDialog, QAbstractItemView, QHeaderView,
+    QLabel, QDialog, QAbstractItemView, QHeaderView, QMenu, QApplication,
 )
 from PyQt6.QtGui import QStandardItem
 
 from memspy.gui.models import WorkspaceModel
+from memspy.scanner_engine import SCANNER
 from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem
-from memspy.utils.types.converters import convert_from_bytes
+from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
 
 VALUE_INDEX = 2
@@ -25,13 +26,7 @@ class WorkspaceTree(QTreeView):
     pathChanged = pyqtSignal(str)
     addAddressSignal = pyqtSignal(WorkspaceItem)
 
-    # Custom roles for backing data (always raw)
     _ROLE_KIND = Qt.ItemDataRole.UserRole + 1
-    # _ROLE_VALUE_BYTES = Qt.ItemDataRole.UserRole + 2
-    # _ROLE_ADDR_INT = Qt.ItemDataRole.UserRole + 3
-    # _ROLE_VALUE_TYPE = Qt.ItemDataRole.UserRole + 4
-    # _ROLE_OFFSETS = Qt.ItemDataRole.UserRole + 5
-    # _ROLE_FROZEN = Qt.ItemDataRole.UserRole + 6
 
     _KIND_GROUP = "group"
     _KIND_ITEM = "item"
@@ -40,17 +35,15 @@ class WorkspaceTree(QTreeView):
 
     def __init__(self, parent: Optional[QWidget] = None):
         super().__init__(parent)
-        self.setEditTriggers(QTreeView.EditTrigger.NoEditTriggers)
         self.setUniformRowHeights(True)
         self.setHeaderHidden(False)
 
         self.model = WorkspaceModel(self)
-        # self._model.setHorizontalHeaderLabels(["Name", "Address", "Value", "Frozen", "Type", "Offsets"])
         self.setModel(self.model)
 
         # Drag/drop: internal move; only groups accept children; root accepts drops
         self.setDragEnabled(True)
-        self.setAcceptDrops(True)  # root accepts
+        self.setAcceptDrops(True)
         self.setDropIndicatorShown(True)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setDragDropMode(QTreeView.DragDropMode.InternalMove)
@@ -64,6 +57,10 @@ class WorkspaceTree(QTreeView):
         # Expand by default
         self.setExpandsOnDoubleClick(True)
         self.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        font = QFont()
+        font.setPointSize(12)
+        self.setFont(font)
 
     # ---------------- Public API ----------------
 
@@ -141,25 +138,28 @@ class WorkspaceTree(QTreeView):
         propagate the new text to the WorkspaceItem stored in UserRole.
         """
         # only handle edits to the 'Name' column for real items
-        if item.column() != 0:
+        wi = item.index().siblingAtColumn(0).data(Qt.ItemDataRole.UserRole)
+        if item.column() == 0:
+            new_name = item.data(Qt.ItemDataRole.EditRole)
+            # Fallback to item.text() if needed
+            if new_name is None:
+                new_name = item.text()
+
+            # No-op if unchanged
+            if wi.name != new_name:
+                wi.name = new_name
             return
-        if item.data(self._ROLE_KIND) != self._KIND_ITEM:
+
+        if self.state() != QAbstractItemView.State.EditingState:
             return
 
-        wi = item.data(Qt.ItemDataRole.UserRole)
-        if wi is None:
-            return  # nothing to update
+        # (1) Update the WorkspaceItem value
+        wi.value = convert_to_bytes(item.text(), wi.value_type)
 
-        new_name = item.data(Qt.ItemDataRole.EditRole)
-        # Fallback to item.text() if needed
-        if new_name is None:
-            new_name = item.text()
+        # (2) Write to scanner
+        SCANNER.write_bytes(wi.address, wi.value)
 
-        # No-op if unchanged
-        if wi.name != new_name:
-            wi.name = new_name
-
-        self.__logger.debug(f'Changed name in item "{wi}"')
+        self.__logger.debug(f'Changed value in item "{wi}"')
 
     def _mk_group_row(self, name: str) -> List[QStandardItem]:
         name_item = QStandardItem(name)
@@ -171,7 +171,6 @@ class WorkspaceTree(QTreeView):
             | Qt.ItemFlag.ItemIsEditable
             | Qt.ItemFlag.ItemIsSelectable
             | Qt.ItemFlag.ItemIsDragEnabled
-            # | Qt.ItemFlag.ItemIsDropEnabled
         )
         # Sibling column items
         empty = [QStandardItem("") for _ in range(5)]
@@ -206,11 +205,11 @@ class WorkspaceTree(QTreeView):
 
                 # trigger refresh on Value column (assumed column 2)
                 val_index = model.index(r, 2, parent)
-                with self.model.suppress_edit():
-                    if wi.value is not None:
-                        model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
-                    else:
-                        model.setData(val_index, '', Qt.ItemDataRole.EditRole)
+
+                if wi.value is not None:
+                    model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
+                else:
+                    model.setData(val_index, '', Qt.ItemDataRole.EditRole)
                 model.dataChanged.emit(val_index, val_index,
                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
 
@@ -221,7 +220,7 @@ class WorkspaceTree(QTreeView):
         """
         # Keep the WorkspaceItem directly
         name_it = QStandardItem(wi.name)
-        name_it.setEditable(True)
+        name_it.setEditable(False)
         name_it.setData(self._KIND_ITEM, self._ROLE_KIND)
         name_it.setData(wi, Qt.ItemDataRole.UserRole)
 
@@ -229,23 +228,16 @@ class WorkspaceTree(QTreeView):
         addr_it = QStandardItem(hex(int(wi.address)))
         addr_it.setEditable(False)
 
-        try:
-            display_val = convert_from_bytes(wi.value, wi.value_type)
-        except TypeError:
-            display_val = None
-        val_it = QStandardItem(str(display_val) if display_val is not None else "")
+        val_it = QStandardItem(wi.get_value())
         val_it.setEditable(True)
 
         frozen_it = QStandardItem("Yes" if wi.frozen else "No")
         frozen_it.setEditable(False)
 
-        type_it = QStandardItem(getattr(wi.value_type, "name", str(wi.value_type)))
-        type_it.setEditable(False)
-
         offsets_it = QStandardItem(",".join(str(o) for o in (wi.offsets or [])))
         offsets_it.setEditable(False)
 
-        return [name_it, addr_it, val_it, frozen_it, type_it, offsets_it]
+        return [name_it, addr_it, val_it, frozen_it, offsets_it]
 
     def _append_item_row(self, parent_group: QStandardItem, wi: WorkspaceItem) -> None:
         # Only allow adding under a GROUP; otherwise add to root (strays allowed)
@@ -303,6 +295,90 @@ class WorkspaceContainer(QWidget):
 
         # Wiring
         self.tree.pathChanged.connect(self.status.setText)
+        # context menu
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.customContextMenuRequested.connect(self.__show_context_menu)
+
+    def __show_context_menu(self, pos: QPoint) -> None:
+        """
+        Right-click context menu with:
+        - Pointer Scan (signal only; you fill behavior)
+        - Edit (same dialog as add, pre-filled)
+        - Copy Address / Offsets / Value
+        - Delete
+        """
+        index = self.tree.indexAt(pos)
+        if not index.isValid():
+            return
+
+        menu = QMenu(self)
+
+        action_pointer_scan = menu.addAction("Pointer Scan")
+        action_edit = menu.addAction("Edit")
+        action_copy_address = menu.addAction("Copy Address")
+        action_copy_offsets = menu.addAction("Copy Offsets")
+        action_copy_value = menu.addAction("Copy Value")
+        action_delete = menu.addAction("Delete")
+
+        global_pos = self.tree.viewport().mapToGlobal(pos)
+        triggered = menu.exec(global_pos)
+        if triggered is None:
+            return
+
+        wi = self.tree.model.workspace_item_from_index(index)
+
+        # Pointer Scan: signal + empty hook
+        if triggered is action_pointer_scan:
+            if wi is None:
+                return
+            self.__start_pointer_scan(wi)
+            return
+
+        # Everything below requires a data row
+        if wi is None:
+            # For folders we just allow delete
+            if triggered is action_delete:
+                self._delete_row(index)
+            return
+
+        if triggered is action_edit:
+            self.__edit_workspace_item(index, wi)
+        elif triggered is action_copy_address:
+            QApplication.clipboard().setText(str(wi.address))
+        elif triggered is action_copy_offsets:
+            QApplication.clipboard().setText(str(wi.offsets))
+        elif triggered is action_copy_value:
+            QApplication.clipboard().setText(str(wi.value))
+        elif triggered is action_delete:
+            self._delete_row(index)
+
+    def __start_pointer_scan(self, wi: WorkspaceItem) -> None:
+        """
+        Empty hook for Pointer Scan.
+        Override in a subclass if you want, or just connect to
+        pointer_scan_requested from outside.
+        """
+        pass
+
+    def __edit_workspace_item(self, index: QModelIndex, wi: WorkspaceItem) -> None:
+        """
+        Use the same dialog as add, but pre-filled with the WorkspaceItem.
+        """
+        dlg = AddItemDialog(self, wi)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        new_wi = dlg.get_workspace_item()
+        if new_wi is None:
+            return
+        self.tree.model.update_workspace_item(index, new_wi)
+
+    def _delete_row(self, index: QModelIndex) -> None:
+        """
+        Delete the row at 'index' (folders or items).
+        """
+        parent = index.parent()
+        self.tree.model.removeRow(index.row(), parent)
 
     @pyqtSlot('quint64')
     def update_address(self, address: int) -> None:

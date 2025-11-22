@@ -66,7 +66,9 @@ class PointerScanTableWidget(QWidget):
         top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignRight)
 
         self.__previous_page_button = QPushButton("Previous page", self)
+        self.__previous_page_button.setDisabled(True)
         self.__next_page_button = QPushButton("Next page", self)
+        self.__next_page_button.setDisabled(True)
 
         self.__totals_label = QLabel(self)
 
@@ -194,13 +196,7 @@ class PointerScanTableWidget(QWidget):
     def model(self) -> PointerScanTableModel:
         return self._model
 
-    # ----- generic tabular API (still available) -----
-
-    # def set_headers(self, headers: Sequence[str]) -> None:
-    #     self._model.set_headers(headers)
-
-    # def set_rows(self, rows: list[Sequence[Any]]) -> None:
-    #     self._model.set_rows(rows)
+    # ----- generic tabular API -----
 
     def clear_rows(self) -> None:
         self._model.clear()
@@ -227,11 +223,8 @@ class PointerScanTableWidget(QWidget):
         self._model.update_row(page, row_index)
 
     def __show_context_menu(self, pos: QPoint) -> None:
-        # Get model index at the click position
         index = self._table_view.indexAt(pos)
 
-        # If no valid index was clicked, you may ignore or still show menu
-        # index.isValid() tells you if a cell was hit
         if not index.isValid():
             return
 
@@ -240,13 +233,13 @@ class PointerScanTableWidget(QWidget):
         action_copy_address = menu.addAction("Copy Target Address")
         action_copy_value = menu.addAction("Copy Value")
         action_copy_module_name = menu.addAction("Copy Module Name")
+        # TODO add functionality to this
         action_copy_chain = menu.addAction("Copy Pointer Chain")
         action_copy_offsets = menu.addAction("Copy Offsets")
 
         global_pos = self._table_view.viewport().mapToGlobal(pos)
         triggered = menu.exec(global_pos)
 
-        # row = index.row()
         pointer = self.pointer_item_at(index)
 
         if triggered is action_add_to_workspace:
@@ -267,4 +260,3 @@ class PointerScanTableWidget(QWidget):
         elif triggered is action_copy_module_name:
             clipboard.setText(str(pointer.module_name))
             self.__logger.debug(f'Action: Copy Chain {pointer.module_name}')
-

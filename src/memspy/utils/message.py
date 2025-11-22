@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
-from memspy.utils.types import MessageType
-from numpy.typing import NDArray
+from memspy.utils.types import MessageType, PointerScanParameters, ScanParameters
+
 
 @dataclass
 class Message:
     message_type: MessageType = MessageType.EMPTY
-    message: list | NDArray = field(default_factory=list)
+    message: list | ScanParameters | PointerScanParameters = field(default_factory=list)

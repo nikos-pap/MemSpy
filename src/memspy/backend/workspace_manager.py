@@ -35,10 +35,6 @@ class WorkspaceManager(QObject):
                 self.__logger.debug(f"Workspace item {item.address}: {item.value}")
                 self.updateAddressSignal.emit(item.address)
 
-    @pyqtSlot('quint64', bytes)
-    def set_value(self, address: int, value: bytes) -> None:
-        SCANNER.write_bytes(address, value)
-
     @pyqtSlot(WorkspaceItem)
     def add_address(self, wi: WorkspaceItem) -> None:
         self.__saved_items.append(wi)
