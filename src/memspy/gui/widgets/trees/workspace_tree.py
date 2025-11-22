@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QInputDialog,
-    QLabel, QDialog, QAbstractItemView,
+    QLabel, QDialog, QAbstractItemView, QHeaderView,
 )
 from PyQt6.QtGui import QStandardItem
 
@@ -63,6 +63,7 @@ class WorkspaceTree(QTreeView):
 
         # Expand by default
         self.setExpandsOnDoubleClick(True)
+        self.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
     # ---------------- Public API ----------------
 
@@ -206,7 +207,10 @@ class WorkspaceTree(QTreeView):
                 # trigger refresh on Value column (assumed column 2)
                 val_index = model.index(r, 2, parent)
                 with self.model.suppress_edit():
-                    model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
+                    if wi.value is not None:
+                        model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
+                    else:
+                        model.setData(val_index, '', Qt.ItemDataRole.EditRole)
                 model.dataChanged.emit(val_index, val_index,
                                        [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole])
 

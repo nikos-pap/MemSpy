@@ -111,7 +111,7 @@ class PointerManager(QObject):
             for _ in range(pointer_info.entries):
                 pointer: PointerItem = pickle.load(f)
                 SCANNER.update_pointer(pointer)
-                if pointer.is_valid and pointer.value == (1689).to_bytes(4, byteorder='little'):
+                if pointer.is_valid:
                     valid_pointers.append(pointer)
 
         self.__logger.debug(f'valid pointers: {len(valid_pointers)}')

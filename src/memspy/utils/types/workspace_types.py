@@ -66,6 +66,10 @@ class WorkspaceItem:
     def get_value(self) -> str:
         return str(convert_from_bytes(self.value, self.value_type))
 
+    @staticmethod
+    def from_pointer_item(item: PointerItem) -> 'WorkspaceItem':
+        return WorkspaceItem(hex(item.start), item.start, b'', item.offsets.copy(), False, item.value_type)
+
 
 @dataclass
 class WorkspaceGroupItem:

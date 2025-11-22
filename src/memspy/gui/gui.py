@@ -172,6 +172,7 @@ class MemoryScannerUI(QMainWindow):
         self.search_pointer_table.exportFileRequested.connect(self.backend.pointer_scan_worker.export_file)
         self.search_pointer_table.importFileRequested.connect(self.backend.pointer_scan_worker.import_file)
         self.search_pointer_table.filterPointersRequested.connect(self.backend.pointer_scan_worker.clear_pointers)
+        self.search_pointer_table.addToWorkspaceRequested.connect(self.workspace_container.add_address)
 
         self.backend.pointer_scan_worker.updateMaxDepthSignal.connect(self.search_pointer_table.set_max_depth)
         self.backend.pointer_scan_worker.loadPageSignal.connect(self.search_pointer_table.set_page)

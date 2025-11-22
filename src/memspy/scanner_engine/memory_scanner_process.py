@@ -1,6 +1,6 @@
 import logging
 import time
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Event
 from typing import Iterator, Optional
 
 import numpy as np
@@ -28,6 +28,7 @@ class MemoryScannerProcess(Process):
     - Allows selecting backend: NewMemoryScanner or ProcessInspector for testing.
     - Tracks scan duration for performance measurement.
     """
+    __logger: Optional[Logger] = None
 
     def __init__(
         self,
@@ -42,10 +43,11 @@ class MemoryScannerProcess(Process):
 
         self.__file_writer: FileWriter = FileWriter(write_dir)
         self.__file_reader: FileStreamReader = FileStreamReader()
+
         self.__pointer_scanner: PointerScanner = PointerScanner()
         self.__current_scan: Optional[Iterator[Optional[tuple[NDArray, int]]]] = None
         self.__scanning: bool = False
-        self.__logger: Optional[Logger] = None
+
         self.__scan_start: float = 0.0
         self.__scan_type: Optional[ScanType] = None
         self.__scan_info: PointerScanInfo = PointerScanInfo(0, 0)
@@ -73,13 +75,9 @@ class MemoryScannerProcess(Process):
             if SCANNER.process_exited():
                 self.__logger.debug(f'Process Exited.')
                 SCANNER.close()
+                self.__cancel_scan()
 
             if self.__scanning and self.__current_scan:
-                if SCANNER.process_exited():
-                    self.__logger.error(f'Process Exited during Scan.')
-                    self.__cancel_scan()
-                    continue
-
                 result = next(self.__current_scan)
 
                 if result is None:
@@ -92,7 +90,7 @@ class MemoryScannerProcess(Process):
                         self.__scan_info.entries = len(addresses)
                     self.__file_writer.write(addresses, self.__scan_type, self.__scan_info)
                     total += len(addresses)
-                    self.__logger.debug(f'Progress: {progress} ')
+                    # self.__logger.debug(f'Progress: {progress} ')
                     self.__queue_out.put(Message(MessageType.SET_PROGRESS, [progress]), False)
 
     def __handle_message(self, msg: Message) -> None:

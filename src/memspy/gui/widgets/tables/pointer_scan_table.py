@@ -1,12 +1,12 @@
 from logging import getLogger, Logger
 
-from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot
+from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot, QModelIndex
 from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView, \
-    QLabel, QFileDialog
+    QLabel, QFileDialog, QApplication
 
 from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
-from memspy.utils.types import PointerScanParameters, PointerItem
+from memspy.utils.types import PointerScanParameters, PointerItem, WorkspaceItem
 
 
 class PointerScanTableWidget(QWidget):
@@ -30,10 +30,7 @@ class PointerScanTableWidget(QWidget):
     exportFileRequested = pyqtSignal(str)
     importFileRequested = pyqtSignal(str)
     filterPointersRequested = pyqtSignal()
-
-    # Context-menu driven actions (you decide what to do when they fire)
-    rowInsertRequested = pyqtSignal()
-    rowValueUpdateRequested = pyqtSignal(int)  # row index
+    addToWorkspaceRequested = pyqtSignal(WorkspaceItem)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -43,6 +40,8 @@ class PointerScanTableWidget(QWidget):
         *args, **kwargs
     ) -> None:
         super().__init__(parent, *args, **kwargs)
+        self.lock_page: bool = False
+
         # ---- table ----
         self._table_view = QTableView(self)
         self._model = PointerScanTableModel(parent=self)
@@ -92,8 +91,8 @@ class PointerScanTableWidget(QWidget):
     # Internal helpers
     # -------------------------------------------------------
     def __connect_signals(self) -> None:
-        self.__next_page_button.clicked.connect(self.nextPageRequested)
-        self.__previous_page_button.clicked.connect(self.previousPageRequested)
+        self.__next_page_button.clicked.connect(self.__handle_next_page)
+        self.__previous_page_button.clicked.connect(self.__handle_previous_page)
         self.__export_button.clicked.connect(self.__choose_save_path)
         self.__import_button.clicked.connect(self.__choose_load_path)
         self.__filter_pointers_button.clicked.connect(self.filterPointersRequested)
@@ -104,41 +103,12 @@ class PointerScanTableWidget(QWidget):
         self._table_view.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         # self._table_view.horizontalHeader().setStretchLastSection(True)
 
-        # Right-click popup
-        self._table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self._table_view.customContextMenuRequested.connect(self._show_context_menu)
-
-        self._table_view.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.ResizeToContents
-        )
+        self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self._table_view.verticalHeader().setVisible(True)
         self._table_view.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    def _show_context_menu(self, pos: QPoint) -> None:
-        """
-        Simple context menu that lets you request:
-          - inserting a new row
-          - updating the value of the clicked row
-
-        The widget itself does not perform these operations; it emits
-        signals that your code can handle.
-        """
-        index = self._table_view.indexAt(pos)
-
-        menu = QMenu(self)
-        insert_action = menu.addAction("Insert pointer row")
-        update_action = menu.addAction("Update value in row")
-
-        if not index.isValid():
-            update_action.setEnabled(False)
-
-        global_pos = self._table_view.viewport().mapToGlobal(pos)
-        chosen = menu.exec(global_pos)
-
-        if chosen is insert_action:
-            self.rowInsertRequested.emit()
-        elif chosen is update_action and index.isValid():
-            self.rowValueUpdateRequested.emit(index.row())
+        self._table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._table_view.customContextMenuRequested.connect(self.__show_context_menu)
 
     def _open_scan_dialog(self) -> None:
         """
@@ -187,6 +157,18 @@ class PointerScanTableWidget(QWidget):
             path = dlg.selectedFiles()[0]
             self.importFileRequested.emit(path)
 
+    def __handle_next_page(self) -> None:
+        if self.lock_page:
+            return
+        self.lock_page = True
+        self.nextPageRequested.emit()
+
+    def __handle_previous_page(self) -> None:
+        if self.lock_page:
+            return
+        self.lock_page = True
+        self.nextPageRequested.emit()
+
     # -------------------------------------------------------
     # Public API
     # -------------------------------------------------------
@@ -204,6 +186,7 @@ class PointerScanTableWidget(QWidget):
             self.__totals_label.setText('')
         else:
             self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
+        self.lock_page = False
 
     def set_totals(self, totals: int) -> None:
         self.__totals = totals
@@ -224,23 +207,17 @@ class PointerScanTableWidget(QWidget):
 
     # ----- pointer-aware API -----
 
-    def set_pointer_items(self, items: list[PointerItem]) -> None:
-        """
-        Configure the table from a sequence of PointerItem-like objects.
-        """
-        self._model.set_pointer_items(items)
-
     def append_pointer_item(self, item: PointerItem) -> None:
         """
         Append a single PointerItem-like object as a new row.
         """
         self._model.add_item(item)
 
-    def pointer_item_at(self, row_index: int) -> PointerItem | None:
+    def pointer_item_at(self, index: QModelIndex) -> PointerItem | None:
         """
         Access the underlying PointerItem-like object for a given row.
         """
-        return self._model.pointer_item_at(row_index)
+        return self._model.pointer_item_at(index)
 
     @pyqtSlot(int, int)
     def update_pointer_value(self, page: int, row_index: int) -> None:
@@ -248,3 +225,46 @@ class PointerScanTableWidget(QWidget):
         Update only the value cell for a given row and keep the object in sync.
         """
         self._model.update_row(page, row_index)
+
+    def __show_context_menu(self, pos: QPoint) -> None:
+        # Get model index at the click position
+        index = self._table_view.indexAt(pos)
+
+        # If no valid index was clicked, you may ignore or still show menu
+        # index.isValid() tells you if a cell was hit
+        if not index.isValid():
+            return
+
+        menu = QMenu(self)
+        action_add_to_workspace = menu.addAction("Add to Workspace")
+        action_copy_address = menu.addAction("Copy Target Address")
+        action_copy_value = menu.addAction("Copy Value")
+        action_copy_module_name = menu.addAction("Copy Module Name")
+        action_copy_chain = menu.addAction("Copy Pointer Chain")
+        action_copy_offsets = menu.addAction("Copy Offsets")
+
+        global_pos = self._table_view.viewport().mapToGlobal(pos)
+        triggered = menu.exec(global_pos)
+
+        # row = index.row()
+        pointer = self.pointer_item_at(index)
+
+        if triggered is action_add_to_workspace:
+            item = WorkspaceItem.from_pointer_item(pointer)
+            self.__logger.debug(f'Action: Add to Workspace {item}')
+            self.addToWorkspaceRequested.emit(item)
+            return
+        clipboard = QApplication.clipboard()
+        if triggered is action_copy_address:
+            clipboard.setText(str(pointer.target))
+            self.__logger.debug(f'Action: Copy Address {pointer.target}')
+        elif triggered is action_copy_value:
+            clipboard.setText(str(pointer.value))
+            self.__logger.debug(f'Action: Copy Previous Value {pointer.value}')
+        elif triggered is action_copy_offsets:
+            clipboard.setText(str(pointer.offsets))
+            self.__logger.debug(f'Action: Copy Chain {pointer.offsets}')
+        elif triggered is action_copy_module_name:
+            clipboard.setText(str(pointer.module_name))
+            self.__logger.debug(f'Action: Copy Chain {pointer.module_name}')
+

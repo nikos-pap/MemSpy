@@ -25,6 +25,9 @@ class PointerScanTableModel(QAbstractTableModel):
     # ---------------------------------------------------------
     # Public API
     # ---------------------------------------------------------
+    def pointer_item_at(self, index: QModelIndex) -> PointerItem:
+        return self._items[index.row()]
+
     def set_page(self, page_num: int):
         self.__page_num = page_num
 
