@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+
+from memspy.utils.condition import Condition
 from memspy.utils.types import Type
 
 
@@ -19,6 +21,13 @@ class PointerScanParameters:
     target_module: str | None
     use_gpu: bool
     randomness: float = 0.0
+
+
+@dataclass
+class ScanParameters:
+    condition: Condition
+    values: tuple[bytes, bytes]
+    value_type: Type
 
 
 @dataclass
