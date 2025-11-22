@@ -39,6 +39,7 @@ class ScanParameters:
     value_type: Type
     scan_type: ScanType
     file_path: Optional[str] = None
+    threads: int | None = None
 
 
 @dataclass

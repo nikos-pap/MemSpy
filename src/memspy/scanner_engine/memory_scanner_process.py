@@ -137,7 +137,7 @@ class MemoryScannerProcess(Process):
         """Initialize a new scan generator, note start time, and notify start."""
         self.__file_writer.close()
 
-        self.__current_scan = SCANNER.scan_value(values=parameters.values, condition=parameters.condition, dtype=parameters.value_type)
+        self.__current_scan = SCANNER.scan_value(parameters)
 
         self.__scanning = True
         self.__scan_start = time.time()

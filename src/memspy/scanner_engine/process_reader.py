@@ -12,7 +12,7 @@ from memspy.scanner_engine.region import Region
 from memspy.scanner_engine.scanner_utils.scanner_tools import find_matches, match_condition
 from memspy.utils.types import Type, WorkspaceItem, PointerItem
 from memspy.utils.condition import Condition
-
+from memspy.utils.types.scan_types import ScanParameters
 
 # ——— Constants ———
 PROCESS_ALL_ACCESS = 0x1F0FFF
@@ -350,18 +350,17 @@ class MemoryScanner:
 
             address += memory_info.RegionSize
 
-    def scan_value(
-            self,
-            values: tuple[bytes, bytes],
-            condition: Condition = Condition.EQUAL,
-            dtype: Type = Type.UInt32,
-            threads: int = os.cpu_count() if os.cpu_count() else 1
-    ) -> Generator[Optional[tuple], Any, None]:
+    def scan_value(self, parameters: ScanParameters) -> Generator[Optional[tuple], Any, None]:
+        values = parameters.values
+        condition = parameters.condition
+        dtype = parameters.value_type
+        threads = parameters.threads if parameters.threads else 16
+
         self.__logger.debug(f'Number of threads: {threads}')
         total_size = self.__get_working_memory_size()
         current_size = 0
         value = np.frombuffer(b''.join(values), dtype=f'<u{dtype.size()}')
-        with ThreadPoolExecutor(max_workers=16) as executor:
+        with ThreadPoolExecutor(max_workers=threads) as executor:
             for region in self.read_memory():
                 result = find_matches(
                     region=region,
