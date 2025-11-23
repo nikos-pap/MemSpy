@@ -341,11 +341,12 @@ class WorkspaceContainer(QWidget):
         elif triggered is action_edit:
             self.__edit_workspace_item(index, wi)
         elif triggered is action_copy_address:
-            QApplication.clipboard().setText(str(wi.address))
+            QApplication.clipboard().setText(hex(wi.address))
         elif triggered is action_copy_offsets:
             QApplication.clipboard().setText(str(wi.offsets))
         elif triggered is action_copy_value:
-            QApplication.clipboard().setText(str(wi.value))
+
+            QApplication.clipboard().setText(wi.get_value())
         elif triggered is action_delete:
             self._delete_row(index)
 
