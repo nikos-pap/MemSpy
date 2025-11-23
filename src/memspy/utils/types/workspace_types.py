@@ -63,9 +63,9 @@ class WorkspaceItem:
     value_type: Type = Type.UInt32
     module_name: Optional[str] = None
 
-    def get_value(self) -> str | None:
+    def get_value(self) -> str:
         if self.value is None:
-            return None
+            return ''
         return str(convert_from_bytes(self.value, self.value_type))
 
     @staticmethod

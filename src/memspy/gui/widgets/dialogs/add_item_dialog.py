@@ -209,7 +209,7 @@ class AddItemDialog(QDialog):
             return
         # Resolve pointers and update the preview one last time
         SCANNER.evaluate_pointer(wi)  # expected to set wi.value
-        self._value_num_label.setText(wi.get_value())
+        self._value_num_label.setText(wi.get_value() or 'Invalid')
         self._result_item = wi
         self.accept()
 
