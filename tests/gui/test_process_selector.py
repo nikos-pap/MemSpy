@@ -5,23 +5,60 @@ ProcessSelector = ps_mod.ProcessSelector
 
 
 @pytest.mark.gui
-def test_emit_selection_signal(qtbot):
+def test_emit_selection_signal_only_on_change(qtbot):
     combo = ProcessSelector()
     qtbot.addWidget(combo)
 
-    # Add a placeholder item 0, then a real one
     combo.addItem("-- Select --", -1)
     combo.addItem("MyProc (1234)", 1234)
 
-    received = {"pid": None, "icon": None}
+    received = []
 
     def handler(pid, icon=None):
-        received["pid"] = pid
-        received["icon"] = icon
+        received.append(pid)
 
-    # Connect first overload (pid, icon)
-    combo.selectionSignal.connect(handler)  # PyQt6 resolves the first signature
+    combo.selectionSignal.connect(handler)
 
-    # Select the real one
     combo.setCurrentIndex(1)
-    assert received["pid"] == 1234
+    combo.setCurrentIndex(1)  # no-op: should not re-emit
+
+    assert received == [1234]
+
+
+@pytest.mark.gui
+def test_show_popup_emits_update_signal(qtbot):
+    combo = ProcessSelector()
+    qtbot.addWidget(combo)
+
+    calls = []
+    combo.updateSignal.connect(lambda: calls.append(True))
+
+    combo.showPopup()
+
+    assert calls == [True]
+
+
+@pytest.mark.gui
+def test_update_process_list_restores_selection_and_truncates(qtbot):
+    combo = ProcessSelector()
+    qtbot.addWidget(combo)
+
+    # Seed with a previous selection
+    combo.addItem("Existing (10)", 10)
+    combo.setCurrentIndex(0)
+    combo.current_pid = 10
+
+    long_name = "VeryLongProcessNameThatWillBeTrimmed"
+    processes = [
+        (long_name, 10, None),
+        ("Short", 2222, None),
+    ]
+
+    combo.update_process_list_command(processes)
+
+    assert combo.count() == 1 + len(processes)
+    assert combo.currentData() == 10
+
+    displayed_text = combo.itemText(1)
+    assert displayed_text.startswith(long_name[:16])
+    assert displayed_text.endswith("(10)")

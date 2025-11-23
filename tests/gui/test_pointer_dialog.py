@@ -1,61 +1,83 @@
 import pytest
-from memspy.gui.widgets.dialogs.pointer_dialog import PointerDialog
-re = pytest.importorskip("re")
-pd_mod = pytest.importorskip("memspy.gui.widgets.dialogs.pointer_dialog", reason="pointer_dialog.py not importable")
-PointerDialog = pd_mod.PointerDialog
+
+pd_mod = pytest.importorskip(
+    "memspy.gui.widgets.dialogs.pointer_scan_dialog",
+    reason="pointer_scan_dialog.py not importable",
+)
+PointerScanConfigDialog = pd_mod.PointerScanConfigDialog
+ModuleInfo = pytest.importorskip("memspy.utils.types", reason="types module not importable").ModuleInfo
 
 
 @pytest.mark.gui
-def test_initial_state(qtbot):
-    dlg = PointerDialog()
+def test_default_parameters(qtbot):
+    dlg = PointerScanConfigDialog()
     qtbot.addWidget(dlg)
-    assert dlg.windowTitle() == "Pointer Dialog"
-    assert dlg.base_edit.text().lower().startswith("0x")
-    assert len(dlg._offset_rows) == 1
-    # label seeded
-    assert "Final Addr:" in dlg.final_label.text()
+
+    params = dlg.parameters()
+
+    assert params.address == 0
+    assert params.value_type.label == "UInt32"
+    assert params.max_depth == 5
+    assert params.max_offset == 4096
+    assert params.alignment == 4
+    assert params.negative_offsets_enabled is False
+    assert params.target_range == (0, 0)
+    assert params.target_module is None
 
 
 @pytest.mark.gui
-def test_add_offset_and_recompute(qtbot, monkeypatch):
-    dlg = PointerDialog()
+def test_module_selection_populates_target_range(qtbot):
+    dlg = PointerScanConfigDialog()
     qtbot.addWidget(dlg)
 
-    # Make memory_reader deterministic
-    # seq = iter([0x100, 0x200, 0xDEAD, 0xBEEF])
-    # monkeypatch.setattr(dlg, "memory_reader", lambda addr, t: next(seq))
+    modules = [
+        ModuleInfo("core", 0x1000, 0x1FFF),
+        ModuleInfo("utils", 0x3000, 0x3FFF),
+    ]
 
-    dlg.base_edit.setText("0x10")
-    dlg._add_offset()
-    # two rows now
-    assert len(dlg._offset_rows) == 2
+    dlg.set_module_list(modules)
+    # +1 for the '<none>' entry
+    assert dlg._module_combo.count() == len(modules) + 1
 
-    # Trigger recompute
-    dlg._recompute()
-    # final label should reflect the deterministic reads
-    assert re.match(r'^Final Addr:\s*(0x[0-9a-fA-F]+),\s*Value:\s*(0x[0-9a-fA-F]+)$', dlg.final_label.text())
+    # Select first module and ensure range fields are filled and locked
+    dlg._module_combo.setCurrentIndex(1)
+    assert dlg._target_start_edit.text() == "0x1000"
+    assert dlg._target_end_edit.text() == "0x1FFF"
+    assert dlg._target_start_edit.isReadOnly()
+    assert dlg._target_end_edit.isReadOnly()
+
+    # Switch back to '<none>' and ensure fields can be edited again
+    dlg._module_combo.setCurrentIndex(0)
+    assert dlg._target_start_edit.isReadOnly() is False
+    assert dlg._target_end_edit.isReadOnly() is False
 
 
 @pytest.mark.gui
-def test_load_from_data_roundtrip(qtbot):
-    dlg = PointerDialog()
+def test_accept_emits_built_parameters(qtbot):
+    dlg = PointerScanConfigDialog()
     qtbot.addWidget(dlg)
 
-    dlg.load_from_data("MyPtr", "uint16", "0x20", [0x8, 0xC, 0x10])
-    assert dlg.base_edit.text() == "0x20"
-    assert dlg.type_combo.currentText() == "uint16"
-    assert len(dlg._offset_rows) == 3
-    assert [int(e.text(), 16) for e, _ in dlg._offset_rows] == [0x8, 0xC, 0x10]
+    modules = [ModuleInfo("game", 0xDEAD, 0xFEED)]
+    dlg.set_module_list(modules)
+    dlg._module_combo.setCurrentIndex(1)
 
+    dlg._address_edit.setText("0xABC")
+    dlg._type_combo.setCurrentIndex(0)  # first enum entry
+    dlg._max_depth_spin.setValue(7)
+    dlg._max_offset_spin.setValue(512)
+    dlg._alignment_spin.setValue(8)
+    dlg._negative_offsets_check.setChecked(True)
+    dlg._target_start_edit.setText("0x10")
+    dlg._target_end_edit.setText("0x20")
 
-@pytest.mark.gui
-def test_get_result_shape(qtbot):
-    dlg = PointerDialog()
-    qtbot.addWidget(dlg)
-    name, typ, base_hex, offsets, final_addr, final_val = dlg.get_result()
-    assert isinstance(name, str)
-    assert typ in [dlg.type_combo.itemText(i) for i in range(dlg.type_combo.count())]
-    assert base_hex.startswith("0x")
-    assert isinstance(offsets, list)
-    assert isinstance(final_addr, int)
-    assert isinstance(final_val, int)
+    with qtbot.waitSignal(dlg.pointerScanRequested, timeout=1000) as ctx:
+        dlg._on_accept()
+
+    params = ctx.args[0]
+    assert params.address == 0xABC
+    assert params.max_depth == 7
+    assert params.max_offset == 512
+    assert params.alignment == 8
+    assert params.negative_offsets_enabled is True
+    assert params.target_range == (0x10, 0x20)
+    assert params.target_module == modules[0]
