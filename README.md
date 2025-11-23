@@ -1,33 +1,59 @@
 # MemSpy
 
-## About this project
-MemSpy is a Python-based tool that is similar to "Cheat Engine", a well-known cheating program created in Object Pascal and C language. Our tool is the only cheat engine like tool, which runs in Python, making it easier to understand and use. The main objective of this tool is to scan for values into varius memory regions of running applications, allowing users to change or freeze those values.
+MemSpy is a Windows-first memory scanner built with Python and PyQt6. It provides a desktop UI for attaching to running processes, searching for values in their address spaces, and keeping those discoveries organized for later reuse. The scanner supports common integer and floating-point types, live value refreshing, and pointer-chain discovery to make values stable across sessions.
 
-## Setup and Prerequisites
-### Python
-Users must already have Python installed on their systems in order for this app to function properly. A few libraries are also necessary for effective operation. The file ```requirements.txt``` contains the necessary libraries. To install them, execute ```pip install -r requirements.txt``` on the terminal. 
+## Features
+- **Process attachment:** Browse running processes and attach to one to enable scanning.
+- **Value scanning:** Search for Int8/16/32/64, UInt8/16/32/64, Float, Double, or String values with configurable scan conditions.
+- **Workspace management:** Save interesting addresses to a workspace, track their current values, and move items between tables.
+- **Pagination for large scans:** Results tables are paged and filterable so you can navigate large result sets efficiently.
+- **Pointer scanning:** Discover pointer chains, page through pointer results, and import/export pointer scans for reuse.
+- **Configurable experience:** Application settings (such as scan defaults and workspace behavior) can be adjusted through the Settings dialog.
 
-### Execution and GUI
-To execute the app you must run ```python gui.py```. After that, a window will pop up and user can interact with it.
+## Requirements
+- Windows 10/11 with permissions to open other processes (administrator rights are recommended for full access).
+- Python 3.10 or newer.
+- System dependencies listed in [`pyproject.toml`](pyproject.toml); install them with `pip` as shown below. (Windows-only packages such as `pywin32` and `wmi` are included conditionally.)
 
-* In order for someone to begin, he must select the desired application from the left side of the pane. The PID of each process is displayed on the title, and the order of processes is alphabetized.
-* After that, the user must click on "Select" button. The list is refreshed when the refresh button is clicked.
-* In the upper left corner, there is a search field. The user can enter a value in this box and select the appropriate value type from the drop-down menu (SByte, Int16, Int32, Int64, UInt16, **UInt32**, UInt64, **Float**, Double, **String**).
-* Currently only "equals" operation works for the first Scan ("New Scan")
-* After New Scan, some results may appear on the right side of the window. On top of that a filter box is located and user can also move into pages.
-* Now user can set a different value on the search box and deside an operation. Next, user can press the filter button to filter out some values.
-* The desired value can be transferred to the left-down box by double-clicking the address. In that box user can freeze or change the values using right click.
+## Installation
+```bash
+# From the repository root
+python -m venv .venv
+source .venv/Scripts/activate  # or `.venv\\Scripts\\activate` in PowerShell
+pip install --upgrade pip
+pip install -e .
+```
 
-![GUI](imgs/GUI.png)
+If you prefer not to use an editable install, replace the last command with `pip install .`.
 
-## Future Goals
-In this section, we provide some future goals about this project.
-* Users can use all the operations (not only "Equals") at the "New Scan".
-* Implementation of Pointer Scanner
-* Redesign
-* Order of processes by PID
+## Running MemSpy
+Activate your virtual environment (if used) and launch the UI:
 
-## Contact
-Georgoulas Dimosthenis - dimosgeo99@gmail.com
+```bash
+memspy
+```
 
-Papanikolaou Nikolaos - nickp3065@gmail.com
+You can also start the app directly with Python:
+
+```bash
+python -m memspy
+```
+
+## Usage overview
+1. **Select a process:** Use the process selector to pick the target process. Attach before starting a scan.
+2. **Configure a scan:** Choose the value type and condition, then run the scan. Results appear in the Search Address Table.
+3. **Filter and page:** Use pagination controls to move through results and apply filters to narrow them down.
+4. **Save addresses:** Double-click or use the workspace controls to add addresses you care about to the Workspace panel, where their values keep updating.
+5. **Pointer scan:** Kick off a pointer scan from the workspace or pointer table. Page through pointer chains, export them to a file, or import prior scans.
+6. **Tweak settings:** Open the Settings dialog from the menu to adjust scanning options and workspace behavior.
+
+## Testing
+Run the automated tests with:
+
+```bash
+pytest
+```
+
+## Notes
+- MemSpy relies on Windows APIs to inspect and manipulate other processes. Run it on Windows and close the application before shutting down target processes to avoid stale handles.
+- Scanning large processes can take time; progress updates are shown in the status bar.
