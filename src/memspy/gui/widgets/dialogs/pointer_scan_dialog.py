@@ -1,6 +1,7 @@
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QLabel, QHBoxLayout, QGridLayout, QDialogButtonBox, QSpinBox, QCheckBox, \
     QComboBox, QLineEdit, QWidget, QDialog
+from numba.core.types import Optional
 
 from memspy.utils.types import PointerScanParameters, Type, ModuleInfo
 
@@ -19,6 +20,7 @@ class PointerScanConfigDialog(QDialog):
         self,
         parent: QWidget | None = None,
         module_list: list[ModuleInfo] | None = None,  # module names from your app
+        address: int | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Pointer Scan Configuration")
@@ -26,6 +28,9 @@ class PointerScanConfigDialog(QDialog):
         # ---------- widgets ----------
         self._address_edit = QLineEdit(self)
         self._address_edit.setPlaceholderText("0x12345678 or decimal")
+
+        if address is not None:
+            self._address_edit.setText(hex(address))
 
         self._type_combo = QComboBox(self)
         for t in Type:

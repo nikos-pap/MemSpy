@@ -162,6 +162,7 @@ class MemoryScannerUI(QMainWindow):
         # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
         self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
+        self.workspace_container.pointerScanRequested.connect(self.backend.pointer_scan)
         # self.backend.workspace_worker.setProcessSignal.connect(self.workspace_container.tree.set_process)
         # self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
 

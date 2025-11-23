@@ -14,8 +14,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QStandardItem
 
 from memspy.gui.models import WorkspaceModel
+from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
 from memspy.scanner_engine import SCANNER
-from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem
+from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem, PointerScanParameters
 from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
 
@@ -88,6 +89,8 @@ class WorkspaceTree(QTreeView):
         self.expandAll()
 
     def open_add_item_dialog(self) -> None:
+        if SCANNER.process_exited() is None:
+            return
         dlg = AddItemDialog(self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -271,6 +274,7 @@ class WorkspaceTree(QTreeView):
 
 
 class WorkspaceContainer(QWidget):
+    pointerScanRequested: pyqtSignal = pyqtSignal(PointerScanParameters)
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -327,13 +331,6 @@ class WorkspaceContainer(QWidget):
 
         wi = self.tree.model.workspace_item_from_index(index)
 
-        # Pointer Scan: signal + empty hook
-        if triggered is action_pointer_scan:
-            if wi is None:
-                return
-            self.__start_pointer_scan(wi)
-            return
-
         # Everything below requires a data row
         if wi is None:
             # For folders we just allow delete
@@ -341,7 +338,10 @@ class WorkspaceContainer(QWidget):
                 self._delete_row(index)
             return
 
-        if triggered is action_edit:
+        # Pointer Scan: signal + empty hook
+        if triggered is action_pointer_scan:
+            self.__open_scan_dialog(wi.address)
+        elif triggered is action_edit:
             self.__edit_workspace_item(index, wi)
         elif triggered is action_copy_address:
             QApplication.clipboard().setText(str(wi.address))
@@ -351,6 +351,24 @@ class WorkspaceContainer(QWidget):
             QApplication.clipboard().setText(str(wi.value))
         elif triggered is action_delete:
             self._delete_row(index)
+
+    def __open_scan_dialog(self, address: int) -> None:
+        # module_list: list[str] = list(self._module_list)
+        # TODO fix module list
+        module_list = []
+        if SCANNER.process_exited():
+            return
+
+        dlg = PointerScanConfigDialog(
+            parent=self,
+            module_list=module_list,
+            address=address,
+        )
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            params = dlg.parameters()
+            self.__logger.debug(params)
+            self.pointerScanRequested.emit(params)
 
     def __start_pointer_scan(self, wi: WorkspaceItem) -> None:
         """

@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBox
 from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
 from memspy.utils.types import PointerScanParameters, PointerItem, WorkspaceItem
+from memspy.utils.types.converters import convert_from_bytes
 
 
 class PointerScanTableWidget(QWidget):
@@ -113,19 +114,8 @@ class PointerScanTableWidget(QWidget):
         self._table_view.customContextMenuRequested.connect(self.__show_context_menu)
 
     def _open_scan_dialog(self) -> None:
-        """
-        Opens the PointerScanConfigDialog, and if the user confirms,
-        emits pointerScanRequested with the chosen parameters.
-
-        On each open, it fetches module names as follows:
-          - if self._module_list is non-empty, use that
-          - otherwise, if HARD_CODED_PID > 0, call list_modules_for_pid(HARD_CODED_PID)
-          - otherwise, leave it empty and the dialog will just have "<none>"
-        """
-        # start from any explicit list you might have set
         # module_list: list[str] = list(self._module_list)
 
-        # if nothing was set explicitly, fetch from the hardcoded PID
         module_list = []
 
         dlg = PointerScanConfigDialog(
@@ -249,14 +239,18 @@ class PointerScanTableWidget(QWidget):
             return
         clipboard = QApplication.clipboard()
         if triggered is action_copy_address:
-            clipboard.setText(str(pointer.target))
-            self.__logger.debug(f'Action: Copy Address {pointer.target}')
+            data = hex(pointer.target) if pointer.target is not None else 'Invalid'
+            clipboard.setText(data)
+            self.__logger.debug(f'Action: Copy Address {data}')
         elif triggered is action_copy_value:
-            clipboard.setText(str(pointer.value))
-            self.__logger.debug(f'Action: Copy Previous Value {pointer.value}')
+            data = str(convert_from_bytes(pointer.value, pointer.value_type) if pointer.value is not None else 'Invalid')
+            clipboard.setText(data)
+            self.__logger.debug(f'Action: Copy Previous Value {data}')
         elif triggered is action_copy_offsets:
             clipboard.setText(str(pointer.offsets))
             self.__logger.debug(f'Action: Copy Chain {pointer.offsets}')
         elif triggered is action_copy_module_name:
             clipboard.setText(str(pointer.module_name))
             self.__logger.debug(f'Action: Copy Chain {pointer.module_name}')
+        elif triggered is action_copy_chain:
+            self.__logger.debug(f'Coming soon!')
