@@ -114,13 +114,8 @@ class PointerScanTableWidget(QWidget):
         self._table_view.customContextMenuRequested.connect(self.__show_context_menu)
 
     def _open_scan_dialog(self) -> None:
-        # module_list: list[str] = list(self._module_list)
-
-        module_list = []
-
         dlg = PointerScanConfigDialog(
-            parent=self,
-            module_list=module_list,
+            parent=self
         )
 
         if dlg.exec() == QDialog.DialogCode.Accepted:

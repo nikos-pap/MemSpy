@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import QVBoxLayout, QLabel, QHBoxLayout, QGridLayout, QDial
     QComboBox, QLineEdit, QWidget, QDialog
 from numba.core.types import Optional
 
+from memspy.scanner_engine import SCANNER
 from memspy.utils.types import PointerScanParameters, Type, ModuleInfo
 
 
@@ -19,7 +20,6 @@ class PointerScanConfigDialog(QDialog):
     def __init__(
         self,
         parent: QWidget | None = None,
-        module_list: list[ModuleInfo] | None = None,  # module names from your app
         address: int | None = None,
     ) -> None:
         super().__init__(parent)
@@ -46,8 +46,8 @@ class PointerScanConfigDialog(QDialog):
         self._target_end_edit = QLineEdit(self)
         self._target_end_edit.setPlaceholderText("end (hex or dec)")
 
-        if module_list is not None:
-            self.set_module_list(module_list)
+        # if SCANNER.modules is not None:
+        #     self.set_module_list(SCANNER.modules)
         self._module_combo.currentIndexChanged.connect(self._on_module_changed)
 
         self._max_depth_spin = QSpinBox(self)

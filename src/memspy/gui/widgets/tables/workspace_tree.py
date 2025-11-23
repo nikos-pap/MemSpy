@@ -20,8 +20,6 @@ from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem, PointerScanPar
 from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
 
-VALUE_INDEX = 2
-
 
 class WorkspaceTree(QTreeView):
     pathChanged = pyqtSignal(str)
@@ -333,12 +331,11 @@ class WorkspaceContainer(QWidget):
 
         # Everything below requires a data row
         if wi is None:
-            # For folders we just allow delete
+            # For folders, we allow the delete option
             if triggered is action_delete:
                 self._delete_row(index)
             return
 
-        # Pointer Scan: signal + empty hook
         if triggered is action_pointer_scan:
             self.__open_scan_dialog(wi.address)
         elif triggered is action_edit:
@@ -353,15 +350,11 @@ class WorkspaceContainer(QWidget):
             self._delete_row(index)
 
     def __open_scan_dialog(self, address: int) -> None:
-        # module_list: list[str] = list(self._module_list)
-        # TODO fix module list
-        module_list = []
         if SCANNER.process_exited():
             return
 
         dlg = PointerScanConfigDialog(
             parent=self,
-            module_list=module_list,
             address=address,
         )
 
@@ -369,14 +362,6 @@ class WorkspaceContainer(QWidget):
             params = dlg.parameters()
             self.__logger.debug(params)
             self.pointerScanRequested.emit(params)
-
-    def __start_pointer_scan(self, wi: WorkspaceItem) -> None:
-        """
-        Empty hook for Pointer Scan.
-        Override in a subclass if you want, or just connect to
-        pointer_scan_requested from outside.
-        """
-        pass
 
     def __edit_workspace_item(self, index: QModelIndex, wi: WorkspaceItem) -> None:
         """
