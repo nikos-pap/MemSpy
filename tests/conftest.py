@@ -4,6 +4,8 @@ import logging
 import pytest
 from contextlib import redirect_stdout, redirect_stderr
 
+from tests.helpers import ensure_numpy_stub, ensure_pillow_stub
+
 
 @pytest.fixture(autouse=True, scope="session")
 def _disable_all_logging():
@@ -26,3 +28,11 @@ def _silence_stdout_stderr():
     out, err = io.StringIO(), io.StringIO()
     with redirect_stdout(out), redirect_stderr(err):
         yield
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _stub_numpy():
+    """Provide a minimal numpy stub so imports work without the real dependency."""
+    ensure_numpy_stub()
+    ensure_pillow_stub()
+    yield

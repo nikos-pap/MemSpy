@@ -1,76 +1,78 @@
 import os
-import numpy as np
+import struct
+
 import pytest
-from memspy.fileio import FileStreamReader, FileWriter
+
+from tests.helpers import ensure_numpy_stub, ensure_pillow_stub
+
+ensure_numpy_stub()
+ensure_pillow_stub()
+
+from memspy.fileio import FileStreamReader
 
 
 @pytest.fixture
-def temp_binary_file(tmp_path):
-    """Creates a temporary binary file with known data using FileWriter."""
-    data = np.arange(10, dtype=np.int32)
-    file_path = tmp_path / "test_data.bin"
-
-    writer = FileWriter()
-    writer.set_file(str(file_path), dtype=np.int32)
-    writer.write(data)
-    writer.close()
-
-    return file_path, data
+def binary_file(tmp_path):
+    values = list(range(10))
+    file_path = tmp_path / "data.bin"
+    with open(file_path, "wb") as fp:
+        for value in values:
+            fp.write(struct.pack("<i", value))
+    return file_path, values
 
 
-def test_set_file_and_size(temp_binary_file):
-    file_path, data = temp_binary_file
+def test_set_file_tracks_size(binary_file):
+    file_path, values = binary_file
     reader = FileStreamReader()
+
     reader.set_file(str(file_path), element_size=4)
 
     assert reader.size == os.path.getsize(file_path)
-    assert reader.size == len(data) * 4
+    assert reader.size == len(values) * 4
 
     reader.close()
 
 
-def test_read_elements(temp_binary_file):
-    file_path, data = temp_binary_file
+def test_read_elements_respects_item_count(binary_file):
+    file_path, values = binary_file
     reader = FileStreamReader()
     reader.set_file(str(file_path), element_size=4)
 
-    first_two = reader.read_elements(2)
-    result = np.frombuffer(first_two, dtype=np.int32)
-    np.testing.assert_array_equal(result, data[:2])
+    payload = reader.read_elements(3)
+    numbers = [struct.unpack("<i", payload[i : i + 4])[0] for i in range(0, len(payload), 4)]
+
+    assert numbers == values[:3]
 
     reader.close()
 
 
-def test_seek_and_read(temp_binary_file):
-    file_path, data = temp_binary_file
+def test_seek_moves_cursor(binary_file):
+    file_path, values = binary_file
     reader = FileStreamReader()
     reader.set_file(str(file_path), element_size=4)
 
-    # Move to element 5 (offset = 5 * 4 bytes)
-    reader.seek(5 * 4)
-    read_data = np.frombuffer(reader.read(4), dtype=np.int32)
-    assert read_data[0] == data[5]
+    reader.seek(6 * 4)
+    data = reader.read(4)
+
+    assert struct.unpack("<i", data)[0] == values[6]
 
     reader.close()
 
 
-def test_iteration(temp_binary_file):
-    file_path, data = temp_binary_file
+def test_iteration_yields_chunks(binary_file):
+    file_path, values = binary_file
     reader = FileStreamReader()
     reader.set_file(str(file_path), element_size=4)
 
-    result = []
-    for element_bytes in reader:
-        result.append(np.frombuffer(element_bytes, dtype=np.int32)[0])
+    collected = [struct.unpack("<i", chunk)[0] for chunk in reader]
 
-    np.testing.assert_array_equal(result, data)
+    assert collected == values
 
     reader.close()
 
 
-def test_invalid_element_size(tmp_path):
-    # Create file of 10 bytes
-    file_path = tmp_path / "bad_size.bin"
+def test_invalid_element_size_raises(tmp_path):
+    file_path = tmp_path / "invalid.bin"
     file_path.write_bytes(b"\x00" * 10)
 
     reader = FileStreamReader()
@@ -78,12 +80,11 @@ def test_invalid_element_size(tmp_path):
         reader.set_file(str(file_path), element_size=3)
 
 
-def test_reset_and_close(temp_binary_file):
-    file_path, _ = temp_binary_file
+def test_reset_on_close(binary_file):
+    file_path, _ = binary_file
     reader = FileStreamReader()
     reader.set_file(str(file_path), element_size=4)
     reader.close()
 
-    # After close, internal attributes should be reset
-    assert getattr(reader, '_FileStreamReader__filepath') is None
-    assert getattr(reader, '_FileStreamReader__data_size') is None
+    assert getattr(reader, "_FileStreamReader__filepath") is None
+    assert getattr(reader, "_FileStreamReader__data_size") is None

@@ -1,41 +1,63 @@
 import os
-import numpy as np
+import pickle
+
 import pytest
+
+from tests.helpers import ensure_numpy_stub, ensure_pillow_stub
+
+ensure_numpy_stub()
+ensure_pillow_stub()
+
 from memspy.fileio import FileWriter
+from memspy.utils.pointer_scan import PointerScanInfo
+from memspy.utils.types.scan_types import ScanType
 
 
-def test_temp_file_creation(tmp_path):
-    fw = FileWriter(out_dir=tmp_path)
-    fw.temp_file(np.uint8)
+class FakeArray:
+    def __init__(self, data: bytes):
+        self._data = data
 
-    # Check file actually exists
-    assert fw.filepath is not None
-    assert os.path.exists(fw.filepath)
-    assert fw.dtype == np.uint8
-
-    fw.close()
-    assert not getattr(fw, '_FileWriter__file')  # after close, internal handle is None
+    def tobytes(self, order: str = "C") -> bytes:  # pragma: no cover - thin wrapper
+        return self._data
 
 
-def test_write_and_close(tmp_path):
-    fw = FileWriter(out_dir=tmp_path)
-    fw.temp_file(np.uint16)
-    data = np.array([1, 2, 3], dtype=np.uint16)
-    fw.write(data)
-    fw.close()
+def test_set_file_writes_raw_bytes(tmp_path):
+    target = tmp_path / "raw.bin"
+    writer = FileWriter()
 
-    # Read back from file to verify bytes
-    with open(fw.filepath, "rb") as f:
-        content = f.read()
-    expected = data.tobytes(order="C")
-    assert content == expected
+    writer.set_file(str(target), dtype="<i4")
+    writer.write(FakeArray(b"\x01\x02\x03\x04"), scan_type=None)
+    writer.close()
+
+    with open(target, "rb") as fp:
+        assert fp.read() == b"\x01\x02\x03\x04"
 
 
-def test_set_file_nonexistent_dir_raises(tmp_path):
-    # Make a fake subdir that doesn't exist
-    fake_dir = tmp_path / "nonexistent"
-    file_path = os.path.join(fake_dir, "data.bin")
+def test_temp_file_pointer_scan_serializes_results(tmp_path):
+    writer = FileWriter(out_dir=tmp_path)
 
-    fw = FileWriter()
+    writer.temp_file(dtype="<i4")
+    scan_info = PointerScanInfo(entries=2, max_depth=3)
+    pointer_data = [b"first", b"second"]
+
+    writer.write(pointer_data, scan_type=ScanType.POINTER_SCAN, scan_info=scan_info)
+    writer.close()
+
+    assert writer.filepath and os.path.exists(writer.filepath)
+
+    with open(writer.filepath, "rb") as fp:
+        restored_info = pickle.load(fp)
+        restored_first = pickle.load(fp)
+        restored_second = pickle.load(fp)
+
+    assert restored_info == scan_info
+    assert restored_first == b"first"
+    assert restored_second == b"second"
+
+
+def test_set_file_validates_directory(tmp_path):
+    writer = FileWriter()
+    missing_dir = tmp_path / "missing" / "output.bin"
+
     with pytest.raises(FileNotFoundError):
-        fw.set_file(file_path, np.uint8)
+        writer.set_file(str(missing_dir), dtype="<i4")
