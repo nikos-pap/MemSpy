@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 from multiprocessing import Process, Queue
 from typing import Iterator, Optional
@@ -55,8 +56,13 @@ class MemoryScannerProcess(Process):
 
     def run(self) -> None:
         self.__logger = getLogger(self.__class__.__name__)
-        logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
-        getLogger("numba").setLevel(logging.ERROR)
+
+        if sys.gettrace() is not None:
+            logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
+        else:
+            logging.basicConfig(level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s")
+        logging.getLogger("numba").setLevel(logging.ERROR)
+
         total = 0
         """Main loop: process commands and stream scan results."""
         while True:
