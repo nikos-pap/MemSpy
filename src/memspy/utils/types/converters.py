@@ -2,6 +2,8 @@ import struct
 from sys import byteorder
 from memspy.utils.types import Type
 
+hex_chars = set("0123456789abcdefABCDEF")
+
 
 def convert_to_bytes(value: str | int | float, to_type: Type) -> bytes:
     t = b''
@@ -30,6 +32,8 @@ def convert_to_bytes(value: str | int | float, to_type: Type) -> bytes:
             t = 'd'
         case _:
             raise ValueError(f"Unsupported type: {to_type}")
+    if isinstance(value, str) and value.startswith('0x') and len(value) > 2 and all(ch in hex_chars for ch in value[2:]):
+        value = int(value, 16)
     cast_value = float(value) if to_type in {Type.Float, Type.Double} else int(value)
     return struct.pack(t, cast_value)
 
