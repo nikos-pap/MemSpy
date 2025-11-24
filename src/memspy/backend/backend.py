@@ -1,21 +1,22 @@
 from logging import getLogger, Logger
 
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot
+
 from multiprocessing import Queue
 from typing import NamedTuple
 import psutil
-from memspy.backend.dataview_manager import MemoryViewThread
-from memspy.backend.pointer_view_manager import PointerManager
-from memspy.backend.workspace_manager import WorkspaceManager
+from bisect import insort
+
+from memspy.data_managers.dataview_manager import MemoryViewThread
+from memspy.data_managers.pointer_view_manager import PointerManager
+from memspy.data_managers.workspace_manager import WorkspaceManager
 from memspy.scanner_engine import SCANNER
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
 from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
-from bisect import insort
 from memspy.utils.message import Message
 from memspy.utils.settings import CONFIG
-from memspy.utils.types import ScanType, Type, MessageType, PointerItem, ProcessItem, PointerScanParameters
-from memspy.utils.condition import Condition
+from memspy.utils.types import ScanType, MessageType, PointerItem, ProcessItem, PointerScanParameters
 from memspy.utils.types.scan_types import ScanParameters
 
 
