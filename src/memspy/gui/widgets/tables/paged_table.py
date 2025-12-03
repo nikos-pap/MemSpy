@@ -24,6 +24,7 @@ class PagedTable(QWidget):
     addressActivated = pyqtSignal(WorkspaceItem)
 
     scanRequested = pyqtSignal(ScanParameters)
+    cancelScanRequested = pyqtSignal()
 
     __logger: Logger = getLogger(__qualname__)
 
@@ -217,10 +218,38 @@ class PagedTable(QWidget):
                 break
 
     def initialise_scan_navigation(self) -> None:
+        self.__scan_controls.new_scan_btn.clicked.disconnect()
+        self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
         self.__scan_controls.initialise_scan_navigation()
 
     def enable_scan_navigation(self) -> None:
         self.__scan_controls.enable_scan_navigation()
+
+    def activate_scan_button(self):
+        if not self.__scan_controls.new_scan_btn.isEnabled() or self.__scan_controls.new_scan_btn.text() == 'New Scan':
+            return
+        self.__scan_controls.new_scan_btn.clicked.disconnect()
+        self.__scan_controls.new_scan_btn.setText('New Scan')
+        self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
+
+    def activate_cancel_scan_button(self):
+        if not self.__scan_controls.new_scan_btn.isEnabled() or self.__scan_controls.new_scan_btn.text() == 'Cancel Scan':
+            return
+        self.__scan_controls.new_scan_btn.clicked.disconnect()
+        self.__scan_controls.new_scan_btn.setText('Cancel Scan')
+        self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_cancel_scan)
+
+    # def toggle_scan_navigation(self) -> None:
+    #     scan_enabled = self.__scan_controls.toggle_scan_button()
+    #     if scan_enabled:
+    #         self.__scan_controls.new_scan_btn.clicked.disconnect()
+    #         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_cancel_scan)
+    #     else:
+    #         self.__scan_controls.new_scan_btn.clicked.disconnect()
+    #         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
+
+    def __handle_cancel_scan(self) -> None:
+        self.cancelScanRequested.emit()
 
     def disable_scan_navigation(self) -> None:
         self.__scan_controls.disable_scan_navigation()

@@ -171,12 +171,10 @@ class MemoryScannerProcess(Process):
     def __filter_iterator(self, value: tuple[bytes, bytes], condition: Condition, data_type: Type, chunk_size: int = 10_000) -> Iterator[Optional[tuple[NDArray, int]]]:
         dtype = data_type.mem_dtype
         data = np.frombuffer(self.__file_reader.read_elements(chunk_size), dtype=dtype)
-        self.__logger.debug(f'{len(data)} bytes read.')
         total = self.__file_reader.size
         current = len(data)
 
         while len(data) > 0:
-            self.__logger.debug(f'{len(data)} bytes read. {current} bytes read total')
             yield SCANNER.filter_values(data, value, condition, data_type), (current // total) * 100
             data = np.frombuffer(self.__file_reader.read_elements(chunk_size), dtype=dtype)
             current += len(data)

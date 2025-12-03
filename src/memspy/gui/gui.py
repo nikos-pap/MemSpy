@@ -153,6 +153,7 @@ class MemoryScannerUI(QMainWindow):
         self.search_address_table.previousPageSignal.connect(data_thread.prev_page_handle)
         self.search_address_table.addressActivated.connect(self.workspace_container.add_address)
         self.search_address_table.scanRequested.connect(self.__scan_command)
+        self.search_address_table.cancelScanRequested.connect(self.__stop_scan_command)
 
         self.fix_dock_close_event(self.search_table_dock, self.__menu_bar.search_table_action)
         self.fix_dock_close_event(self.saved_table_dock, self.__menu_bar.saved_table_action)
@@ -198,29 +199,14 @@ class MemoryScannerUI(QMainWindow):
             self.__set_message('⚠️ Select a process before starting a scan!')
             return
 
-        # OK, condition, values, data_type, message = self.__scan_controls.prepare_scan()
-        # self.__set_message(message)
-        # if not OK:
-        #     return
-
         self.search_address_table.clear()
         self.scan_type = parameters.scan_type
-        # self.__scan_controls.new_scan_btn.clicked.connect(self.__stop_scan_command)
+        self.search_address_table.activate_cancel_scan_button()
         self.backend.scan(parameters)
-
-    def __toggle_scan_button(self):
-        # if not self.__scan_controls.new_scan_btn.isEnabled():
-        #     return
-        # self.__scan_controls.new_scan_btn.clicked.disconnect()
-        # if self.__scan_controls.toggle_scan_button():
-        #     self.__scan_controls.new_scan_btn.clicked.connect(lambda: self.__scan_command(ScanType.ADDRESS_SCAN))
-        # else:
-        #     self.__scan_controls.new_scan_btn.clicked.connect(self.__stop_scan_command)
-        pass
 
     def __stop_scan_command(self):
         self.backend.stop_scan()
-        self.__toggle_scan_button()
+        self.search_address_table.activate_scan_button()
         self.search_address_table.enable_scan_navigation()
 
     @pyqtSlot()
@@ -245,7 +231,7 @@ class MemoryScannerUI(QMainWindow):
         self.__logger.debug(f'Attached ({proc_id}) in {time.time() - start:.2f}s')
         self.setWindowIcon(icon or QIcon())
         if self.search_address_table.initialise_scan_navigation():
-            self.__toggle_scan_button()
+            self.search_address_table.activate_scan_button()
         # self.saved_address_tree.clear_tree()
 
     @pyqtSlot(int)
@@ -290,7 +276,7 @@ class MemoryScannerUI(QMainWindow):
     @pyqtSlot()
     def __finished_scan(self):
         self.scan_type = None
-        self.__toggle_scan_button()
+        self.search_address_table.activate_scan_button()
         self.search_address_table.enable_scan_navigation()
 
     def __set_message(self, message: str):

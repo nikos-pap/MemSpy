@@ -123,7 +123,9 @@ class ScanControls(QHBoxLayout):
         self.filter_btn.setDisabled(False)
         self.filter_address_btn.setDisabled(False)
 
-    def toggle_scan_button(self) -> bool:
+    def toggle_scan_button(self) -> bool | None:
+        if not self.new_scan_btn.isEnabled():
+            return None
         if self.new_scan_btn.text() == 'Cancel Scan':
             self.new_scan_btn.setText('New Scan')
         elif self.new_scan_btn.text() == 'New Scan':
