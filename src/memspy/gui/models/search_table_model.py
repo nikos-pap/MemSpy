@@ -70,6 +70,7 @@ class SearchTableModel(QAbstractTableModel):
         #     return
 
     def set_items(self, items: list[SearchItem]) -> None:
+        self.beginResetModel()
         for index, item in enumerate(items):
             self.__items[index].address = item.address
             self.__items[index].previous_value = item.previous_value
@@ -78,6 +79,7 @@ class SearchTableModel(QAbstractTableModel):
         self.__valid_count = len(items)
         top_left = self.index(0, 0)
         bottom_right = self.index(self.__valid_count - 1, self.columnCount() - 1)
+        self.endResetModel()
         self.dataChanged.emit(top_left, bottom_right, [])
 
     def set_current_page(self, page: int) -> None:
