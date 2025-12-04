@@ -1,4 +1,5 @@
 import time
+import gc
 
 import numpy as np
 from numba import cuda
@@ -78,8 +79,7 @@ class PointerScanner:
     def get_pointer_map(self, use_gpu: bool):
         print("Getting process regions", end=' ')
         start = time.time()
-        self.regions = []
-        self.ranges = []
+        self.clean()
         for region in SCANNER.get_regions():
             self.regions.append(region)
             self.ranges.append([region.base_address, region.base_address + region.size, region.id])
@@ -133,4 +133,10 @@ class PointerScanner:
         print("Finalize the pointers list")
         yield [pointer for pointer in self.make_pointers_list(results, target_address)], 0
         print('Finished')
+        self.clean()
         yield None
+
+    def clean(self):
+        self.regions = []
+        self.ranges = []
+        gc.collect()
