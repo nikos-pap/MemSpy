@@ -1,9 +1,7 @@
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QVBoxLayout, QLabel, QHBoxLayout, QGridLayout, QDialogButtonBox, QSpinBox, QCheckBox, \
-    QComboBox, QLineEdit, QWidget, QDialog
-from numba.core.types import Optional
+from PyQt6.QtWidgets import (QVBoxLayout, QLabel, QGridLayout, QDialogButtonBox, QSpinBox, QCheckBox,
+                             QComboBox, QLineEdit, QWidget, QDialog)
 
-from memspy.scanner_engine import SCANNER
 from memspy.utils.types import PointerScanParameters, Type, ModuleInfo
 
 
@@ -18,9 +16,9 @@ class PointerScanConfigDialog(QDialog):
     pointerScanRequested = pyqtSignal(PointerScanParameters)
 
     def __init__(
-        self,
-        parent: QWidget | None = None,
-        address: int | None = None,
+            self,
+            parent: QWidget | None = None,
+            address: int | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Pointer Scan Configuration")
@@ -129,11 +127,11 @@ class PointerScanConfigDialog(QDialog):
     def _current_type(self) -> Type:
         return self._type_combo.currentData()
 
-    def _current_module(self) -> str | None:
-        idx = self._module_combo.currentIndex()
-        if 0 <= idx < len(self._module_items):
-            return self._module_items[idx]
-        return None
+    # def _current_module(self) -> str | None:
+    #     idx = self._module_combo.currentIndex()
+    #     if 0 <= idx < len(self._module_items):
+    #         return self._module_items[idx]
+    #     return None
 
     def _build_parameters(self) -> PointerScanParameters:
         address = self._parse_int(self._address_edit.text())
@@ -167,47 +165,46 @@ class PointerScanConfigDialog(QDialog):
         return self._build_parameters()
 
     # REMOVE
-    def set_module_list(self, module_list: list[ModuleInfo]) -> None:
-        self._module_combo.clear()
-        self._module_items.clear()
-        self._module_combo.addItem("<none>")
-        self._module_items.append(None)
-        for item in module_list:
-            print(item.name, item)
-            self._module_combo.addItem(item.name, item)
-            self._module_items.append(item)
+    # def set_module_list(self, module_list: list[ModuleInfo]) -> None:
+    #     self._module_combo.clear()
+    #     self._module_items.clear()
+    #     self._module_combo.addItem("<none>")
+    #     self._module_items.append(None)
+    #     for item in module_list:
+    #         print(item.name, item)
+    #         self._module_combo.addItem(item.name, item)
+    #         self._module_items.append(item)
+    #
+    #     self._module_combo.setCurrentIndex(0)
+    # self._target_start_edit.setReadOnly(False)
+    # self._target_end_edit.setReadOnly(False)
 
-        self._module_combo.setCurrentIndex(0)
-        # self._target_start_edit.setReadOnly(False)
-        # self._target_end_edit.setReadOnly(False)
-
-    def _on_module_changed(self, index: int) -> None:
-        """
-        When a module is selected:
-          - fill target range start/end from the module's range
-          - lock the fields (read-only)
-
-        When '<none>' is selected:
-          - keep whatever values are there
-          - unlock the fields so the user can edit manually
-        """
-        if not (0 <= index < len(self._module_items)):
-            # fail-safe: unlock fields
-            self._target_start_edit.setReadOnly(False)
-            self._target_end_edit.setReadOnly(False)
-            return
-
-        module = self._module_items[index]
-
-        if module is None:
-            # '<none>' selection
-            self._target_start_edit.setReadOnly(False)
-            self._target_end_edit.setReadOnly(False)
-            return
-
-        # set range from module info and lock it
-        self._target_start_edit.setText(f"0x{module.start:X}")
-        self._target_end_edit.setText(f"0x{module.end:X}")
-        self._target_start_edit.setReadOnly(True)
-        self._target_end_edit.setReadOnly(True)
-
+    # def _on_module_changed(self, index: int) -> None:
+    # """
+    # When a module is selected:
+    #   - fill target range start/end from the module's range
+    #   - lock the fields (read-only)
+    #
+    # When '<none>' is selected:
+    #   - keep whatever values are there
+    #   - unlock the fields so the user can edit manually
+    # """
+    # if not (0 <= index < len(self._module_items)):
+    #     # fail-safe: unlock fields
+    #     self._target_start_edit.setReadOnly(False)
+    #     self._target_end_edit.setReadOnly(False)
+    #     return
+    #
+    # module = self._module_items[index]
+    #
+    # if module is None:
+    #     # '<none>' selection
+    #     self._target_start_edit.setReadOnly(False)
+    #     self._target_end_edit.setReadOnly(False)
+    #     return
+    #
+    # # set range from module info and lock it
+    # self._target_start_edit.setText(f"0x{module.start:X}")
+    # self._target_end_edit.setText(f"0x{module.end:X}")
+    # self._target_start_edit.setReadOnly(True)
+    # self._target_end_edit.setReadOnly(True)
