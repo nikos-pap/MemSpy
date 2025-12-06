@@ -25,7 +25,6 @@ class PointerScanParameters:
     max_depth: int
     max_offset: int
     negative_offsets_enabled: bool
-    alignment: int #REMOVE
     target_range: tuple[int, int]
     target_module: str | None
     use_gpu: bool

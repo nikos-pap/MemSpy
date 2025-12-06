@@ -102,6 +102,8 @@ class PointerManager(QObject):
         self.set_file(tmp_path)
 
     def clear_pointers(self) -> None:
+        if self.__file is None:
+            return
         path = self.__file.name
         valid_pointers = []
         max_depth = 0

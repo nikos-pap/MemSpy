@@ -37,18 +37,18 @@ class PointerScanConfigDialog(QDialog):
             self._type_combo.addItem(t.label, t)
         self._type_combo.setCurrentText(Type.UInt32.label)
 
-        self._module_combo = QComboBox(self)
+        # self._module_combo = QComboBox(self)
         self._module_items: list[ModuleInfo | None] = [None]
-        self._module_combo.addItem("<none>")
+        # self._module_combo.addItem("<none>")
 
-        self._target_start_edit = QLineEdit(self)
-        self._target_start_edit.setPlaceholderText("start (hex or dec)")
-        self._target_end_edit = QLineEdit(self)
-        self._target_end_edit.setPlaceholderText("end (hex or dec)")
+        # self._target_start_edit = QLineEdit(self)
+        # self._target_start_edit.setPlaceholderText("start (hex or dec)")
+        # self._target_end_edit = QLineEdit(self)
+        # self._target_end_edit.setPlaceholderText("end (hex or dec)")
 
         # if SCANNER.modules is not None:
         #     self.set_module_list(SCANNER.modules)
-        self._module_combo.currentIndexChanged.connect(self._on_module_changed)
+        # self._module_combo.currentIndexChanged.connect(self._on_module_changed)
 
         self._max_depth_spin = QSpinBox(self)
         self._max_depth_spin.setRange(1, 64)
@@ -58,10 +58,6 @@ class PointerScanConfigDialog(QDialog):
         self._max_offset_spin.setRange(0, 1_000_000)
         self._max_offset_spin.setSingleStep(256)
         self._max_offset_spin.setValue(4096)
-
-        self._alignment_spin = QSpinBox(self)
-        self._alignment_spin.setRange(1, 1024)
-        self._alignment_spin.setValue(4)
 
         self._negative_offsets_check = QCheckBox("Allow negative offsets", self)
 
@@ -86,18 +82,18 @@ class PointerScanConfigDialog(QDialog):
         grid.addWidget(self._type_combo, row, 1)
         row += 1
 
-        grid.addWidget(QLabel("Target module:"), row, 0, Qt.AlignmentFlag.AlignRight)
-        grid.addWidget(self._module_combo, row, 1)
-        row += 1
+        # grid.addWidget(QLabel("Target module:"), row, 0, Qt.AlignmentFlag.AlignRight)
+        # grid.addWidget(self._module_combo, row, 1)
+        # row += 1
+        #
+        # range_row = QHBoxLayout()
+        # range_row.addWidget(self._target_start_edit)
+        # range_row.addWidget(QLabel("to"))
+        # range_row.addWidget(self._target_end_edit)
 
-        range_row = QHBoxLayout()
-        range_row.addWidget(self._target_start_edit)
-        range_row.addWidget(QLabel("to"))
-        range_row.addWidget(self._target_end_edit)
-
-        grid.addWidget(QLabel("Target range:"), row, 0, Qt.AlignmentFlag.AlignRight)
-        grid.addLayout(range_row, row, 1)
-        row += 1
+        # grid.addWidget(QLabel("Target range:"), row, 0, Qt.AlignmentFlag.AlignRight)
+        # grid.addLayout(range_row, row, 1)
+        # row += 1
 
         grid.addWidget(QLabel("Max depth:"), row, 0, Qt.AlignmentFlag.AlignRight)
         grid.addWidget(self._max_depth_spin, row, 1)
@@ -105,10 +101,6 @@ class PointerScanConfigDialog(QDialog):
 
         grid.addWidget(QLabel("Max offset:"), row, 0, Qt.AlignmentFlag.AlignRight)
         grid.addWidget(self._max_offset_spin, row, 1)
-        row += 1
-
-        grid.addWidget(QLabel("Alignment:"), row, 0, Qt.AlignmentFlag.AlignRight)
-        grid.addWidget(self._alignment_spin, row, 1)
         row += 1
 
         grid.addWidget(self._negative_offsets_check, row, 0, 1, 2)
@@ -148,11 +140,10 @@ class PointerScanConfigDialog(QDialog):
         value_type = self._current_type()
         max_depth = int(self._max_depth_spin.value())
         max_offset = int(self._max_offset_spin.value())
-        alignment = int(self._alignment_spin.value())
         negative_offsets_enabled = self._negative_offsets_check.isChecked()
-        target_start = self._parse_int(self._target_start_edit.text())
-        target_end = self._parse_int(self._target_end_edit.text())
-        target_module = self._current_module()
+        target_start = 0  # self._parse_int(self._target_start_edit.text())
+        target_end = 0  # self._parse_int(self._target_end_edit.text())
+        # target_module = self._current_module()
 
         return PointerScanParameters(
             address=address,
@@ -160,9 +151,8 @@ class PointerScanConfigDialog(QDialog):
             max_depth=max_depth,
             max_offset=max_offset,
             negative_offsets_enabled=negative_offsets_enabled,
-            alignment=alignment,
             target_range=(target_start, target_end),
-            target_module=target_module,
+            target_module=None,
             use_gpu=False
         )
 
@@ -176,6 +166,7 @@ class PointerScanConfigDialog(QDialog):
     def parameters(self) -> PointerScanParameters:
         return self._build_parameters()
 
+    # REMOVE
     def set_module_list(self, module_list: list[ModuleInfo]) -> None:
         self._module_combo.clear()
         self._module_items.clear()
@@ -186,10 +177,9 @@ class PointerScanConfigDialog(QDialog):
             self._module_combo.addItem(item.name, item)
             self._module_items.append(item)
 
-
         self._module_combo.setCurrentIndex(0)
-        self._target_start_edit.setReadOnly(False)
-        self._target_end_edit.setReadOnly(False)
+        # self._target_start_edit.setReadOnly(False)
+        # self._target_end_edit.setReadOnly(False)
 
     def _on_module_changed(self, index: int) -> None:
         """
