@@ -26,6 +26,8 @@ pip install -e .
 
 If you prefer not to use an editable install, replace the last command with `pip install .`.
 
+If using powershell, replace the `source ..` above with ` .\\.venv\Scripts\activate`
+
 ## Running MemSpy
 Activate your virtual environment (if used) and launch the UI:
 
