@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QBrush
 from PyQt6.QtWidgets import (
@@ -50,8 +48,8 @@ class AddItemDialog(QDialog):
 
     def __init__(
         self,
-        parent: Optional[QWidget] = None,
-        workspace_item: Optional[WorkspaceItem] = None,
+        parent: QWidget | None = None,
+        workspace_item: WorkspaceItem | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Add Item")
@@ -59,7 +57,7 @@ class AddItemDialog(QDialog):
         self.setMinimumSize(390, 310)
 
         # keep reference to source item (for preset)
-        self._source_item: Optional[WorkspaceItem] = workspace_item
+        self._source_item: WorkspaceItem | None = workspace_item
 
         # --- Widgets ---------------------------------------------------------
         self._name_edit = QLineEdit(self)
@@ -138,7 +136,7 @@ class AddItemDialog(QDialog):
         )
 
         # Internal result
-        self._result_item: Optional[WorkspaceItem] = None
+        self._result_item: WorkspaceItem | None = None
 
         # If an existing WorkspaceItem is provided, preset the UI from it
         if self._source_item is not None:
@@ -146,7 +144,7 @@ class AddItemDialog(QDialog):
 
     # ---------------------------- Public API ---------------------------------
 
-    def get_workspace_item(self) -> Optional[WorkspaceItem]:
+    def get_workspace_item(self) -> WorkspaceItem | None:
         """Return the WorkspaceItem after successful Accept; otherwise None."""
         return self._result_item
 
@@ -261,7 +259,7 @@ class AddItemDialog(QDialog):
         # Recompute preview based on preset data
         self._recompute_preview()
 
-    def _build_item(self) -> Optional[WorkspaceItem]:
+    def _build_item(self) -> WorkspaceItem | None:
         name = self._name_edit.text().strip()
         if not name:
             self._name_edit.setFocus()

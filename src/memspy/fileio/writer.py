@@ -1,7 +1,7 @@
 import os
 import tempfile
 from os import PathLike
-from typing import Optional, BinaryIO
+from typing import BinaryIO
 
 import pickle
 from numpy.typing import NDArray, DTypeLike
@@ -21,10 +21,10 @@ class FileWriter:
     """
 
     def __init__(self, out_dir: str | PathLike = tempfile.gettempdir()) -> None:
-        self.dtype: Optional[DTypeLike] = None
-        self.filepath: Optional[str] = None
-        self.__file: Optional[BinaryIO] = None
-        self.__out_dir: Optional[str] = out_dir
+        self.dtype: DTypeLike | None = None
+        self.filepath: str | None = None
+        self.__file: BinaryIO | None = None
+        self.__out_dir: str | None = out_dir
 
     def set_file(self, file_path: str, dtype: DTypeLike) -> None:
         """
@@ -52,7 +52,7 @@ class FileWriter:
         self.filepath = self.__file.name
         self.dtype = dtype
 
-    def write(self, data: NDArray, scan_type: Optional[ScanType], scan_info: Optional[PointerScanInfo] = None) -> None:
+    def write(self, data: NDArray, scan_type: ScanType | None, scan_info: PointerScanInfo | None = None) -> None:
         """
         Writes data to file.
 

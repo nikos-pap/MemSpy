@@ -3,7 +3,6 @@ import shutil
 import tempfile
 from logging import getLogger, Logger
 from typing import BinaryIO
-from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal, QThread, pyqtSlot, QTimer
 
@@ -27,10 +26,10 @@ class PointerManager(QObject):
     def __init__(self, page_size: int = 100, update_rate: int = 1000, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.__file: Optional[BinaryIO] = None
+        self.__file: BinaryIO | None = None
         self.__current_page: int = -1
         self.__page_buffer: list[PointerItem] = []
-        self.__file_info: Optional[PointerScanInfo] = None
+        self.__file_info: PointerScanInfo | None = None
         self.__page_size = page_size
         self.__page_indexes: list[int] = []
 

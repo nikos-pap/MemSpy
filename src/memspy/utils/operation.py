@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional
 from numpy.typing import DTypeLike
 from memspy.utils.condition import Condition, OperationCondition
 
@@ -15,13 +14,13 @@ class GenericOperation:
         The NumPy dtype or equivalent.
     filepath : str
         File path to the related data.
-    parent : Optional[Operation]
+    parent : Operation | None
         Parent operation, if any.
     """
     condition: OperationCondition
     dtype: DTypeLike
     filepath: str
-    parent: Optional["GenericOperation"] = None
+    parent: "GenericOperation | None" = None
 
     def history(self) -> list["GenericOperation"]:
         """Return chain of parent → this collection."""

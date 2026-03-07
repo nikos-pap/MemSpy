@@ -1,6 +1,6 @@
 import time
 from logging import getLogger, Logger
-from typing import Callable, Optional
+from typing import Callable
 from PyQt6.QtCore import Qt, pyqtSlot, QSize
 from PyQt6.QtGui import QIcon, QFont, QAction
 from PyQt6.QtWidgets import (
@@ -29,7 +29,7 @@ class MemoryScannerUI(QMainWindow):
         self.backend: Backend = Backend()
         self.isAttached: bool = False
         self.valid_input: bool = False
-        self.scan_type: Optional[ScanType] = None
+        self.scan_type: ScanType | None = None
         self.__setup_window()
         self.__create_widgets()
         self.__create_layouts()
@@ -67,7 +67,7 @@ class MemoryScannerUI(QMainWindow):
         for i in range(3):
             header.setSectionResizeMode(i, QHeaderView.ResizeMode.Stretch)
 
-        self.search_table_dock = QDockWidget("Search Address Table", self)
+        self.search_table_dock = QDockWidget("Address Search", self)
         self.search_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_table_dock.setWidget(self.search_address_table)
 
@@ -77,7 +77,7 @@ class MemoryScannerUI(QMainWindow):
         self.saved_table_dock.setWidget(self.workspace_container)
 
         self.search_pointer_table: PointerScanTableWidget = PointerScanTableWidget(self)
-        self.search_pointer_dock = QDockWidget("Pointer Scan Table", self)
+        self.search_pointer_dock = QDockWidget("Pointer Scan", self)
         self.search_pointer_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_pointer_dock.setWidget(self.search_pointer_table)
 
@@ -160,10 +160,10 @@ class MemoryScannerUI(QMainWindow):
         self.fix_dock_close_event(self.search_pointer_dock, self.__menu_bar.search_pointer_action)
 
         # Workspace Signals
-        # self.saved_address_tree.tree_view.freezeSignal.connect(self.backend.freeze_address)
+        self.workspace_container.freezeRequestSignal.connect(self.backend.freeze_address)
         # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
         self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
-        self.workspace_container.pointerScanRequested.connect(self.backend.pointer_scan)
+        self.workspace_container.pointerScanRequestSignal.connect(self.backend.pointer_scan)
         # self.backend.workspace_worker.setProcessSignal.connect(self.workspace_container.tree.set_process)
         # self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
 
@@ -283,7 +283,7 @@ class MemoryScannerUI(QMainWindow):
         self.status.showMessage(message)
 
     @staticmethod
-    def fix_dock_close_event(dock: QDockWidget, action: QAction, on_closed_callback: Optional[Callable[[], None]] = None):
+    def fix_dock_close_event(dock: QDockWidget, action: QAction, on_closed_callback: Callable[[], None] | None = None):
         """
         Hooks up a QDockWidget and QAction so that:
           - action.toggled ↔ dock.setVisible

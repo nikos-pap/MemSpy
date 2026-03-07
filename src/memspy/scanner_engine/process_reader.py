@@ -2,7 +2,7 @@ import ctypes
 import os
 from ctypes import wintypes
 from logging import getLogger, Logger
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 
 from PIL.ImageChops import offset
 from numpy.typing import NDArray
@@ -350,7 +350,7 @@ class MemoryScanner:
 
             address += memory_info.RegionSize
 
-    def scan_value(self, parameters: ScanParameters) -> Generator[Optional[tuple], Any, None]:
+    def scan_value(self, parameters: ScanParameters) -> Generator[tuple | None, Any, None]:
         values = parameters.values
         condition = parameters.condition
         dtype = parameters.value_type

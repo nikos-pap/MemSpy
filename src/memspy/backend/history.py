@@ -1,4 +1,3 @@
-from typing import Optional
 from memspy.utils.operation import Operation, GenericOperation, FilterOperation
 from memspy.utils.condition import FilterCondition
 
@@ -6,8 +5,8 @@ from memspy.utils.condition import FilterCondition
 class History:
     def __init__(self):
         self.__history: list[Operation] = []
-        self.__current_filter: Optional[FilterOperation] = None
-        self.__last_scan: Optional[Operation] = None
+        self.__current_filter: FilterOperation | None = None
+        self.__last_scan: Operation | None = None
 
     def append(self, operation: GenericOperation) -> None:
         if isinstance(operation, FilterOperation):

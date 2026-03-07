@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from typing import Any
+
 import numpy as np
 from numpy.typing import NDArray
 from memspy.scanner_engine.region import Region
@@ -27,7 +28,7 @@ def match_condition(arr_chunk: NDArray, offset, mode: Condition, start, end, dty
     return indices+offset, vals
 
 
-def find_matches(region: Region, executor: ThreadPoolExecutor, values_dtype: Type = Type.UInt32, mode: Condition = Condition.EQUAL, target: Optional = None) -> np.ndarray:
+def find_matches(region: Region, executor: ThreadPoolExecutor, values_dtype: Type = Type.UInt32, mode: Condition = Condition.EQUAL, target: Any | None = None) -> np.ndarray:
     def chunk_bytes(data, x, n):
         total_length = len(arr)
 

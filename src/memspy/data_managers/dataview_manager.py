@@ -1,5 +1,3 @@
-from typing import Optional
-
 from numpy.typing import NDArray
 import numpy as np
 
@@ -37,10 +35,10 @@ class MemoryViewThread(QObject):
 
         self.current_page_number: int = -1
 
-        self.__current_page: Optional[NDArray] = None
+        self.__current_page: NDArray | None = None
 
-        self.__page_buffer: Optional[NDArray] = None
-        self.__initialized_value_mask: Optional[NDArray] = None
+        self.__page_buffer: NDArray | None = None
+        self.__initialized_value_mask: NDArray | None = None
 
         self.__timer = QTimer(self)
         self.__timer.setInterval(update_rate)
@@ -50,7 +48,7 @@ class MemoryViewThread(QObject):
         self.__timer.timeout.connect(self.__update_values)
         self.__timer.start()
 
-    def get_last_file(self) -> Optional[str]:
+    def get_last_file(self) -> str | None:
         if self.__history.empty():
             return None
         return self.__history.last.filepath

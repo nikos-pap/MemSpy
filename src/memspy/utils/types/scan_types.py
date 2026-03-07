@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
 
 from memspy.utils.condition import Condition
 from memspy.utils.types import Type
@@ -37,7 +36,7 @@ class ScanParameters:
     values: tuple[bytes, bytes]
     value_type: Type
     scan_type: ScanType
-    file_path: Optional[str] = None
+    file_path: str | None = None
     threads: int | None = None
 
 

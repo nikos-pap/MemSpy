@@ -1,6 +1,6 @@
 import os
 from numpy.typing import DTypeLike
-from typing import Optional, BinaryIO
+from typing import BinaryIO
 from logging import Logger, getLogger
 from collections.abc import Iterable
 
@@ -11,9 +11,9 @@ class FileStreamReader:
 
     def __init__(self):
         self.__size: int = 0
-        self.__data_size: Optional[int] = None
-        self.__filepath: Optional[str] = None
-        self.__stream: Optional[BinaryIO] = None
+        self.__data_size: int | None = None
+        self.__filepath: str | None = None
+        self.__stream: BinaryIO | None = None
 
     def set_file(self, filepath: str, element_size: int) -> None:
         self.__filepath = filepath
@@ -38,8 +38,8 @@ class FileStreamReader:
         return self.__size
 
     def reset(self):
-        self.__data_size: Optional[DTypeLike] = None
-        self.__filepath: Optional[str] = None
+        self.__data_size: DTypeLike | None = None
+        self.__filepath: str | None = None
 
     def close(self) -> None:
         self.reset()

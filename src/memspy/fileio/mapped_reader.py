@@ -1,7 +1,7 @@
 import os
 
 from numpy.typing import NDArray, DTypeLike
-from typing import Optional, BinaryIO
+from typing import BinaryIO
 from logging import Logger, getLogger
 import numpy as np
 
@@ -13,9 +13,9 @@ class MappedFileReader:
     def __init__(self, page_size: int = 100):
         self.__page_size: int = page_size
 
-        self.__dtype: Optional[DTypeLike] = None
-        self.__address_list: Optional[NDArray] = None
-        self.__filepath: Optional[str] = None
+        self.__dtype: DTypeLike | None = None
+        self.__address_list: NDArray | None = None
+        self.__filepath: str | None = None
         self.__current_page_number: int = 0
         self.__total_page_number: int = 0
 
@@ -101,11 +101,11 @@ class MappedFileReader:
         return self.__page_size
 
     def reset(self):
-        self.__dtype: Optional[DTypeLike] = None
-        self.__address_list: Optional[NDArray] = None
-        self.__filepath: Optional[str] = None
-        self.__current_page_number: int = 0
-        self.__total_page_number: int = 0
+        self.__dtype = None
+        self.__address_list = None
+        self.__filepath = None
+        self.__current_page_number = 0
+        self.__total_page_number = 0
 
     def close(self) -> None:
         del self.__address_list

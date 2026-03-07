@@ -3,7 +3,7 @@ from typing import  Iterable, List
 from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
-from memspy.utils.types import WorkspaceItem
+from memspy.utils.types import WorkspaceItem, WorkspaceColumn
 from memspy.utils.types.converters import convert_from_bytes
 
 
@@ -18,7 +18,7 @@ class WorkspaceModel(QStandardItemModel):
     editValueSignal = pyqtSignal('quint64', bytes)
     addAddressSignal = pyqtSignal(WorkspaceItem)
 
-    HEADER = ["Name", "Address", "Value", "Frozen", "Offsets"]
+    HEADER = WorkspaceColumn.headers()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -33,17 +33,17 @@ class WorkspaceModel(QStandardItemModel):
             return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDropEnabled
 
         # Always base folder/data logic on column 0
-        name_index = index.sibling(index.row(), 0)
+        name_index = index.sibling(index.row(), WorkspaceColumn.NAME.index)
         name_item = self.itemFromIndex(name_index)
 
         base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
 
-        if index.column() == 0:
+        if index.column() == WorkspaceColumn.NAME.index:
             base |= Qt.ItemFlag.ItemIsDragEnabled
             if self._is_folder_item(name_item):
                 base |= Qt.ItemFlag.ItemIsDropEnabled
 
-        if index.column() == 2:
+        if index.column() == WorkspaceColumn.VALUE.index:
             # Editable only for data rows (those whose name column has a WorkspaceItem)
             if not self._is_folder_item(name_item):
                 base |= Qt.ItemFlag.ItemIsEditable
@@ -66,11 +66,11 @@ class WorkspaceModel(QStandardItemModel):
             return False
 
         # Always use column 0
-        column = 0
+        column = WorkspaceColumn.NAME.index
 
         # Normalize parent to column 0
         if parent.isValid():
-            parent = parent.sibling(parent.row(), 0)
+            parent = parent.sibling(parent.row(), WorkspaceColumn.NAME.index)
 
         # If parent is a data row, move under its parent folder/root
         if parent.isValid():
@@ -141,7 +141,7 @@ class WorkspaceModel(QStandardItemModel):
         if not index.isValid():
             return
 
-        name_index = index.sibling(index.row(), 0)
+        name_index = index.sibling(index.row(), WorkspaceColumn.NAME.index)
         name_item = self.itemFromIndex(name_index)
         if name_item is None:
             return
@@ -153,11 +153,11 @@ class WorkspaceModel(QStandardItemModel):
         row = name_item.row()
 
         # Column 0: name
-        name_item = parent.child(row, 0)
-        addr_item = parent.child(row, 1)
-        value_item = parent.child(row, 2)
-        frozen_item = parent.child(row, 3)
-        offsets_item = parent.child(row, 4)
+        name_item = parent.child(row, WorkspaceColumn.NAME.index)
+        addr_item = parent.child(row, WorkspaceColumn.ADDRESS.index)
+        value_item = parent.child(row, WorkspaceColumn.VALUE.index)
+        frozen_item = parent.child(row, WorkspaceColumn.FROZEN.index)
+        offsets_item = parent.child(row, WorkspaceColumn.OFFSETS.index)
 
         if name_item is None:
             return
@@ -172,7 +172,7 @@ class WorkspaceModel(QStandardItemModel):
             value_item.setText(ws_item.get_value())
             value_item.setFlags(value_item.flags() | Qt.ItemFlag.ItemIsEditable)
         if frozen_item is not None:
-            frozen_item.setText("Yes" if ws_item.frozen else "No")
+            frozen_item.setText("❄" if ws_item.frozen else "")
         if offsets_item is not None:
             offsets_item.setText(",".join(str(o) for o in (ws_item.offsets or [])))
 
@@ -186,7 +186,7 @@ class WorkspaceModel(QStandardItemModel):
         if not index.isValid():
             return None
 
-        name_index = index.sibling(index.row(), 0)
+        name_index = index.sibling(index.row(), WorkspaceColumn.NAME.index)
         obj = name_index.data(Qt.ItemDataRole.UserRole)
         if isinstance(obj, WorkspaceItem):
             return obj
@@ -201,7 +201,7 @@ class WorkspaceModel(QStandardItemModel):
 
         def walk(item: QStandardItem):
             for row in range(item.rowCount()):
-                name_item = item.child(row, 0)
+                name_item = item.child(row, WorkspaceColumn.NAME.index)
                 if name_item is None:
                     continue
                 obj = name_item.data(Qt.ItemDataRole.UserRole)
@@ -243,7 +243,7 @@ class WorkspaceModel(QStandardItemModel):
         row.append(value_item)
 
         # Frozen
-        frozen_item = QStandardItem("Yes" if ws_item.frozen else "No")
+        frozen_item = QStandardItem("❄" if ws_item.frozen else "")
         frozen_item.setEditable(False)
         row.append(frozen_item)
 
@@ -276,7 +276,7 @@ class WorkspaceModel(QStandardItemModel):
             return self.invisibleRootItem()
 
         # Normalize to column 0
-        parent_index = parent_index.sibling(parent_index.row(), 0)
+        parent_index = parent_index.sibling(parent_index.row(), WorkspaceColumn.NAME.index)
         item = self.itemFromIndex(parent_index)
 
         if item is not None and self._is_folder_item(item):

@@ -1,5 +1,3 @@
-from typing import Optional
-
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -18,7 +16,7 @@ from memspy.utils.types.scan_types import ScanParameters, ScanType
 class PagedTable(QWidget):
     filterSignal = pyqtSignal(str)
     valueSetSignal = pyqtSignal(int, bytes)
-    freezeSignal = pyqtSignal(int)
+    freezeSignal = pyqtSignal(int)  # TODO REMOVE
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
     addressActivated = pyqtSignal(WorkspaceItem)
@@ -28,7 +26,7 @@ class PagedTable(QWidget):
 
     __logger: Logger = getLogger(__qualname__)
 
-    def __init__(self, font: Optional[QFont] = None, *args, **kwargs):
+    def __init__(self, font: QFont | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setWindowTitle("Large Table with Filter + Pagination")
 

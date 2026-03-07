@@ -1,2 +1,3 @@
 from memspy.scanner_engine.process_reader import MemoryScanner, SCANNER
 from memspy.scanner_engine.pointer_scanner import PointerScanner
+from memspy.scanner_engine.value_freezer_process import ValueFreezerProcess

@@ -83,7 +83,7 @@ class PointerScanConfigDialog(QDialog):
         # grid.addWidget(QLabel("Target module:"), row, 0, Qt.AlignmentFlag.AlignRight)
         # grid.addWidget(self._module_combo, row, 1)
         # row += 1
-        #
+
         # range_row = QHBoxLayout()
         # range_row.addWidget(self._target_start_edit)
         # range_row.addWidget(QLabel("to"))

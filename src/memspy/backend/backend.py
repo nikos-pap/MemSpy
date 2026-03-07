@@ -10,7 +10,7 @@ from bisect import insort
 from memspy.data_managers.dataview_manager import MemoryViewThread
 from memspy.data_managers.pointer_view_manager import PointerManager
 from memspy.data_managers.workspace_manager import WorkspaceManager
-from memspy.scanner_engine import SCANNER
+from memspy.scanner_engine import SCANNER, ValueFreezerProcess
 from memspy.scanner_engine.memory_scanner_process import MemoryScannerProcess
 from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
@@ -42,11 +42,11 @@ class QueueWorker(QObject):
                 if msg.message_type == MessageType.EXIT:
                     self.__logger.debug(f"Exiting")
                     break
-                elif msg.message_type == MessageType.SET_PROGRESS:  # scanner
+                elif msg.message_type == MessageType.SCANNER_SET_PROGRESS:  # scanner
                     self.progressSignal.emit(msg.message[0])
-                elif msg.message_type == MessageType.START_SCAN:
+                elif msg.message_type == MessageType.SCANNER_START_SCAN:
                     self.scanStartedSignal.emit(msg.message)
-                elif msg.message_type == MessageType.SCAN_COMPLETED:  # scanner
+                elif msg.message_type == MessageType.SCANNER_SCAN_COMPLETED:  # scanner
                     if len(msg.message) == 2 and msg.message[1] == ScanType.POINTER_SCAN:
                         self.pointerScanCompletedSignal.emit(msg.message[0])
                     else:
@@ -67,9 +67,12 @@ class Backend(QObject):
         super().__init__()
         self.__save_dir: str = CONFIG.tempFolderPath
 
-        # Communication queues
+        # Scanner Process queues
         self.__scanner_queue_out: Queue = Queue()
         self.__scanner_queue_in: Queue = Queue(maxsize=10)
+
+        # Freeze Process queues
+        self.__freezer_queue_in: Queue = Queue(maxsize=10)
 
         # Scanner listener thread
         self.__thread = QThread(self)
@@ -102,6 +105,9 @@ class Backend(QObject):
         self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir)
         self.__scanner.start()
 
+        self.__freezer_process = ValueFreezerProcess(self.__freezer_queue_in)
+        self.__freezer_process.start()
+
         # Cached process list
         self.__running_procs: list[ProcessItem] = []
         self.__active_processes: set = set()
@@ -119,26 +125,29 @@ class Backend(QObject):
         msg = Message(MessageType.SET_PROCESS, [pid])
         SCANNER.change_process(pid)
         self.__scanner_queue_in.put(msg)
+        self.__freezer_queue_in.put(msg)
 
     @pyqtSlot('quint64', bytes, bool)
     def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
-        pass
-        # message = MessageType.FREEZE_ADDRESS if freeze else MessageType.UNFREEZE_ADDRESS
-        # self.proc_queue_in.put(Message(message, [address, value]))
+        if freeze:
+            message = Message(MessageType.FREEZE_ADDRESS, [(address, value)])
+        else:
+            message = Message(MessageType.UNFREEZE_ADDRESS, [address])
+        self.__freezer_queue_in.put(message)
 
     def scan(self, parameters: ScanParameters) -> None:
         if parameters.scan_type == ScanType.VALUE_SCAN:
-            self.__scanner_queue_in.put(Message(MessageType.START_SCAN, parameters))
+            self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_SCAN, parameters))
         elif parameters.scan_type == ScanType.FILTER_SCAN:
             parameters.file_path = self.memory_worker.get_last_file()
-            self.__scanner_queue_in.put(Message(MessageType.START_FILTER_SCAN, parameters))
+            self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_FILTER_SCAN, parameters))
 
     def stop_scan(self) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.CANCEL_SCAN))
+        self.__scanner_queue_in.put(Message(MessageType.SCANNER_CANCEL_SCAN))
 
     @pyqtSlot(PointerScanParameters)
     def pointer_scan(self, params: PointerScanParameters) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.START_POINTER_SCAN, params))
+        self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_POINTER_SCAN, params))
 
     @property
     def scanner(self):
@@ -164,6 +173,10 @@ class Backend(QObject):
         self.__scanner_queue_in.put_nowait(exit_msg)
         while not self.__scanner_queue_out.empty():
             self.__scanner_queue_out.get()
+
+        while not self.__freezer_queue_in.empty():
+            self.__freezer_queue_in.get()
+        self.__freezer_queue_in.put_nowait(exit_msg)
 
         self.__scanner_queue_out.put_nowait(exit_msg)
         self.memory_worker.exitSignal.emit()

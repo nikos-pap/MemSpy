@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QCheckBox,
-    QTabWidget
+    QTabWidget, QFontComboBox
 )
 from PyQt6.QtCore import QSize, QSettings
 from memspy.utils.devices import list_devices
@@ -60,6 +60,24 @@ class SettingsManager:
 
     def set_pointer_scan_options(self, **kwargs):
         self.scan_data = PointerScanSettings.from_dict(kwargs)
+
+
+class FontPicker(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        layout = QVBoxLayout(self)
+
+        self.combo = QFontComboBox(self)
+        self.label = QLabel("Preview text", self)
+
+        self.combo.currentFontChanged.connect(self._on_font_changed)
+
+        layout.addWidget(self.combo)
+        layout.addWidget(self.label)
+
+    def _on_font_changed(self, font: QFont) -> None:
+        self.label.setFont(font)
 
 
 class SettingsDialog(QDialog):
@@ -197,8 +215,7 @@ class SettingsDialog(QDialog):
         # Fonts
         tab1 = QWidget()
         f1 = QFormLayout(tab1)
-        font_family = QComboBox()
-        font_family.addItems(["Segoe UI", "Arial", "Courier New"])
+        font_family = QFontComboBox()
         f1.addRow("Font Family:", font_family)
         font_size = QSpinBox()
         font_size.setRange(8, 32)

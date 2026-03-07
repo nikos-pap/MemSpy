@@ -1,4 +1,4 @@
-from typing import Optional, NamedTuple
+from typing import NamedTuple
 import numpy as np
 from PIL.Image import Image
 from dataclasses import dataclass, field
@@ -12,22 +12,22 @@ from memspy.utils.types.converters import convert_from_bytes
 class ProcessItem(NamedTuple):
     name: str
     pid: int
-    image: Optional[Image] = None
+    image: Image | None = None
 
 
 @dataclass
 class SearchItem:
-    address: Optional[int] = None
-    previous_value: Optional[bytes] = None
-    next_value: Optional[bytes] = None
-    display_type: Optional[Type] = None
+    address: int | None = None
+    previous_value: bytes | None = None
+    next_value: bytes | None = None
+    display_type: Type | None = None
 
-    def display_next(self) -> Optional[str]:
+    def display_next(self) -> str | None:
         if self.next_value is None or self.display_type is None:
             return None
         return convert_from_bytes(self.next_value, self.display_type)
 
-    def display_previous(self) -> Optional[str]:
+    def display_previous(self) -> str | None:
         if self.previous_value is None or self.display_type is None:
             return None
         return convert_from_bytes(self.previous_value, self.display_type)
@@ -57,11 +57,11 @@ class PointerItem:
 class WorkspaceItem:
     name: str
     address: int
-    value: Optional[bytes] = b''
+    value: bytes | None = b''
     offsets: list[int] = field(default_factory=list)
     frozen: bool = False
     value_type: Type = Type.UInt32
-    module_name: Optional[str] = None
+    module_name: str | None = None
 
     def get_value(self) -> str:
         if self.value is None:
@@ -83,3 +83,31 @@ class WorkspaceDataType(Enum):
     POINTER = auto()
     GROUP = auto()
     ADDRESS = auto()
+
+
+class WorkspaceColumn(Enum):
+    NAME = (0, "Name")
+    ADDRESS = (1, "Address")
+    VALUE = (2, "Value")
+    FROZEN = (3, "❄")
+    OFFSETS = (4, "Offsets")
+
+    def __init__(self, index: int, title: str):
+        self._index = index
+        self._title = title
+
+    @property
+    def index(self) -> int:
+        return self._index
+
+    @property
+    def title(self) -> str:
+        return self._title
+
+    @classmethod
+    def headers(cls) -> list[str]:
+        return [c.title for c in cls]
+
+    @classmethod
+    def count(cls) -> int:
+        return len(cls)

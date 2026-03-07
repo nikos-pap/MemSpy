@@ -1,6 +1,5 @@
 from enum import Enum, unique
 import numpy as np
-from typing import Optional
 from numpy.typing import DTypeLike
 
 
@@ -19,7 +18,7 @@ class Type(Enum):
     Double = ("Double", 8, np.float64)
     String = ("String", None, None)  # variable length
 
-    def __init__(self, label: str, size_bytes: Optional[int], np_dtype: Optional[DTypeLike]):
+    def __init__(self, label: str, size_bytes: int | None, np_dtype: DTypeLike | None):
         self._label = label
         self._size_bytes = size_bytes
         self._np_dtype = np_dtype
@@ -30,7 +29,7 @@ class Type(Enum):
         return self._size_bytes
 
     @property
-    def dtype(self) -> Optional[DTypeLike]:
+    def dtype(self) -> DTypeLike | None:
         return self._np_dtype
 
     # Nice-to-haves that don’t change behavior elsewhere

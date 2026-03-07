@@ -1,24 +1,45 @@
 from logging import getLogger, Logger
-from typing import Optional, List
+from typing import List
 
 from PyQt6.QtCore import Qt, pyqtSignal, pyqtSlot, QModelIndex, QPoint
-from PyQt6.QtGui import QAction, QFont
+from PyQt6.QtGui import QAction, QFont, QPainter
 from PyQt6.QtWidgets import (
     QTreeView,
     QToolBar,
     QVBoxLayout,
     QWidget,
     QInputDialog,
-    QLabel, QDialog, QAbstractItemView, QHeaderView, QMenu, QApplication,
+    QLabel, QDialog, QAbstractItemView, QHeaderView, QMenu, QApplication, QStyledItemDelegate,
 )
 from PyQt6.QtGui import QStandardItem
 
 from memspy.gui.models import WorkspaceModel
 from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
 from memspy.scanner_engine import SCANNER
-from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem, PointerScanParameters
+from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem, PointerScanParameters, WorkspaceColumn
 from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
 from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
+
+
+class SnowflakeDelegate(QStyledItemDelegate):
+
+    def paint(self, painter: QPainter, option, index):
+        state = index.data(Qt.ItemDataRole.CheckStateRole)
+
+        painter.save()
+
+        if state == Qt.CheckState.Checked:
+            font = QFont(option.font)
+            font.setPointSize(font.pointSize() + 2)
+            painter.setFont(font)
+
+            painter.drawText(
+                option.rect,
+                Qt.AlignmentFlag.AlignCenter,
+                "❄"
+            )
+
+        painter.restore()
 
 
 class WorkspaceTree(QTreeView):
@@ -32,7 +53,7 @@ class WorkspaceTree(QTreeView):
 
     __logger: Logger = getLogger(__qualname__)
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setUniformRowHeights(True)
         self.setHeaderHidden(False)
@@ -83,7 +104,7 @@ class WorkspaceTree(QTreeView):
             self.model.appendRow(group_items)
         else:
             target.appendRow(group_items)
-            target.setChild(group_items[0].row(), 0)  # .setEditable(False)  # keep consistent
+            target.setChild(group_items[0].row(), WorkspaceColumn.NAME.index, None)  # .setEditable(False)  # keep consistent
         self.expandAll()
 
     def open_add_item_dialog(self) -> None:
@@ -139,8 +160,8 @@ class WorkspaceTree(QTreeView):
         propagate the new text to the WorkspaceItem stored in UserRole.
         """
         # only handle edits to the 'Name' column for real items
-        wi = item.index().siblingAtColumn(0).data(Qt.ItemDataRole.UserRole)
-        if item.column() == 0:
+        wi = item.index().siblingAtColumn(WorkspaceColumn.NAME.index).data(Qt.ItemDataRole.UserRole)
+        if item.column() == WorkspaceColumn.NAME.index:
             new_name = item.data(Qt.ItemDataRole.EditRole)
             # Fallback to item.text() if needed
             if new_name is None:
@@ -174,7 +195,7 @@ class WorkspaceTree(QTreeView):
             | Qt.ItemFlag.ItemIsDragEnabled
         )
         # Sibling column items
-        empty = [QStandardItem("") for _ in range(5)]
+        empty = [QStandardItem("") for _ in range(WorkspaceColumn.count())]
         for it in empty:
             it.setEditable(False)
         return [name_item] + empty
@@ -190,7 +211,7 @@ class WorkspaceTree(QTreeView):
         while rows:
             parent = rows.pop()
             for r in range(model.rowCount(parent)):
-                name_index = model.index(r, 0, parent)  # column 0 = Name
+                name_index = model.index(r, WorkspaceColumn.NAME.index, parent)  # column 0 = Name
                 kind = name_index.data(self._ROLE_KIND)
 
                 if kind == self._KIND_GROUP:
@@ -205,7 +226,7 @@ class WorkspaceTree(QTreeView):
                     continue
 
                 # trigger refresh on Value column (assumed column 2)
-                val_index = model.index(r, 2, parent)
+                val_index = model.index(r, WorkspaceColumn.VALUE.index, parent)
 
                 if wi.value is not None:
                     model.setData(val_index, convert_from_bytes(wi.value, wi.value_type), Qt.ItemDataRole.EditRole)
@@ -232,7 +253,7 @@ class WorkspaceTree(QTreeView):
         val_it = QStandardItem(wi.get_value())
         val_it.setEditable(True)
 
-        frozen_it = QStandardItem("Yes" if wi.frozen else "No")
+        frozen_it = QStandardItem("❄" if wi.frozen else "")
         frozen_it.setEditable(False)
 
         offsets_it = QStandardItem(",".join(str(o) for o in (wi.offsets or [])))
@@ -247,7 +268,7 @@ class WorkspaceTree(QTreeView):
         else:
             self.model.appendRow(self._mk_item_row(wi))
 
-    def _selected_group_or_root(self) -> Optional[QStandardItem]:
+    def _selected_group_or_root(self) -> QStandardItem | None:
         """Return selected GROUP item or None (meaning root)."""
         sel = self.selectionModel().selectedRows()
         if not sel:
@@ -272,12 +293,13 @@ class WorkspaceTree(QTreeView):
 
 
 class WorkspaceContainer(QWidget):
-    pointerScanRequested: pyqtSignal = pyqtSignal(PointerScanParameters)
+    pointerScanRequestSignal: pyqtSignal = pyqtSignal(PointerScanParameters)
+    freezeRequestSignal: pyqtSignal = pyqtSignal('quint64', bytes, bool)
 
     __logger: Logger = getLogger(__qualname__)
 
     """Toolbar + WorkspaceTree + status label."""
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
 
@@ -317,6 +339,8 @@ class WorkspaceContainer(QWidget):
 
         action_pointer_scan = menu.addAction("Pointer Scan")
         action_edit = menu.addAction("Edit")
+        action_freeze = menu.addAction("Freeze")
+        menu.addSeparator()
         action_copy_address = menu.addAction("Copy Address")
         action_copy_offsets = menu.addAction("Copy Offsets")
         action_copy_value = menu.addAction("Copy Value")
@@ -340,12 +364,20 @@ class WorkspaceContainer(QWidget):
             self.__open_scan_dialog(wi.address)
         elif triggered is action_edit:
             self.__edit_workspace_item(index, wi)
+        elif triggered is action_freeze:
+            wi.frozen = not wi.frozen
+            self.freezeRequestSignal.emit(wi.address, wi.value, wi.frozen)
+            frozen_index = index.sibling(index.row(), WorkspaceColumn.FROZEN.index)
+            self.tree.model.setData(
+                frozen_index,
+                "❄" if wi.frozen else "",
+                Qt.ItemDataRole.DisplayRole
+            )
         elif triggered is action_copy_address:
             QApplication.clipboard().setText(hex(wi.address))
         elif triggered is action_copy_offsets:
             QApplication.clipboard().setText(str(wi.offsets))
         elif triggered is action_copy_value:
-
             QApplication.clipboard().setText(wi.get_value())
         elif triggered is action_delete:
             self._delete_row(index)
@@ -362,7 +394,7 @@ class WorkspaceContainer(QWidget):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             params = dlg.parameters()
             self.__logger.debug(params)
-            self.pointerScanRequested.emit(params)
+            self.pointerScanRequestSignal.emit(params)
 
     def __edit_workspace_item(self, index: QModelIndex, wi: WorkspaceItem) -> None:
         """
