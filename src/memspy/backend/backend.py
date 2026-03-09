@@ -16,16 +16,23 @@ from memspy.utils.operation import Operation
 from memspy.backend import image_extractor
 from memspy.utils.message import Message
 from memspy.utils.settings import CONFIG
-from memspy.utils.types import ScanType, MessageType, PointerItem, ProcessItem, PointerScanParameters
+from memspy.utils.types import (
+    ScanType,
+    MessageType,
+    PointerItem,
+    ProcessItem,
+    PointerScanParameters,
+)
 from memspy.utils.types.scan_types import ScanParameters
 
 
 class QueueWorker(QObject):
     """Worker living in a QThread, forwarding messages from a multiprocessing.Queue."""
+
     progressSignal = pyqtSignal(int)
     scanCompletedSignal = pyqtSignal()
     pointerScanCompletedSignal = pyqtSignal(str)
-    updateSavedSignal = pyqtSignal('quint64', bytes)
+    updateSavedSignal = pyqtSignal("quint64", bytes)
     pointerUpdateSignal = pyqtSignal(PointerItem)
     processExitedSignal = pyqtSignal(int)
     scanStartedSignal = pyqtSignal(ScanParameters)
@@ -40,14 +47,17 @@ class QueueWorker(QObject):
             while not QThread.currentThread().isInterruptionRequested():
                 msg: Message = self.__queue.get()
                 if msg.message_type == MessageType.EXIT:
-                    self.__logger.debug(f"Exiting")
+                    self.__logger.debug(f"Exiting.")
                     break
                 elif msg.message_type == MessageType.SCANNER_SET_PROGRESS:  # scanner
                     self.progressSignal.emit(msg.message[0])
                 elif msg.message_type == MessageType.SCANNER_START_SCAN:
                     self.scanStartedSignal.emit(msg.message)
                 elif msg.message_type == MessageType.SCANNER_SCAN_COMPLETED:  # scanner
-                    if len(msg.message) == 2 and msg.message[1] == ScanType.POINTER_SCAN:
+                    if (
+                        len(msg.message) == 2
+                        and msg.message[1] == ScanType.POINTER_SCAN
+                    ):
                         self.pointerScanCompletedSignal.emit(msg.message[0])
                     else:
                         self.scanCompletedSignal.emit()
@@ -61,6 +71,7 @@ class QueueWorker(QObject):
 
 class Backend(QObject):
     """Central coordinator: manages memory scanning, process enumeration, and inter-thread communication."""
+
     __logger: Logger = getLogger(__qualname__)
 
     def __init__(self):
@@ -102,7 +113,9 @@ class Backend(QObject):
         self.__pointer_manager_thread.started.connect(self.pointer_scan_worker.run)
         self.__pointer_manager_thread.start()
 
-        self.__scanner = MemoryScannerProcess(self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir)
+        self.__scanner = MemoryScannerProcess(
+            self.__scanner_queue_in, self.__scanner_queue_out, self.__save_dir
+        )
         self.__scanner.start()
 
         self.__freezer_process = ValueFreezerProcess(self.__freezer_queue_in)
@@ -117,8 +130,12 @@ class Backend(QObject):
 
     def __connect_signals(self) -> None:
         self.listener.scanStartedSignal.connect(self.__start_operation)
-        self.listener.scanCompletedSignal.connect(self.memory_worker.handle_scan_finished)
-        self.listener.pointerScanCompletedSignal.connect(self.pointer_scan_worker.set_file)
+        self.listener.scanCompletedSignal.connect(
+            self.memory_worker.handle_scan_finished
+        )
+        self.listener.pointerScanCompletedSignal.connect(
+            self.pointer_scan_worker.set_file
+        )
 
     def init_process_reader(self, pid: int) -> None:
         """Initialize memory scanning for a given process ID."""
@@ -127,7 +144,7 @@ class Backend(QObject):
         self.__scanner_queue_in.put(msg)
         self.__freezer_queue_in.put(msg)
 
-    @pyqtSlot('quint64', bytes, bool)
+    @pyqtSlot("quint64", bytes, bool)
     def freeze_address(self, address: int, value: bytes, freeze: bool) -> None:
         if freeze:
             message = Message(MessageType.FREEZE_ADDRESS, [(address, value)])
@@ -137,17 +154,23 @@ class Backend(QObject):
 
     def scan(self, parameters: ScanParameters) -> None:
         if parameters.scan_type == ScanType.VALUE_SCAN:
-            self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_SCAN, parameters))
+            self.__scanner_queue_in.put(
+                Message(MessageType.SCANNER_START_SCAN, parameters)
+            )
         elif parameters.scan_type == ScanType.FILTER_SCAN:
             parameters.file_path = self.memory_worker.get_last_file()
-            self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_FILTER_SCAN, parameters))
+            self.__scanner_queue_in.put(
+                Message(MessageType.SCANNER_START_FILTER_SCAN, parameters)
+            )
 
     def stop_scan(self) -> None:
         self.__scanner_queue_in.put(Message(MessageType.SCANNER_CANCEL_SCAN))
 
     @pyqtSlot(PointerScanParameters)
     def pointer_scan(self, params: PointerScanParameters) -> None:
-        self.__scanner_queue_in.put(Message(MessageType.SCANNER_START_POINTER_SCAN, params))
+        self.__scanner_queue_in.put(
+            Message(MessageType.SCANNER_START_POINTER_SCAN, params)
+        )
 
     @property
     def scanner(self):
@@ -158,8 +181,14 @@ class Backend(QObject):
         parent = None
         if operation_data.scan_type != ScanType.VALUE_SCAN:
             parent = self.__history[-1]
-        operation = Operation(condition=operation_data.condition, parent=parent, filepath=operation_data.file_path, dtype=operation_data.value_type.mem_dtype, values=operation_data.values)
-        self.__logger.debug(f'Starting operation {operation}')
+        operation = Operation(
+            condition=operation_data.condition,
+            parent=parent,
+            filepath=operation_data.file_path,
+            dtype=operation_data.value_type.mem_dtype,
+            values=operation_data.values,
+        )
+        self.__logger.debug(f"Starting operation {operation}")
         self.__history.append(operation)
 
         self.memory_worker.scanFileCreatedSignal.emit(operation)
@@ -183,8 +212,6 @@ class Backend(QObject):
         self.workspace_worker.exitSignal.emit()
         self.pointer_scan_worker.exitSignal.emit()
 
-        CONFIG.exit()
-
         if self.__scanner.is_alive():
             self.__scanner.join()
         if self.__thread.isRunning():
@@ -196,14 +223,14 @@ class Backend(QObject):
 
     def get_running_processes(self) -> list[NamedTuple]:
         """Retrieve and cache running processes and their icons."""
-        skip = {'svchost.exe'}
+        skip = {"svchost.exe"}
         found = set()
         pids = []
-        for proc in psutil.process_iter(['pid', 'name', 'exe']):
+        for proc in psutil.process_iter(["pid", "name", "exe"]):
             try:
-                name = proc.info['name']
-                exe = proc.info['exe']
-                pid = proc.info['pid']
+                name = proc.info["name"]
+                exe = proc.info["exe"]
+                pid = proc.info["pid"]
 
                 if name in skip:
                     continue
@@ -216,11 +243,13 @@ class Backend(QObject):
                     insort(self.__running_procs, process, key=lambda p: p.name.lower())
                 found.add(pid)
             except (psutil.AccessDenied, psutil.NoSuchProcess) as e:
-                self.__logger.error(f'Error Loading Process: {e}')
+                self.__logger.error(f"Error Loading Process: {e}")
 
         removed = self.__active_processes - found
         if removed:
             self.__active_processes = found
-            self.__running_procs = [proc for proc in self.__running_procs if proc.pid in found]
+            self.__running_procs = [
+                proc for proc in self.__running_procs if proc.pid in found
+            ]
 
         return self.__running_procs

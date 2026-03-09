@@ -1,11 +1,9 @@
 from typing import NamedTuple
-import numpy as np
 from PIL.Image import Image
 from dataclasses import dataclass, field
-from numpy.typing import DTypeLike
-from memspy.utils.types import Type
-from enum import Enum, auto
+from enum import Enum
 
+from memspy.utils.types import Type
 from memspy.utils.types.converters import convert_from_bytes
 
 
@@ -32,15 +30,6 @@ class SearchItem:
             return None
         return convert_from_bytes(self.previous_value, self.display_type)
 
-@dataclass
-class AddressItem:
-    name: str
-    address: int
-    value: bytes = b''
-    description: str = ''
-    frozen: bool = False
-    dtype: DTypeLike = np.uint32
-
 
 @dataclass
 class PointerItem:
@@ -57,7 +46,7 @@ class PointerItem:
 class WorkspaceItem:
     name: str
     address: int
-    value: bytes | None = b''
+    value: bytes | None = b""
     offsets: list[int] = field(default_factory=list)
     frozen: bool = False
     value_type: Type = Type.UInt32
@@ -65,24 +54,25 @@ class WorkspaceItem:
 
     def get_value(self) -> str:
         if self.value is None:
-            return ''
+            return ""
         return str(convert_from_bytes(self.value, self.value_type))
 
     @staticmethod
-    def from_pointer_item(item: PointerItem) -> 'WorkspaceItem':
-        return WorkspaceItem(hex(item.start), item.start, b'', item.offsets.copy(), False, item.value_type)
+    def from_pointer_item(item: PointerItem) -> "WorkspaceItem":
+        return WorkspaceItem(
+            hex(item.start),
+            item.start,
+            b"",
+            item.offsets.copy(),
+            False,
+            item.value_type,
+        )
 
 
 @dataclass
 class WorkspaceGroupItem:
     name: str
     items: list[WorkspaceItem] = field(default_factory=list)
-
-
-class WorkspaceDataType(Enum):
-    POINTER = auto()
-    GROUP = auto()
-    ADDRESS = auto()
 
 
 class WorkspaceColumn(Enum):

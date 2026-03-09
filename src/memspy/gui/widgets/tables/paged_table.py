@@ -1,7 +1,15 @@
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QLineEdit, QPushButton, QLabel, QTableView, QHeaderView, QMenu, QApplication
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLineEdit,
+    QPushButton,
+    QLabel,
+    QTableView,
+    QHeaderView,
+    QMenu,
+    QApplication,
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex, QPoint
 
@@ -16,7 +24,6 @@ from memspy.utils.types.scan_types import ScanParameters, ScanType
 class PagedTable(QWidget):
     filterSignal = pyqtSignal(str)
     valueSetSignal = pyqtSignal(int, bytes)
-    freezeSignal = pyqtSignal(int)  # TODO REMOVE
     nextPageSignal = pyqtSignal()
     previousPageSignal = pyqtSignal()
     addressActivated = pyqtSignal(WorkspaceItem)
@@ -40,7 +47,7 @@ class PagedTable(QWidget):
         self.page_end: int = -1
         self.total: int = 0
         self.filtered: int = -1
-        self.current_filter: str = ''
+        self.current_filter: str = ""
 
         self._init_ui()
 
@@ -54,7 +61,9 @@ class PagedTable(QWidget):
         self.table = QTableView(self)
         self.table.setModel(self.model)
         self.table.setFont(self.font)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self.info_label = QLabel()
         self.prev_button = QPushButton("Previous")
         self.next_button = QPushButton("Next")
@@ -94,17 +103,19 @@ class PagedTable(QWidget):
 
         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
         self.__scan_controls.filter_btn.clicked.connect(self.__handle_filter_scan)
-        self.__scan_controls.filter_address_btn.clicked.connect(self.__handle_address_filter)
+        self.__scan_controls.filter_address_btn.clicked.connect(
+            self.__handle_address_filter
+        )
 
     # Triggers
     def __handle_scan(self):
-        self.__logger.debug(f'Scan Button Clicked')
+        self.__logger.debug(f"Scan Button Clicked")
         parameters = self.__scan_controls.get_scan_parameters()
         parameters.scan_type = ScanType.VALUE_SCAN
         self.scanRequested.emit(parameters)
 
     def __handle_filter_scan(self):
-        self.__logger.debug(f'Filter Value Button Clicked')
+        self.__logger.debug(f"Filter Value Button Clicked")
         parameters = self.__scan_controls.get_scan_parameters()
         parameters.scan_type = ScanType.FILTER_SCAN
         self.scanRequested.emit(parameters)
@@ -113,10 +124,14 @@ class PagedTable(QWidget):
         return self.table.horizontalHeader()
 
     def show_message(self):
-        filtered_text = f'{self.filtered} of ' if self.filter_input.text() else ''
+        filtered_text = f"{self.filtered} of " if self.filter_input.text() else ""
         start = self.page_start
         end = self.page_end
-        text = f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)" if self.total else ''
+        text = (
+            f"Showing {start + 1}–{end} ({filtered_text}{self.total} total)"
+            if self.total
+            else ""
+        )
         self.next_button.setDisabled(end == self.filtered or self.total == end)
         self.prev_button.setDisabled(start == 0)
         self.info_label.setText(text)
@@ -184,21 +199,21 @@ class PagedTable(QWidget):
         previous_value = index.sibling(row, 1).data()
 
         if triggered is action_add_to_workspace:
-            item = WorkspaceItem(address, int(address, 16), b'', value_type=Type.UInt32)
+            item = WorkspaceItem(address, int(address, 16), b"", value_type=Type.UInt32)
             self.addressActivated.emit(item)
-            self.__logger.debug(f'Action: Add to Workspace {item}')
+            self.__logger.debug(f"Action: Add to Workspace {item}")
         if triggered is action_copy_address:
             clipboard = QApplication.clipboard()
             clipboard.setText(str(address))
-            self.__logger.debug(f'Action: Copy Address {address}')
+            self.__logger.debug(f"Action: Copy Address {address}")
         if triggered is action_copy_previous:
             clipboard = QApplication.clipboard()
             clipboard.setText(str(previous_value))
-            self.__logger.debug(f'Action: Copy Previous Value {previous_value}')
+            self.__logger.debug(f"Action: Copy Previous Value {previous_value}")
         if triggered is action_copy_current:
             clipboard = QApplication.clipboard()
             clipboard.setText(str(current_value))
-            self.__logger.debug(f'Action: Copy Current Value {current_value}')
+            self.__logger.debug(f"Action: Copy Current Value {current_value}")
 
     def _forward_double_click(self, index: QModelIndex) -> None:
         """
@@ -209,9 +224,18 @@ class PagedTable(QWidget):
         # Find which column holds the text 'Address'
         for col in range(model.columnCount()):
             if model.headerData(col, Qt.Orientation.Horizontal) == "Address":
-                addr_str = model.data(model.index(index.row(), col), Qt.ItemDataRole.DisplayRole)
+                addr_str = model.data(
+                    model.index(index.row(), col), Qt.ItemDataRole.DisplayRole
+                )
                 if addr_str:
-                    wi = WorkspaceItem(address=int(addr_str, 16), value=None, value_type=Type.UInt32, frozen=False, offsets=[], name=addr_str)
+                    wi = WorkspaceItem(
+                        address=int(addr_str, 16),
+                        value=None,
+                        value_type=Type.UInt32,
+                        frozen=False,
+                        offsets=[],
+                        name=addr_str,
+                    )
                     self.addressActivated.emit(wi)
                 break
 
@@ -224,17 +248,23 @@ class PagedTable(QWidget):
         self.__scan_controls.enable_scan_navigation()
 
     def activate_scan_button(self):
-        if not self.__scan_controls.new_scan_btn.isEnabled() or self.__scan_controls.new_scan_btn.text() == 'New Scan':
+        if (
+            not self.__scan_controls.new_scan_btn.isEnabled()
+            or self.__scan_controls.new_scan_btn.text() == "New Scan"
+        ):
             return
         self.__scan_controls.new_scan_btn.clicked.disconnect()
-        self.__scan_controls.new_scan_btn.setText('New Scan')
+        self.__scan_controls.new_scan_btn.setText("New Scan")
         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_scan)
 
     def activate_cancel_scan_button(self):
-        if not self.__scan_controls.new_scan_btn.isEnabled() or self.__scan_controls.new_scan_btn.text() == 'Cancel Scan':
+        if (
+            not self.__scan_controls.new_scan_btn.isEnabled()
+            or self.__scan_controls.new_scan_btn.text() == "Cancel Scan"
+        ):
             return
         self.__scan_controls.new_scan_btn.clicked.disconnect()
-        self.__scan_controls.new_scan_btn.setText('Cancel Scan')
+        self.__scan_controls.new_scan_btn.setText("Cancel Scan")
         self.__scan_controls.new_scan_btn.clicked.connect(self.__handle_cancel_scan)
 
     # def toggle_scan_navigation(self) -> None:
@@ -253,7 +283,7 @@ class PagedTable(QWidget):
         self.__scan_controls.disable_scan_navigation()
 
     def clear(self):
-        self.filter_input.setText('')
+        self.filter_input.setText("")
         self.prev_button.setDisabled(True)
         self.next_button.setDisabled(True)
         self.model.current_page = 0

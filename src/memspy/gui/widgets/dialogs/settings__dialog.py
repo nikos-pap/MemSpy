@@ -15,51 +15,12 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QSpinBox,
     QCheckBox,
-    QTabWidget, QFontComboBox
+    QTabWidget,
+    QFontComboBox,
 )
 from PyQt6.QtCore import QSize, QSettings
-from memspy.utils.devices import list_devices
 from memspy.utils.settings import PointerScanSettings, ScanSettings
-from memspy.utils.types.devices import Device
-
-
-class SettingsManager:
-    """
-    Centralized settings storage with load/save via QSettings.
-    """
-    def __init__(self):
-        self.settings = QSettings("MyCompany", "MyApp")
-
-        self.devices: list[Device] = list_devices()
-
-        self.default_pointer_scan_settings: PointerScanSettings = PointerScanSettings()
-        self.default_scan_settings: ScanSettings = ScanSettings()
-
-        self.pointer_scan_data: PointerScanSettings = self.default_pointer_scan_settings
-        self.scan_data: ScanSettings = self.default_scan_settings
-        self.load_all()
-
-    def load_all(self):
-        # Load pointer_scan
-        pointer_scan_settings = {key: self.settings.value(f"pointer_scan/{key}", default, type(default)) for key, default in self.default_pointer_scan_settings.items()}
-        self.pointer_scan_data = PointerScanSettings.from_dict(pointer_scan_settings)
-
-        scan_settings = {key: self.settings.value(f"scan_settings/{key}", default, type(default)) for key, default in self.default_scan_settings.items()}
-        self.scan_data = ScanSettings.from_dict(scan_settings)
-        # TODO: load other categories similarly
-
-    def save_all(self):
-        # Save pointer_scan
-        for key, val in self.pointer_scan_data.items():
-            self.settings.setValue(f"pointer_scan/{key}", val)
-        # TODO: save other categories similarly
-        self.settings.sync()
-
-    def get_pointer_scan_options(self) -> PointerScanSettings:
-        return self.pointer_scan_data
-
-    def set_pointer_scan_options(self, **kwargs):
-        self.scan_data = PointerScanSettings.from_dict(kwargs)
+from memspy.data_managers.settings_manager import SettingsManager
 
 
 class FontPicker(QWidget):
@@ -101,7 +62,7 @@ class SettingsDialog(QDialog):
         content_layout.setSpacing(10)
         self.sidebar = QListWidget()
         self.sidebar.setFixedWidth(180)
-        self.sidebar.setFont(QFont('Segoe UI', 11))
+        self.sidebar.setFont(QFont("Segoe UI", 11))
         for name in ("General", "Appearance", "Advanced", "Pointer Scan", "Scan"):
             item = QListWidgetItem(name)
             item.setSizeHint(QSize(180, 36))
@@ -129,8 +90,12 @@ class SettingsDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.Apply).setText("Apply")
         buttons.accepted.connect(self.on_ok)
         buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(self.on_apply)
-        buttons.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(self.on_reset)
+        buttons.button(QDialogButtonBox.StandardButton.Apply).clicked.connect(
+            self.on_apply
+        )
+        buttons.button(QDialogButtonBox.StandardButton.Reset).clicked.connect(
+            self.on_reset
+        )
         root_layout.addWidget(buttons)
 
         self.sidebar.setCurrentRow(0)
@@ -170,7 +135,7 @@ class SettingsDialog(QDialog):
             depth=self.depth.value(),
             max_offset=self.max_offset.value(),
             random_scan=self.random_scan.isChecked(),
-            device=self.device.currentIndex()
+            device=self.device.currentIndex(),
         )
         # TODO: other categories
         self.manager.save_all()
@@ -191,7 +156,9 @@ class SettingsDialog(QDialog):
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setSpacing(15)
-        layout.addWidget(self._make_header("General Settings", "Configure core application options."))
+        layout.addWidget(
+            self._make_header("General Settings", "Configure core application options.")
+        )
         grp = QGroupBox("User Preferences")
         form = QFormLayout(grp)
         # Demo controls
@@ -210,7 +177,9 @@ class SettingsDialog(QDialog):
         page = QWidget()
         v = QVBoxLayout(page)
         v.setSpacing(15)
-        v.addWidget(self._make_header("Appearance Settings", "Customize UI look and feel."))
+        v.addWidget(
+            self._make_header("Appearance Settings", "Customize UI look and feel.")
+        )
         tabs = QTabWidget()
         # Fonts
         tab1 = QWidget()
@@ -240,7 +209,11 @@ class SettingsDialog(QDialog):
         page = QWidget()
         v = QVBoxLayout(page)
         v.setSpacing(15)
-        v.addWidget(self._make_header("Advanced Settings", "Performance and experimental features."))
+        v.addWidget(
+            self._make_header(
+                "Advanced Settings", "Performance and experimental features."
+            )
+        )
         grp1 = QGroupBox("Performance")
         f1 = QFormLayout(grp1)
         cache = QSpinBox()
@@ -261,7 +234,11 @@ class SettingsDialog(QDialog):
         v = QVBoxLayout(page)
         v.setSpacing(15)
         options = self.manager.get_pointer_scan_options()
-        v.addWidget(self._make_header("Pointer Scan Settings", "Configure pointer scanning options."))
+        v.addWidget(
+            self._make_header(
+                "Pointer Scan Settings", "Configure pointer scanning options."
+            )
+        )
         grp = QGroupBox("Pointer Scan Options")
         f = QFormLayout(grp)
         self.negative_offsets = QCheckBox()
@@ -295,7 +272,12 @@ class SettingsDialog(QDialog):
         # Load persisted options (dict-like)
         # options = self.manager.get_scan_options()
         options = self.manager.scan_data
-        v.addWidget(self._make_header("Scan Settings", "Global scanning performance and memory-region options."))
+        v.addWidget(
+            self._make_header(
+                "Scan Settings",
+                "Global scanning performance and memory-region options.",
+            )
+        )
 
         # ---------- Performance ----------
         perf_grp = QGroupBox("Performance")
@@ -306,7 +288,9 @@ class SettingsDialog(QDialog):
         perf_form.addRow("Fast Scan:", self.fast_scan)
 
         self.threads = QSpinBox()
-        self.threads.setRange(1, 128)  # keep generous; you can clamp to CPU cores in save/apply
+        self.threads.setRange(
+            1, 128
+        )  # keep generous; you can clamp to CPU cores in save/apply
         self.threads.setValue(options.threads)
         self.threads.setSuffix(" thread(s)")
         perf_form.addRow("Worker Threads:", self.threads)
@@ -377,8 +361,12 @@ class SettingsDialog(QDialog):
         res_form.addRow("Show Previous Values Column:", self.show_previous_values)
 
         self.page_size = QSpinBox()
-        self.page_size.setMinimum(1)  # keep generous; you can clamp to CPU cores in save/apply
-        self.page_size.setMaximum(1000)  # keep generous; you can clamp to CPU cores in save/apply
+        self.page_size.setMinimum(
+            1
+        )  # keep generous; you can clamp to CPU cores in save/apply
+        self.page_size.setMaximum(
+            1000
+        )  # keep generous; you can clamp to CPU cores in save/apply
         self.page_size.setValue(options.page_size)
         res_form.addRow("Page Size:", self.page_size)
 
@@ -391,7 +379,7 @@ class SettingsDialog(QDialog):
         w = QWidget()
         layout = QVBoxLayout(w)
         lbl = QLabel(title)
-        lbl.setFont(QFont('Segoe UI', 16, QFont.Weight.Bold))
+        lbl.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         layout.addWidget(lbl)
         d = QLabel(desc)
         d.setWordWrap(True)

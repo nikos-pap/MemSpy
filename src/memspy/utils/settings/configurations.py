@@ -1,7 +1,8 @@
-import os
 import shutil
 import tempfile
 from logging import getLogger, Logger
+import atexit
+from pathlib import Path
 
 
 class AppConfiguration:
@@ -9,11 +10,13 @@ class AppConfiguration:
     __logger: Logger = getLogger(__qualname__)
 
     def __init__(self):
-        self.__logger.debug(f'Temp Path: {os.path.join(tempfile.gettempdir(), "MemSpy")}')
-        self.tempFolderPath: str = os.path.join(tempfile.gettempdir(), "MemSpy")
-        os.makedirs(self.tempFolderPath, exist_ok=True)
+        self.tempFolderPath: Path = Path(tempfile.gettempdir()) / "MemSpy"
+        self.tempFolderPath.mkdir(exist_ok=True)
+        self.__logger.debug(f"Output Temp Path: {self.tempFolderPath}")
 
-    def exit(self):
+        atexit.register(self.__exit)
+
+    def __exit(self):
         shutil.rmtree(self.tempFolderPath, ignore_errors=True)
 
 

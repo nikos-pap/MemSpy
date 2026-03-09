@@ -30,14 +30,11 @@ class MemoryScannerProcess(Process):
     - Allows selecting backend: NewMemoryScanner or ProcessInspector for testing.
     - Tracks scan duration for performance measurement.
     """
+
     __logger: Logger | None = None
 
     def __init__(
-        self,
-        scanner_queue: Queue,
-        progress_queue: Queue,
-        write_dir: str,
-        **kwargs
+        self, scanner_queue: Queue, progress_queue: Queue, write_dir: str, **kwargs
     ) -> None:
         super().__init__(**kwargs)
         self.__queue_in: Queue = scanner_queue
@@ -58,9 +55,14 @@ class MemoryScannerProcess(Process):
         self.__logger = getLogger(self.__class__.__name__)
 
         if sys.gettrace() is not None:
-            logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s",
+            )
         else:
-            logging.basicConfig(level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s")
+            logging.basicConfig(
+                level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s"
+            )
         logging.getLogger("numba").setLevel(logging.ERROR)
 
         total = 0
@@ -72,15 +74,9 @@ class MemoryScannerProcess(Process):
             elif not self.__scanning:
                 msg: Message = self.__queue_in.get()
                 self.__handle_message(msg)
-            else:
-                msg: Message = Message(MessageType.EMPTY)
-
-            if msg.message_type == MessageType.EXIT:
-                self.__logger.debug('Exiting.')
-                break
 
             if SCANNER.process_exited():
-                self.__logger.debug(f'Process Exited.')
+                self.__logger.debug(f"Process Exited.")
                 SCANNER.close()
                 self.__cancel_scan()
 
@@ -89,16 +85,19 @@ class MemoryScannerProcess(Process):
 
                 if result is None:
                     self.__finish_scan()
-                    self.__logger.debug(f'Found: {total} addresses')
+                    self.__logger.debug(f"Found: {total} addresses")
                     total = 0
                 elif result:
                     addresses, progress = result
                     if self.__scan_type == ScanType.POINTER_SCAN:
                         self.__scan_info.entries = len(addresses)
-                    self.__file_writer.write(addresses, self.__scan_type, self.__scan_info)
+                    self.__file_writer.write(
+                        addresses, self.__scan_type, self.__scan_info
+                    )
                     total += len(addresses)
-                    # self.__logger.debug(f'Progress: {progress} ')
-                    self.__queue_out.put(Message(MessageType.SCANNER_SET_PROGRESS, [progress]), False)
+                    self.__queue_out.put(
+                        Message(MessageType.SCANNER_SET_PROGRESS, [progress]), False
+                    )
 
     def __handle_message(self, msg: Message) -> None:
         typ = msg.message_type
@@ -108,24 +107,24 @@ class MemoryScannerProcess(Process):
             pid = data[0]
             if pid == -1:
                 SCANNER.close()
-                self.__logger.debug('Process detached')
+                self.__logger.debug("Process detached")
             else:
                 SCANNER.change_process(pid)
-                self.__logger.debug(f'Process set to {pid}')
+                self.__logger.debug(f"Process set to {pid}")
 
             if SCANNER.process_exited():
                 SCANNER.close()
 
         elif typ == MessageType.SCANNER_START_SCAN:
             if not SCANNER:
-                self.__logger.debug('Scanner not initialized!')
+                self.__logger.debug("Scanner not initialized!")
                 return
             # value, condition, data_type = data
-            self.__logger.debug(f'Received Scan Request {data}')
+            self.__logger.debug(f"Received Scan Request {data}")
             self.__start_scan(data)
         elif typ == MessageType.SCANNER_START_FILTER_SCAN:
             if not SCANNER:
-                self.__logger.debug('Scanner not initialized!')
+                self.__logger.debug("Scanner not initialized!")
                 return
             # value, condition, filepath, data_type = data
             self.__start_filter_scan(data)
@@ -136,8 +135,8 @@ class MemoryScannerProcess(Process):
             self.__start_pointer_scan(data)
 
         elif typ == MessageType.EXIT:
-            self.__logger.debug('Exiting')
             SCANNER.trim_process()
+            exit()
 
     def __start_scan(self, parameters: ScanParameters) -> None:
         """Initialize a new scan generator, note start time, and notify start."""
@@ -150,10 +149,15 @@ class MemoryScannerProcess(Process):
         dtype = parameters.value_type.mem_dtype
         self.__queue_out.put(Message(MessageType.SCANNER_SET_PROGRESS, [0]), False)
         self.__file_writer.temp_file(dtype)
-        payload = ScanParameters(condition=parameters.condition, scan_type=parameters.scan_type, values=parameters.values, value_type=parameters.value_type)
+        payload = ScanParameters(
+            condition=parameters.condition,
+            scan_type=parameters.scan_type,
+            values=parameters.values,
+            value_type=parameters.value_type,
+        )
         payload.file_path = self.__file_writer.filepath
         self.__queue_out.put(Message(MessageType.SCANNER_START_SCAN, payload), False)
-        self.__logger.debug('Scan started')
+        self.__logger.debug("Scan started")
 
     def __start_filter_scan(self, parameters: ScanParameters) -> None:
         dtype = parameters.value_type.mem_dtype
@@ -161,28 +165,46 @@ class MemoryScannerProcess(Process):
         self.__scanning = True
         self.__scan_start = time.time()
         self.__file_reader.set_file(parameters.file_path, dtype.itemsize)
-        self.__current_scan = self.__filter_iterator(parameters.values, parameters.condition, parameters.value_type)
+        self.__current_scan = self.__filter_iterator(
+            parameters.values, parameters.condition, parameters.value_type
+        )
         self.__queue_out.put(Message(MessageType.SCANNER_SET_PROGRESS, [0]), False)
         self.__file_writer.temp_file(dtype)
-        payload = ScanParameters(parameters.condition, scan_type=parameters.scan_type, values=parameters.values, value_type=parameters.value_type, file_path=self.__file_writer.filepath)
+        payload = ScanParameters(
+            parameters.condition,
+            scan_type=parameters.scan_type,
+            values=parameters.values,
+            value_type=parameters.value_type,
+            file_path=self.__file_writer.filepath,
+        )
         self.__queue_out.put(Message(MessageType.SCANNER_START_SCAN, payload), False)
-        self.__logger.debug('Filter Scan started')
+        self.__logger.debug("Filter Scan started")
 
-    def __filter_iterator(self, value: tuple[bytes, bytes], condition: Condition, data_type: Type, chunk_size: int = 10_000) -> Iterator[tuple[NDArray, int] | None]:
+    def __filter_iterator(
+        self,
+        value: tuple[bytes, bytes],
+        condition: Condition,
+        data_type: Type,
+        chunk_size: int = 10_000,
+    ) -> Iterator[tuple[NDArray, int] | None]:
         dtype = data_type.mem_dtype
         data = np.frombuffer(self.__file_reader.read_elements(chunk_size), dtype=dtype)
         total = self.__file_reader.size
         current = len(data)
 
         while len(data) > 0:
-            yield SCANNER.filter_values(data, value, condition, data_type), (current // total) * 100
-            data = np.frombuffer(self.__file_reader.read_elements(chunk_size), dtype=dtype)
+            yield SCANNER.filter_values(data, value, condition, data_type), (
+                current // total
+            ) * 100
+            data = np.frombuffer(
+                self.__file_reader.read_elements(chunk_size), dtype=dtype
+            )
             current += len(data)
         yield None
 
     def __start_pointer_scan(self, parameters: PointerScanParameters) -> None:
         if self.__scanning:
-            self.__logger.error('Cannot have two scans running together.')
+            self.__logger.error("Cannot have two scans running together.")
             return
         self.__scanning = True
         self.__file_writer.close()
@@ -194,17 +216,20 @@ class MemoryScannerProcess(Process):
         self.__scan_type = ScanType.POINTER_SCAN
 
     def __finish_scan(self) -> None:
-        """Cleanup after scan completes or is signalled done, and log duration."""
+        """Cleanup after scan completes or is signaled done, and log duration."""
         self.__scanning = False
         self.__current_scan = None
         elapsed = time.time() - self.__scan_start
         file_name = self.__file_writer.filepath
         self.__file_writer.close()
         self.__file_reader.close()
-        self.__queue_out.put(Message(MessageType.SCANNER_SCAN_COMPLETED, [file_name, self.__scan_type]), False)
+        self.__queue_out.put(
+            Message(MessageType.SCANNER_SCAN_COMPLETED, [file_name, self.__scan_type]),
+            False,
+        )
         self.__queue_out.put(Message(MessageType.SCANNER_SET_PROGRESS, [100]), False)
         self.__scan_type = None
-        self.__logger.debug(f'Scan finished in {elapsed:.3f} seconds')
+        self.__logger.debug(f"Scan finished in {elapsed:.3f} seconds")
 
     def __cancel_scan(self) -> None:
         """Cancel ongoing scan immediately."""
@@ -214,4 +239,4 @@ class MemoryScannerProcess(Process):
             self.__file_writer.close()
             self.__file_reader.close()
             self.__queue_out.put(Message(MessageType.SCANNER_SET_PROGRESS, [0]), False)
-            self.__logger.debug('Scan cancelled')
+            self.__logger.debug("Scan cancelled")

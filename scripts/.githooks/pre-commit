@@ -1,0 +1,16 @@
+#!/bin/sh
+
+FILES=$(git diff --cached --name-only --diff-filter=ACM | grep ".py$")
+
+if [ -z "$FILES" ]; then
+    exit 0
+fi
+
+if [ -f ".venv/Scripts/black.exe" ]; then
+    FORMATTER=".venv/Scripts/black.exe"
+else
+    FORMATTER=".venv/Scripts/black.sh"
+fi
+
+$FORMATTER $FILES
+git add $FILES

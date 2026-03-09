@@ -4,8 +4,15 @@ from typing import Callable
 from PyQt6.QtCore import Qt, pyqtSlot, QSize
 from PyQt6.QtGui import QIcon, QFont, QAction
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QDockWidget, QStatusBar,
-    QProgressBar, QHeaderView, QStyle
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QVBoxLayout,
+    QDockWidget,
+    QStatusBar,
+    QProgressBar,
+    QHeaderView,
+    QStyle,
 )
 
 from memspy.backend import Backend
@@ -22,6 +29,7 @@ from memspy.utils.types.scan_types import ScanParameters
 
 class MemoryScannerUI(QMainWindow):
     """Main window for the Memory Scanner application."""
+
     __logger: Logger = getLogger(__qualname__)
 
     def __init__(self):
@@ -108,12 +116,14 @@ class MemoryScannerUI(QMainWindow):
         dock_container.addDockWidget(
             Qt.DockWidgetArea.RightDockWidgetArea, self.search_pointer_dock
         )
-        dock_container.tabifyDockWidget(self.search_table_dock, self.search_pointer_dock)
+        dock_container.tabifyDockWidget(
+            self.search_table_dock, self.search_pointer_dock
+        )
         dock_container.tabifyDockWidget(self.search_table_dock, self.saved_table_dock)
         # noinspection PyTypeChecker
         dock_container.setDockOptions(
-            QMainWindow.DockOption.AllowNestedDocks |
-            QMainWindow.DockOption.AllowTabbedDocks
+            QMainWindow.DockOption.AllowNestedDocks
+            | QMainWindow.DockOption.AllowTabbedDocks
         )
 
         self.search_table_dock.raise_()
@@ -145,49 +155,94 @@ class MemoryScannerUI(QMainWindow):
         listener.progressSignal.connect(self.progress_bar.setValue)
         listener.scanCompletedSignal.connect(self.__finished_scan)
         listener.processExitedSignal.connect(self.__process_closed_handle)
-        # listener.pointerUpdateSignal.connect(self.search_pointer_table.handleUpdate)
 
-        self.backend.workspace_worker.updateAddressSignal.connect(self.workspace_container.update_address)
+        self.backend.workspace_worker.updateAddressSignal.connect(
+            self.workspace_container.update_address
+        )
 
         self.search_address_table.nextPageSignal.connect(data_thread.next_page_handle)
-        self.search_address_table.previousPageSignal.connect(data_thread.prev_page_handle)
-        self.search_address_table.addressActivated.connect(self.workspace_container.add_address)
+        self.search_address_table.previousPageSignal.connect(
+            data_thread.prev_page_handle
+        )
+        self.search_address_table.addressActivated.connect(
+            self.workspace_container.add_address
+        )
         self.search_address_table.scanRequested.connect(self.__scan_command)
         self.search_address_table.cancelScanRequested.connect(self.__stop_scan_command)
 
-        self.fix_dock_close_event(self.search_table_dock, self.__menu_bar.search_table_action)
-        self.fix_dock_close_event(self.saved_table_dock, self.__menu_bar.saved_table_action)
-        self.fix_dock_close_event(self.search_pointer_dock, self.__menu_bar.search_pointer_action)
+        self.fix_dock_close_event(
+            self.search_table_dock, self.__menu_bar.search_table_action
+        )
+        self.fix_dock_close_event(
+            self.saved_table_dock, self.__menu_bar.saved_table_action
+        )
+        self.fix_dock_close_event(
+            self.search_pointer_dock, self.__menu_bar.search_pointer_action
+        )
 
         # Workspace Signals
-        self.workspace_container.freezeRequestSignal.connect(self.backend.freeze_address)
-        # self.saved_address_tree.tree_view.pointerScanSignal.connect(self.__pointer_scan_command)
-        self.workspace_container.tree.addAddressSignal.connect(self.backend.workspace_worker.add_address)
-        self.workspace_container.pointerScanRequestSignal.connect(self.backend.pointer_scan)
-        # self.backend.workspace_worker.setProcessSignal.connect(self.workspace_container.tree.set_process)
-        # self.workspace_container.tree.model.editValueSignal.connect(self.backend.workspace_worker.set_value)
+        self.workspace_container.freezeRequestSignal.connect(
+            self.backend.freeze_address
+        )
+        self.workspace_container.tree.addAddressSignal.connect(
+            self.backend.workspace_worker.add_address
+        )
+        self.workspace_container.pointerScanRequestSignal.connect(
+            self.backend.pointer_scan
+        )
 
         # Pointer Scan Signals
-        self.search_pointer_table.pointerScanRequested.connect(self.backend.pointer_scan)
-        self.search_pointer_table.nextPageRequested.connect(self.backend.pointer_scan_worker.get_next_page)
-        self.search_pointer_table.previousPageRequested.connect(self.backend.pointer_scan_worker.get_previous_page)
-        self.search_pointer_table.exportFileRequested.connect(self.backend.pointer_scan_worker.export_file)
-        self.search_pointer_table.importFileRequested.connect(self.backend.pointer_scan_worker.import_file)
-        self.search_pointer_table.filterPointersRequested.connect(self.backend.pointer_scan_worker.clear_pointers)
-        self.search_pointer_table.addToWorkspaceRequested.connect(self.workspace_container.add_address)
+        self.search_pointer_table.pointerScanRequested.connect(
+            self.backend.pointer_scan
+        )
+        self.search_pointer_table.nextPageRequested.connect(
+            self.backend.pointer_scan_worker.get_next_page
+        )
+        self.search_pointer_table.previousPageRequested.connect(
+            self.backend.pointer_scan_worker.get_previous_page
+        )
+        self.search_pointer_table.exportFileRequested.connect(
+            self.backend.pointer_scan_worker.export_file
+        )
+        self.search_pointer_table.importFileRequested.connect(
+            self.backend.pointer_scan_worker.import_file
+        )
+        self.search_pointer_table.filterPointersRequested.connect(
+            self.backend.pointer_scan_worker.clear_pointers
+        )
+        self.search_pointer_table.addToWorkspaceRequested.connect(
+            self.workspace_container.add_address
+        )
 
-        self.backend.pointer_scan_worker.updateMaxDepthSignal.connect(self.search_pointer_table.set_max_depth)
-        self.backend.pointer_scan_worker.loadPageSignal.connect(self.search_pointer_table.set_page)
-        self.backend.pointer_scan_worker.updateValueSignal.connect(self.search_pointer_table.update_pointer_value)
-        self.backend.pointer_scan_worker.setTotalsSignal.connect(self.search_pointer_table.set_totals)
+        self.backend.pointer_scan_worker.updateMaxDepthSignal.connect(
+            self.search_pointer_table.set_max_depth
+        )
+        self.backend.pointer_scan_worker.loadPageSignal.connect(
+            self.search_pointer_table.set_page
+        )
+        self.backend.pointer_scan_worker.updateValueSignal.connect(
+            self.search_pointer_table.update_pointer_value
+        )
+        self.backend.pointer_scan_worker.setTotalsSignal.connect(
+            self.search_pointer_table.set_totals
+        )
 
         self.__menu_bar.openSettingsSignal.connect(self.__open_settings)
         self.__menu_bar.search_table_action.triggered.connect(
-            lambda: self.search_table_dock.setVisible(self.__menu_bar.search_table_action.isChecked()))
+            lambda: self.search_table_dock.setVisible(
+                self.__menu_bar.search_table_action.isChecked()
+            )
+        )
         self.__menu_bar.saved_table_action.triggered.connect(
-            lambda: self.saved_table_dock.setVisible(self.__menu_bar.saved_table_action.isChecked()))
+            lambda: self.saved_table_dock.setVisible(
+                self.__menu_bar.saved_table_action.isChecked()
+            )
+        )
         self.__menu_bar.search_pointer_action.triggered.connect(
-            lambda: self.search_pointer_dock.setVisible(self.__menu_bar.search_pointer_action.isChecked()))
+            lambda: self.search_pointer_dock.setVisible(
+                self.__menu_bar.search_pointer_action.isChecked()
+            )
+        )
 
     def closeEvent(self, event):
         self.backend.stop()
@@ -196,7 +251,7 @@ class MemoryScannerUI(QMainWindow):
     @pyqtSlot(ScanParameters)
     def __scan_command(self, parameters: ScanParameters) -> None:
         if not self.isAttached:
-            self.__set_message('⚠️ Select a process before starting a scan!')
+            self.__set_message("⚠️ Select a process before starting a scan!")
             return
 
         self.search_address_table.clear()
@@ -218,36 +273,39 @@ class MemoryScannerUI(QMainWindow):
     @pyqtSlot(int)
     def __process_selection_handle(self, proc_id: int | None, icon: QIcon = QIcon()):
         if proc_id == -1:
-            icon = self.style().standardIcon(QStyle.StandardPixmap.SP_TitleBarMenuButton)
+            icon = self.style().standardIcon(
+                QStyle.StandardPixmap.SP_TitleBarMenuButton
+            )
             self.setWindowIcon(icon or QIcon())
             self.backend.init_process_reader(-1)
             self.setWindowTitle("Memory Scanner")
             self.isAttached = False
             return
         self.isAttached = True
-        self.setWindowTitle(f'Mem Scanner - {proc_id}')
+        self.setWindowTitle(f"Mem Scanner - {proc_id}")
         start = time.time()
         self.backend.init_process_reader(proc_id)
-        self.__logger.debug(f'Attached ({proc_id}) in {time.time() - start:.2f}s')
+        self.__logger.debug(f"Attached ({proc_id}) in {time.time() - start:.2f}s")
         self.setWindowIcon(icon or QIcon())
         if self.search_address_table.initialise_scan_navigation():
             self.search_address_table.activate_scan_button()
-        # self.saved_address_tree.clear_tree()
 
     @pyqtSlot(int)
     def __process_closed_handle(self, code: int) -> None:
-        self.__logger.debug(f'Closing process {code}')
+        self.__logger.debug(f"Closing process {code}")
         self.__process_box.setCurrentIndex(0)
 
-    @pyqtSlot('quint64')
+    @pyqtSlot("quint64")
     def __pointer_scan_command(self, address: int):
         self.scan_type = ScanType.POINTER_SCAN
         options = self.settings_manager.get_pointer_scan_options()
-        self.backend.pointer_scan(address,
-                                  options.depth,
-                                  options.max_offset,
-                                  options.negative_offsets,
-                                  bool(options.device))
+        self.backend.pointer_scan(
+            address,
+            options.depth,
+            options.max_offset,
+            options.negative_offsets,
+            bool(options.device),
+        )
         # TODO fix device typing
         self.search_address_table.disable_scan_navigation()
 
@@ -260,7 +318,9 @@ class MemoryScannerUI(QMainWindow):
 
     @pyqtSlot(str, str, bool, str, object)
     def __on_pointer_command(self, name, typ, is_ptr, base_hex, offsets):
-        self.__logger.debug(f'Pointer requested: {name}, {typ}, {is_ptr}, {base_hex}, {offsets}')
+        self.__logger.debug(
+            f"Pointer requested: {name}, {typ}, {is_ptr}, {base_hex}, {offsets}"
+        )
         # … fire off your utility, read mem, insert into tree, etc. …
 
     @pyqtSlot(str)
@@ -283,7 +343,11 @@ class MemoryScannerUI(QMainWindow):
         self.status.showMessage(message)
 
     @staticmethod
-    def fix_dock_close_event(dock: QDockWidget, action: QAction, on_closed_callback: Callable[[], None] | None = None):
+    def fix_dock_close_event(
+        dock: QDockWidget,
+        action: QAction,
+        on_closed_callback: Callable[[], None] | None = None,
+    ):
         """
         Hooks up a QDockWidget and QAction so that:
           - action.toggled ↔ dock.setVisible

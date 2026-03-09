@@ -2,13 +2,11 @@ import logging
 import sys
 import time
 from multiprocessing import Process
-from multiprocessing.connection import address_type
 from multiprocessing.queues import Queue
 from queue import Empty
 
 from memspy.scanner_engine.process_reader import SCANNER
-from memspy.utils.message import Message
-from memspy.utils.types import MessageType
+from memspy.utils.message import Message, MessageType
 
 
 class ValueFreezerProcess(Process):
@@ -24,9 +22,14 @@ class ValueFreezerProcess(Process):
         self.__logger = logging.getLogger(self.__class__.__name__)
 
         if sys.gettrace() is not None:
-            logging.basicConfig(level=logging.DEBUG, format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s")
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format="%(asctime)s: [%(name)s] %(levelname)s: %(message)s",
+            )
         else:
-            logging.basicConfig(level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s")
+            logging.basicConfig(
+                level=logging.INFO, format="[%(name)s] %(levelname)s: %(message)s"
+            )
 
         while True:
             if len(self.addresses) == 0 or SCANNER.handle is None:
@@ -47,16 +50,17 @@ class ValueFreezerProcess(Process):
 
     def __handle_message(self, message: Message):
         if message.message_type == MessageType.EXIT:
-            self.__logger.debug('Exiting.')
+            self.__logger.debug("Exiting.")
             exit()
         if message.message_type == MessageType.FREEZE_ADDRESS:
             key, value = message.message[0]
             self.addresses[key] = value
-            self.__logger.debug(f'Frozen address: {key}, {value}')
+            self.__logger.debug(f"Frozen address: {key}, {value}")
         elif message.message_type == MessageType.UNFREEZE_ADDRESS:
             key = message.message[0]
             self.addresses.pop(key, None)
-            self.__logger.debug(f'Unfrozen address: {key}')
+            self.__logger.debug(f"Unfrozen address: {key}")
         elif message.message_type == MessageType.SET_PROCESS:
             SCANNER.change_process(message.message[0])
-            self.__logger.debug(f'Set process: {message.message[0]}')
+            self.addresses.clear()
+            self.__logger.debug(f"Set process: {message.message[0]}")

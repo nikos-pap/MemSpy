@@ -9,6 +9,7 @@ class SettingsManager:
     """
     Centralized settings storage with load/save via QSettings.
     """
+
     def __init__(self):
         self.settings = QSettings("MyCompany", "MyApp")
 
@@ -23,10 +24,16 @@ class SettingsManager:
 
     def load_all(self):
         # Load pointer_scan
-        pointer_scan_settings = {key: self.settings.value(f"pointer_scan/{key}", default, type(default)) for key, default in self.default_pointer_scan_settings.items()}
+        pointer_scan_settings = {
+            key: self.settings.value(f"pointer_scan/{key}", default, type(default))
+            for key, default in self.default_pointer_scan_settings.items()
+        }
         self.pointer_scan_data = PointerScanSettings.from_dict(pointer_scan_settings)
 
-        scan_settings = {key: self.settings.value(f"scan_settings/{key}", default, type(default)) for key, default in self.default_scan_settings.items()}
+        scan_settings = {
+            key: self.settings.value(f"scan_settings/{key}", default, type(default))
+            for key, default in self.default_scan_settings.items()
+        }
         self.scan_data = ScanSettings.from_dict(scan_settings)
         # TODO: load other categories similarly
 
@@ -41,4 +48,4 @@ class SettingsManager:
         return self.pointer_scan_data
 
     def set_pointer_scan_options(self, **kwargs):
-        self.scan_data = PointerScanSettings.from_dict(kwargs)
+        self.pointer_scan_data = PointerScanSettings.from_dict(kwargs)
