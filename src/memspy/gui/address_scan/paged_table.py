@@ -13,9 +13,9 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSlot, pyqtSignal, QModelIndex, QPoint
 
-from memspy.gui.models import SearchTableModel
+from memspy.gui.address_scan.search_table_model import SearchTableModel
 from memspy.utils.types import Type, WorkspaceItem, SearchItem
-from memspy.gui.widgets.controls.scan_controls import ScanControls
+from memspy.gui.address_scan.scan_controls import ScanControls
 from logging import Logger, getLogger
 
 from memspy.utils.types.scan_types import ScanParameters, ScanType

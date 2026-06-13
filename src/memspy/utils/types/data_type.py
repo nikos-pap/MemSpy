@@ -1,27 +1,31 @@
 from enum import Enum, unique
 import numpy as np
-from numpy.typing import DTypeLike
 
 
 @unique
 class Type(Enum):
-    # name = (wire_name, size_in_bytes, numpy_dtype)
-    Int8 = ("Int8",   1, np.int8)
-    Int16 = ("Int16",  2, np.int16)
-    Int32 = ("Int32",  4, np.int32)
-    Int64 = ("Int64",  8, np.int64)
-    UInt8 = ("UInt8",  1, np.uint8)
+    """
+    name = (name, size_in_bytes, numpy_dtype)
+    """
+
+    Int8 = ("Int8", 1, np.int8)
+    Int16 = ("Int16", 2, np.int16)
+    Int32 = ("Int32", 4, np.int32)
+    Int64 = ("Int64", 8, np.int64)
+    UInt8 = ("UInt8", 1, np.uint8)
     UInt16 = ("UInt16", 2, np.uint16)
     UInt32 = ("UInt32", 4, np.uint32)
     UInt64 = ("UInt64", 8, np.uint64)
-    Float = ("Float",  4, np.float32)
+    Float = ("Float", 4, np.float32)
     Double = ("Double", 8, np.float64)
     String = ("String", None, None)  # variable length
 
-    def __init__(self, label: str, size_bytes: int | None, np_dtype: DTypeLike | None):
+    def __init__(
+        self, label: str, size_bytes: int | None, np_dtype: type[np.generic] | None
+    ):
         self._label = label
         self._size_bytes = size_bytes
-        self._np_dtype = np_dtype
+        self._np_dtype: type[np.generic] | None = np_dtype
 
     # Keep your current API intact
     def size(self) -> int:
@@ -29,10 +33,9 @@ class Type(Enum):
         return self._size_bytes
 
     @property
-    def dtype(self) -> DTypeLike | None:
+    def dtype(self) -> type[np.generic] | None:
         return self._np_dtype
 
-    # Nice-to-haves that don’t change behavior elsewhere
     def __str__(self) -> str:
         return self._label
 
@@ -41,11 +44,8 @@ class Type(Enum):
         return self._label
 
     @property
-    def mem_dtype(self) -> DTypeLike:
-        return np.dtype([
-            ("num", np.uint64),
-            ("bytes", f"V{self._size_bytes}")
-        ])
+    def mem_dtype(self) -> np.dtype:
+        return np.dtype([("num", np.uint64), ("bytes", f"V{self._size_bytes}")])
 
     def check(self, s: str, *, finite_floats: bool = False) -> bool:
         """

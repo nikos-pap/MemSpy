@@ -5,7 +5,9 @@ pd_mod = pytest.importorskip(
     reason="pointer_scan_dialog.py not importable",
 )
 PointerScanConfigDialog = pd_mod.PointerScanConfigDialog
-ModuleInfo = pytest.importorskip("memspy.utils.types", reason="types module not importable").ModuleInfo
+ModuleInfo = pytest.importorskip(
+    "memspy.utils.types", reason="types module not importable"
+).ModuleInfo
 
 
 @pytest.mark.gui
@@ -70,7 +72,7 @@ def test_accept_emits_built_parameters(qtbot):
     dlg._target_start_edit.setText("0x10")
     dlg._target_end_edit.setText("0x20")
 
-    with qtbot.waitSignal(dlg.pointerScanRequested, timeout=1000) as ctx:
+    with qtbot.waitSignal(dlg.pointerScanRequestSignal, timeout=1000) as ctx:
         dlg._on_accept()
 
     params = ctx.args[0]

@@ -16,12 +16,13 @@ from PyQt6.QtWidgets import (
 )
 
 from memspy.backend import Backend
-from memspy.gui.widgets.controls.process_selector import ProcessSelector
-from memspy.gui.widgets.tables.workspace_tree import WorkspaceContainer
-from memspy.gui.widgets.tables.paged_table import PagedTable
-from memspy.gui.widgets.tables.pointer_scan_table import PointerScanTableWidget
-from memspy.gui.widgets.menus.menu_bar import MenuBar
-from memspy.gui.widgets.dialogs.settings__dialog import SettingsDialog, SettingsManager
+from memspy.gui.controls.process_selector import ProcessSelector
+from memspy.gui.workspace.workspace_tree import WorkspaceContainer
+from memspy.gui.address_scan.paged_table import PagedTable
+from memspy.gui.pointer_scan.pointer_scan_table import PointerScanTableWidget
+from memspy.gui.controls import MenuBar
+from memspy.gui.settings import SettingsDialog
+from memspy.utils.settings import CONFIG
 
 from memspy.utils.types import ScanType
 from memspy.utils.types.scan_types import ScanParameters
@@ -57,7 +58,6 @@ class MemoryScannerUI(QMainWindow):
         self.setStyleSheet("QPushButton { padding: 5px; }")
 
     def __create_widgets(self):
-        self.settings_manager = SettingsManager()
         # Process selection
         font = QFont()
         font.setPointSize(16)
@@ -133,7 +133,7 @@ class MemoryScannerUI(QMainWindow):
         self.setCentralWidget(self.container)
 
     def __open_settings(self):
-        dlg = SettingsDialog(self, self.settings_manager)
+        dlg = SettingsDialog(self)
         dlg.exec()
 
     def __connect_signals(self):
@@ -295,19 +295,21 @@ class MemoryScannerUI(QMainWindow):
         self.__logger.debug(f"Closing process {code}")
         self.__process_box.setCurrentIndex(0)
 
-    @pyqtSlot("quint64")
-    def __pointer_scan_command(self, address: int):
-        self.scan_type = ScanType.POINTER_SCAN
-        options = self.settings_manager.get_pointer_scan_options()
-        self.backend.pointer_scan(
-            address,
-            options.depth,
-            options.max_offset,
-            options.negative_offsets,
-            bool(options.device),
-        )
-        # TODO fix device typing
-        self.search_address_table.disable_scan_navigation()
+    # REMOVE
+    # @pyqtSlot("quint64")
+    # def __pointer_scan_command(self, address: int):
+    #     self.scan_type = ScanType.POINTER_SCAN
+    #     options = CONFIG.settings_manager.pointer_scan_data
+    #
+    #     self.backend.pointer_scan(
+    #         address,
+    #         options.max_depth,
+    #         options.max_offset,
+    #         options.negative_offsets,
+    #         bool(CONFIG.settings_manager.configuration_data.device),
+    #     )
+    #     # TODO fix device typing
+    #     self.search_address_table.disable_scan_navigation()
 
     @pyqtSlot(int, int)
     def __scan_progress(self, total_addresses: int, total_pointers: int):

@@ -1,7 +1,7 @@
 from PyQt6.QtCore import QSettings
 
 
-def show_settings(organization: str = "MyCompany", application: str = "MyApp") -> None:
+def show_settings(organization: str = "Uminode", application: str = "MemSpy") -> None:
     """Display all settings for the given organization and application."""
     settings = QSettings(organization, application)
     keys = settings.allKeys()
@@ -16,7 +16,7 @@ def show_settings(organization: str = "MyCompany", application: str = "MyApp") -
         print(f"  {key} = {value!r}")
 
 
-def clear_settings(organization: str = "MyCompany", application: str = "MyApp") -> None:
+def clear_settings(organization: str = "Uminode", application: str = "MemSpy") -> None:
     """Clear all settings for the given organization and application."""
     settings = QSettings(organization, application)
     settings.clear()
@@ -27,7 +27,9 @@ def clear_settings(organization: str = "MyCompany", application: str = "MyApp") 
 if __name__ == "__main__":
     # Example usage:
     print("Current settings:")
+    # show_settings("MyCompany", "MyApp")
     show_settings()
 
-    # Uncomment to clear
+    # Uncomment to clear old data
+    # clear_settings("MyCompany", "MyApp")
     clear_settings()

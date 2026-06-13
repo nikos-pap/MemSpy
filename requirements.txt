@@ -2,6 +2,7 @@ Pillow
 pywin32
 psutil
 pyqt6
+pyqt6-sip
 numpy
 numba
 wmi

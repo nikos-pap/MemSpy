@@ -5,7 +5,7 @@ from dataclasses import dataclass, asdict
 from typing import Any
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class Settings(Mapping, ABC):
 
     @classmethod
@@ -41,3 +41,47 @@ class Settings(Mapping, ABC):
 
     def items(self):
         return asdict(self).items()
+
+
+@dataclass(slots=True)
+class AppearanceSettings(Settings):
+    font: str = "Segoe UI"
+    font_size: int = 12
+    theme: str = "Windows11"
+    addresses_per_page: int = 100
+
+
+@dataclass(slots=True)
+class ConfigurationSettings(Settings):
+    device: int = 0
+    max_threads: int = 8
+
+
+@dataclass(slots=True)
+class ScannerSettings(Settings):
+    writable: bool = True
+    executable: bool = False
+    copy_on_write: bool = True
+    private: bool = True
+    mapped: bool = False
+
+    address_range: str = "00000000 - 7FFFFFFF"
+    alignment: bool = True
+    alignment_bytes: int = 4
+
+
+@dataclass(slots=True)
+class PointerScannerSettings(Settings):
+    max_depth: int = 3
+    negative_offsets: bool = False
+    max_offset: int = 4096
+    algorithm: str = "DFS"
+    alignment: bool = True
+    alignment_bytes: int = 4
+
+
+@dataclass(slots=True)
+class ViewSettings(Settings):
+    show_address_search: bool = True
+    show_pointer_scan: bool = True
+    show_workspace: bool = True

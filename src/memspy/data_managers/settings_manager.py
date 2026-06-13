@@ -1,51 +1,111 @@
+from copy import deepcopy
+from typing import TypeVar
 from PyQt6.QtCore import QSettings
-from memspy.utils.devices import list_devices
-from memspy.utils.settings import PointerScanSettings, ScanSettings
 
+from memspy.utils.devices import list_devices
+
+from memspy.utils.settings.settings import (
+    Settings,
+    AppearanceSettings,
+    ConfigurationSettings,
+    ScannerSettings,
+    PointerScannerSettings,
+    ViewSettings,
+)
 from memspy.utils.types.devices import Device
+
+T = TypeVar("T", bound=Settings)
 
 
 class SettingsManager:
-    """
-    Centralized settings storage with load/save via QSettings.
-    """
-
     def __init__(self):
-        self.settings = QSettings("MyCompany", "MyApp")
+        self.settings = QSettings("Uminode", "MemSpy")
 
         self.devices: list[Device] = list_devices()
 
-        self.default_pointer_scan_settings: PointerScanSettings = PointerScanSettings()
-        self.default_scan_settings: ScanSettings = ScanSettings()
+        self.default_appearance_settings: AppearanceSettings = AppearanceSettings()
+        self.default_configuration_settings: ConfigurationSettings = (
+            ConfigurationSettings()
+        )
+        self.default_scanner_settings: ScannerSettings = ScannerSettings()
+        self.default_pointer_scanner_settings: PointerScannerSettings = (
+            PointerScannerSettings()
+        )
+        self.default_view_settings: ViewSettings = ViewSettings()
 
-        self.pointer_scan_data: PointerScanSettings = self.default_pointer_scan_settings
-        self.scan_data: ScanSettings = self.default_scan_settings
-        self.load_all()
+        self.__load_all()
 
-    def load_all(self):
-        # Load pointer_scan
-        pointer_scan_settings = {
-            key: self.settings.value(f"pointer_scan/{key}", default, type(default))
-            for key, default in self.default_pointer_scan_settings.items()
+    def _load_group(self, group: str, defaults: T, settings_type: type[T]) -> T:
+        values = {
+            key: self.settings.value(
+                f"{group}/{key}",
+                default,
+                type(default),
+            )
+            for key, default in defaults.items()
         }
-        self.pointer_scan_data = PointerScanSettings.from_dict(pointer_scan_settings)
 
-        scan_settings = {
-            key: self.settings.value(f"scan_settings/{key}", default, type(default))
-            for key, default in self.default_scan_settings.items()
-        }
-        self.scan_data = ScanSettings.from_dict(scan_settings)
-        # TODO: load other categories similarly
+        return settings_type.from_dict(values)
+
+    def _save_group(self, group: str, data):
+        for key, value in data.items():
+            self.settings.setValue(f"{group}/{key}", value)
+
+    def __load_all(self):
+        self.appearance_data: AppearanceSettings = self._load_group(
+            "appearance",
+            self.default_appearance_settings,
+            AppearanceSettings,
+        )
+
+        self.configuration_data: ConfigurationSettings = self._load_group(
+            "configuration",
+            self.default_configuration_settings,
+            ConfigurationSettings,
+        )
+
+        self.scanner_data: ScannerSettings = self._load_group(
+            "scanner",
+            self.default_scanner_settings,
+            ScannerSettings,
+        )
+
+        self.pointer_scanner_data: PointerScannerSettings = self._load_group(
+            "pointer_scanner",
+            self.default_pointer_scanner_settings,
+            PointerScannerSettings,
+        )
+
+        self.view_data: ViewSettings = self._load_group(
+            "view",
+            self.default_view_settings,
+            ViewSettings,
+        )
 
     def save_all(self):
-        # Save pointer_scan
-        for key, val in self.pointer_scan_data.items():
-            self.settings.setValue(f"pointer_scan/{key}", val)
-        # TODO: save other categories similarly
+        self._save_group("appearance", self.appearance_data)
+        self._save_group("configuration", self.configuration_data)
+        self._save_group("scanner", self.scanner_data)
+        self._save_group("pointer_scanner", self.pointer_scanner_data)
+        self._save_group("view", self.view_data)
+
         self.settings.sync()
+        print("Saving settings")
 
-    def get_pointer_scan_options(self) -> PointerScanSettings:
-        return self.pointer_scan_data
+    def make_applied_snapshot(self):
+        return {
+            "appearance": deepcopy(self.appearance_data),
+            "configuration": deepcopy(self.configuration_data),
+            "scanner": deepcopy(self.scanner_data),
+            "pointer_scanner": deepcopy(self.pointer_scanner_data),
+            "view": deepcopy(self.view_data),
+        }
 
-    def set_pointer_scan_options(self, **kwargs):
-        self.pointer_scan_data = PointerScanSettings.from_dict(kwargs)
+    def make_default_snapshot(self):
+        return {
+            "appearance": deepcopy(self.default_appearance_settings),
+            "configuration": deepcopy(self.default_configuration_settings),
+            "scanner": deepcopy(self.default_scanner_settings),
+            "pointer_scanner": deepcopy(self.default_pointer_scanner_settings),
+            "view": deepcopy(self.default_view_settings),
+        }

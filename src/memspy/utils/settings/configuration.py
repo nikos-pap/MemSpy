@@ -4,6 +4,8 @@ from logging import getLogger, Logger
 import atexit
 from pathlib import Path
 
+from memspy.data_managers.settings_manager import SettingsManager
+
 
 class AppConfiguration:
 
@@ -13,6 +15,7 @@ class AppConfiguration:
         self.tempFolderPath: Path = Path(tempfile.gettempdir()) / "MemSpy"
         self.tempFolderPath.mkdir(exist_ok=True)
         self.__logger.debug(f"Output Temp Path: {self.tempFolderPath}")
+        self.settings_manager: SettingsManager = SettingsManager()
 
         atexit.register(self.__exit)
 

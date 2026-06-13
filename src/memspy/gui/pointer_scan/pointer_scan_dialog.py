@@ -2,18 +2,12 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (QVBoxLayout, QLabel, QGridLayout, QDialogButtonBox, QSpinBox, QCheckBox,
                              QComboBox, QLineEdit, QWidget, QDialog)
 
+from memspy.utils.settings import CONFIG
 from memspy.utils.types import PointerScanParameters, Type, ModuleInfo
 
 
 class PointerScanConfigDialog(QDialog):
-    """
-    Popup dialog to configure pointer scan parameters.
-
-    It does NOT know anything about your process.
-    It does NOT run the scan.
-    """
-
-    pointerScanRequested = pyqtSignal(PointerScanParameters)
+    # pointerScanRequested = pyqtSignal(PointerScanParameters)
 
     def __init__(
             self,
@@ -47,15 +41,15 @@ class PointerScanConfigDialog(QDialog):
         # if SCANNER.modules is not None:
         #     self.set_module_list(SCANNER.modules)
         # self._module_combo.currentIndexChanged.connect(self._on_module_changed)
-
+        config = CONFIG.settings_manager
         self._max_depth_spin = QSpinBox(self)
         self._max_depth_spin.setRange(1, 64)
-        self._max_depth_spin.setValue(5)
+        self._max_depth_spin.setValue(config.pointer_scanner_data.max_depth)
 
         self._max_offset_spin = QSpinBox(self)
         self._max_offset_spin.setRange(0, 1_000_000)
         self._max_offset_spin.setSingleStep(256)
-        self._max_offset_spin.setValue(4096)
+        self._max_offset_spin.setValue(config.pointer_scanner_data.max_offset)
 
         self._negative_offsets_check = QCheckBox("Allow negative offsets", self)
 
@@ -156,7 +150,7 @@ class PointerScanConfigDialog(QDialog):
 
     def _on_accept(self) -> None:
         params = self._build_parameters()
-        self.pointerScanRequested.emit(params)
+        # self.pointerScanRequested.emit(params)
         self.accept()
 
     # ---------- public API ----------

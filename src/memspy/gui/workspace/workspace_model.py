@@ -4,7 +4,6 @@ from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal
 from PyQt6.QtGui import QStandardItemModel, QStandardItem
 
 from memspy.utils.types import WorkspaceItem, WorkspaceColumn
-from memspy.utils.types.converters import convert_from_bytes
 
 
 class WorkspaceModel(QStandardItemModel):

@@ -4,8 +4,8 @@ from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot, QModelIndex
 from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView, \
     QLabel, QFileDialog, QApplication
 
-from memspy.gui.models.pointer_scan_table_model import PointerScanTableModel
-from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
+from memspy.gui.pointer_scan.pointer_scan_table_model import PointerScanTableModel
+from memspy.gui.pointer_scan.pointer_scan_dialog import PointerScanConfigDialog
 from memspy.utils.types import PointerScanParameters, PointerItem, WorkspaceItem
 from memspy.utils.types.converters import convert_from_bytes
 

@@ -13,12 +13,12 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QStandardItem
 
-from memspy.gui.models import WorkspaceModel
-from memspy.gui.widgets.dialogs.pointer_scan_dialog import PointerScanConfigDialog
+from memspy.gui.workspace.workspace_model import WorkspaceModel
+from memspy.gui.pointer_scan.pointer_scan_dialog import PointerScanConfigDialog
 from memspy.scanner_engine import SCANNER
 from memspy.utils.types import WorkspaceItem, WorkspaceGroupItem, PointerScanParameters, WorkspaceColumn
 from memspy.utils.types.converters import convert_from_bytes, convert_to_bytes
-from memspy.gui.widgets.dialogs.add_item_dialog import AddItemDialog
+from memspy.gui.workspace.add_item_dialog import AddItemDialog
 
 
 class SnowflakeDelegate(QStyledItemDelegate):
