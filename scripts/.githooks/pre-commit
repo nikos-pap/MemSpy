@@ -8,8 +8,11 @@ fi
 
 if [ -f ".venv/Scripts/black.exe" ]; then
     FORMATTER=".venv/Scripts/black.exe"
+elif [ -f ".venv/Scripts/black" ]; then
+    FORMATTER=".venv/Scripts/black"
 else
-    FORMATTER=".venv/Scripts/black.sh"
+    echo "black not found, skipping formatting"
+    exit 0
 fi
 
 $FORMATTER $FILES

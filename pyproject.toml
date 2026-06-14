@@ -22,7 +22,7 @@ dependencies = [
 # (Optional) classifiers, authors, etc.
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-qt"]
+dev = ["pytest", "pytest-qt", "black"]
 
 [project.scripts]
 memspy = "memspy.main:main"
