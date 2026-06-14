@@ -25,7 +25,7 @@ def test_set_file_writes_raw_bytes(tmp_path):
     target = tmp_path / "raw.bin"
     writer = FileWriter()
 
-    writer.set_file(str(target), dtype="<i4")
+    writer.open_file(str(target), dtype="<i4")
     writer.write(FakeArray(b"\x01\x02\x03\x04"), scan_type=None)
     writer.close()
 
@@ -60,4 +60,4 @@ def test_set_file_validates_directory(tmp_path):
     missing_dir = tmp_path / "missing" / "output.bin"
 
     with pytest.raises(FileNotFoundError):
-        writer.set_file(str(missing_dir), dtype="<i4")
+        writer.open_file(str(missing_dir), dtype="<i4")

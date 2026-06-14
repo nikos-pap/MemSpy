@@ -60,7 +60,8 @@ class MemoryScannerUI(QMainWindow):
     def __create_widgets(self):
         # Process selection
         font = QFont()
-        font.setPointSize(16)
+        font.setPointSize(12)
+
         self.__menu_bar = MenuBar(self)
         self.setMenuBar(self.__menu_bar)
 
@@ -78,13 +79,16 @@ class MemoryScannerUI(QMainWindow):
         self.search_table_dock = QDockWidget("Address Search", self)
         self.search_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_table_dock.setWidget(self.search_address_table)
+        self.search_table_dock.setFont(font)
 
         self.workspace_container = WorkspaceContainer(self)
         self.saved_table_dock = QDockWidget("Workspace", self)
         self.saved_table_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.saved_table_dock.setWidget(self.workspace_container)
 
-        self.search_pointer_table: PointerScanTableWidget = PointerScanTableWidget(self)
+        self.search_pointer_table: PointerScanTableWidget = PointerScanTableWidget(
+            self, font=font
+        )
         self.search_pointer_dock = QDockWidget("Pointer Scan", self)
         self.search_pointer_dock.setAllowedAreas(Qt.DockWidgetArea.AllDockWidgetAreas)
         self.search_pointer_dock.setWidget(self.search_pointer_table)

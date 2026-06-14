@@ -1,8 +1,20 @@
 from logging import getLogger, Logger
 
 from PyQt6.QtCore import pyqtSignal, Qt, QPoint, pyqtSlot, QModelIndex
-from PyQt6.QtWidgets import QWidget, QTableView, QPushButton, QHBoxLayout, QVBoxLayout, QMenu, QDialog, QHeaderView, \
-    QLabel, QFileDialog, QApplication
+from PyQt6.QtGui import QFont
+from PyQt6.QtWidgets import (
+    QWidget,
+    QTableView,
+    QPushButton,
+    QHBoxLayout,
+    QVBoxLayout,
+    QMenu,
+    QDialog,
+    QHeaderView,
+    QLabel,
+    QFileDialog,
+    QApplication,
+)
 
 from memspy.gui.pointer_scan.pointer_scan_table_model import PointerScanTableModel
 from memspy.gui.pointer_scan.pointer_scan_dialog import PointerScanConfigDialog
@@ -36,35 +48,41 @@ class PointerScanTableWidget(QWidget):
     __logger: Logger = getLogger(__qualname__)
 
     def __init__(
-        self,
-        parent: QWidget | None = None,
-        *args, **kwargs
+        self, parent: QWidget | None = None, font: QFont | None = None, *args, **kwargs
     ) -> None:
         super().__init__(parent, *args, **kwargs)
         self.lock_page: bool = False
-
         # ---- table ----
-        self._table_view = QTableView(self)
+        self._table_view: QTableView = QTableView(self)
         self._model = PointerScanTableModel(parent=self)
         self._table_view.setModel(self._model)
         self._configure_view()
         self.__totals = 0
 
+        self.font: QFont = font or QFont()
+        if not font:
+            self.font.setPointSize(12)
+
         # ---- top bar with button ----
         self._scan_button = QPushButton("Pointer Scan", self)
+        self._scan_button.setFont(self.font)
         self._scan_button.clicked.connect(self._open_scan_dialog)
 
         self.__import_button = QPushButton("Import", self)
+        self.__import_button.setFont(self.font)
         self.__export_button = QPushButton("Export", self)
+        self.__export_button.setFont(self.font)
         self.__filter_pointers_button = QPushButton("Filter Pointers", self)
+        self.__filter_pointers_button.setFont(self.font)
 
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(0, 0, 0, 0)
-        top_bar.addStretch(1)
+        # top_bar.addStretch(1)
+        top_bar.setAlignment(Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self.__import_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self.__export_button, 0, Qt.AlignmentFlag.AlignLeft)
         top_bar.addWidget(self.__filter_pointers_button, 0, Qt.AlignmentFlag.AlignLeft)
-        top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignRight)
+        top_bar.addWidget(self._scan_button, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.__previous_page_button = QPushButton("Previous page", self)
         self.__previous_page_button.setDisabled(True)
@@ -77,7 +95,9 @@ class PointerScanTableWidget(QWidget):
         bottom_bar.setContentsMargins(0, 0, 0, 0)
         # bottom_bar.addStretch(1)
         bottom_bar.addWidget(self.__previous_page_button)
+        self.__previous_page_button.setFont(self.font)
         bottom_bar.addWidget(self.__next_page_button)
+        self.__next_page_button.setFont(self.font)
 
         # ---- main layout ----
         layout = QVBoxLayout(self)
@@ -106,17 +126,19 @@ class PointerScanTableWidget(QWidget):
         self._table_view.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         # self._table_view.horizontalHeader().setStretchLastSection(True)
 
-        self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self._table_view.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
         self._table_view.verticalHeader().setVisible(True)
-        self._table_view.verticalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._table_view.verticalHeader().setDefaultAlignment(
+            Qt.AlignmentFlag.AlignCenter
+        )
 
         self._table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self._table_view.customContextMenuRequested.connect(self.__show_context_menu)
 
     def _open_scan_dialog(self) -> None:
-        dlg = PointerScanConfigDialog(
-            parent=self
-        )
+        dlg = PointerScanConfigDialog(parent=self)
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
             params = dlg.parameters()
@@ -170,9 +192,11 @@ class PointerScanTableWidget(QWidget):
         self._model.set_page(page_num)
         start = self._model.page_num * self._model.page_size
         if self.__totals <= 0:
-            self.__totals_label.setText('')
+            self.__totals_label.setText("")
         else:
-            self.__totals_label.setText(f'Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total).')
+            self.__totals_label.setText(
+                f"Showing {start + 1}-{min(start + self._model.page_size, self.__totals)} ({self.__totals} total)."
+            )
         self.lock_page = False
 
     def set_totals(self, totals: int) -> None:
@@ -194,7 +218,7 @@ class PointerScanTableWidget(QWidget):
         """
         self._model.add_item(item)
 
-    def pointer_item_at(self, index: QModelIndex) -> PointerItem | None:
+    def pointer_item_at(self, index: QModelIndex) -> PointerItem:
         """
         Access the underlying PointerItem-like object for a given row.
         """
@@ -229,23 +253,30 @@ class PointerScanTableWidget(QWidget):
 
         if triggered is action_add_to_workspace:
             item = WorkspaceItem.from_pointer_item(pointer)
-            self.__logger.debug(f'Action: Add to Workspace {item}')
+            self.__logger.debug(f"Action: Add to Workspace {item}")
             self.addToWorkspaceRequested.emit(item)
             return
         clipboard = QApplication.clipboard()
+        if clipboard is None:
+            self.__logger.debug(f"There is no clipboard available.")
+            return
         if triggered is action_copy_address:
-            data = hex(pointer.target) if pointer.target is not None else 'Invalid'
+            data = hex(pointer.target) if pointer.target is not None else "Invalid"
             clipboard.setText(data)
-            self.__logger.debug(f'Action: Copy Address {data}')
+            self.__logger.debug(f"Action: Copy Address {data}")
         elif triggered is action_copy_value:
-            data = str(convert_from_bytes(pointer.value, pointer.value_type) if pointer.value is not None else 'Invalid')
+            data = str(
+                convert_from_bytes(pointer.value, pointer.value_type)
+                if pointer.value is not None
+                else "Invalid"
+            )
             clipboard.setText(data)
-            self.__logger.debug(f'Action: Copy Previous Value {data}')
+            self.__logger.debug(f"Action: Copy Previous Value {data}")
         elif triggered is action_copy_offsets:
             clipboard.setText(str(pointer.offsets))
-            self.__logger.debug(f'Action: Copy Chain {pointer.offsets}')
+            self.__logger.debug(f"Action: Copy Chain {pointer.offsets}")
         elif triggered is action_copy_module_name:
             clipboard.setText(str(pointer.module_name))
-            self.__logger.debug(f'Action: Copy Chain {pointer.module_name}')
+            self.__logger.debug(f"Action: Copy Chain {pointer.module_name}")
         elif triggered is action_copy_chain:
-            self.__logger.debug(f'Coming soon!')
+            self.__logger.debug(f"Coming soon!")

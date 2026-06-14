@@ -53,8 +53,6 @@ class PagedTable(QWidget):
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
-        font = QFont()
-        font.setPointSize(16)
         self.__scan_controls = ScanControls(font=self.font)
 
         self.filter_input = QLineEdit()

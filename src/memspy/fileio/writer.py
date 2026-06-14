@@ -1,13 +1,15 @@
+import io
 import os
 import tempfile
-from os import PathLike
-from typing import BinaryIO
+from typing import TypeAlias
 
 import pickle
 from numpy.typing import NDArray, DTypeLike
 
 from memspy.utils.pointer_scan import PointerScanInfo
 from memspy.utils.types import ScanType
+
+OutputFile: TypeAlias = io.BufferedWriter | tempfile._TemporaryFileWrapper
 
 
 class FileWriter:
@@ -20,45 +22,44 @@ class FileWriter:
         __file: Optional binary file object.
     """
 
-    def __init__(self, out_dir: str | PathLike = tempfile.gettempdir()) -> None:
+    def __init__(self, out_dir: str | os.PathLike = tempfile.gettempdir()) -> None:
         self.dtype: DTypeLike | None = None
         self.filepath: str | None = None
-        self.__file: BinaryIO | None = None
-        self.__out_dir: str | None = out_dir
+        self.__file: OutputFile | None = None
+        self.__out_dir: str | os.PathLike = out_dir
 
-    def set_file(self, file_path: str, dtype: DTypeLike) -> None:
-        """
-        Creates a chosen file so that it can be filled with data.
-        Args:
-            file_path: The file path to write.
-            dtype: the numpy dtype to use.
-        """
+    # noinspection PyTypeHints
+    def open_file(self, file_path: str, dtype: DTypeLike) -> None:
         dirpath, filename = os.path.split(file_path)
         if dirpath and not os.path.exists(dirpath):
             raise FileNotFoundError(f"Path {dirpath} does not exist")
 
-        self.__file = open(file_path, "wb")
-        self.filepath = self.__file.name
-        self.dtype = dtype
+        file = open(file_path, "wb")
+        self.__set_file(file, dtype)
 
+    # noinspection PyTypeHints
     def temp_file(self, dtype: DTypeLike) -> None:
-        """
-        Creates a temporary file so that it can be filled with data.
+        file = tempfile.NamedTemporaryFile(delete=False, dir=self.__out_dir, mode="wb+")
+        self.__set_file(file, dtype)
 
-        Args:
-            dtype: [DTypeLike] the dtype of the written data.
-        """
-        self.__file = tempfile.NamedTemporaryFile(delete=False, dir=self.__out_dir, mode='wb+')
-        self.filepath = self.__file.name
+    # noinspection PyTypeHints
+    def __set_file(self, file: OutputFile, dtype: DTypeLike) -> None:
+        self.__file = file
+        self.filepath = file.name
         self.dtype = dtype
 
-    def write(self, data: NDArray, scan_type: ScanType | None, scan_info: PointerScanInfo | None = None) -> None:
+    def write(
+        self,
+        data: NDArray,
+        scan_type: ScanType | None,
+        scan_info: PointerScanInfo | None = None,
+    ) -> None:
         """
         Writes data to file.
 
         Args:
-            scan_type: Optional[ScanType] the scan type.
             data: [NDArray] the nparray data to write to the file.
+            scan_type: Optional[ScanType] the scan type.
             scan_info: Optional[PointerScanInfo] the scan info.
         Returns:
             None:
@@ -66,10 +67,8 @@ class FileWriter:
         if not self.__file:
             raise RuntimeError("File not set or closed.")
         if scan_type == ScanType.POINTER_SCAN:
-            # noinspection PyTypeChecker
             pickle.dump(scan_info, self.__file)
             for d in data:
-                # noinspection PyTypeChecker
                 pickle.dump(d, self.__file)
         else:
             result = data.tobytes(order="C")

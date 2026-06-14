@@ -1,6 +1,6 @@
 from logging import getLogger, Logger
 
-from PyQt6.QtCore import  Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QComboBox, QLineEdit, QPushButton, QHBoxLayout
 
@@ -15,7 +15,9 @@ class ScanControls(QHBoxLayout):
     filterScanSignal = pyqtSignal()
     __logger: Logger = getLogger(__qualname__)
 
-    def __init__(self, parent=None, horizontal_spacing: int = 10, font: QFont = QFont()):
+    def __init__(
+        self, parent=None, horizontal_spacing: int = 10, font: QFont = QFont()
+    ):
         super(ScanControls, self).__init__(parent)
 
         self.__font = font
@@ -28,7 +30,7 @@ class ScanControls(QHBoxLayout):
     def __setup_widgets(self) -> None:
         self.typeCombo = QComboBox()
         self.typeCombo.setFont(self.__font)
-        self.typeCombo.setFixedWidth(100)
+        # self.typeCombo.setFixedWidth(100)
 
         self.search_input = QLineEdit()
         self.search_input.setFont(self.__font)
@@ -72,12 +74,17 @@ class ScanControls(QHBoxLayout):
     def __connect_signals(self) -> None:
         # self.search_input.textChanged.connect(self.__validate_input)
         # self.typeCombo.currentTextChanged.connect(self.__validate_input)
-        self.condition_combo.currentIndexChanged.connect(self.__condition_changed_command)
+        self.condition_combo.currentIndexChanged.connect(
+            self.__condition_changed_command
+        )
         # self.new_scan_btn.clicked.connect(self.scanSignal)
         # self.filter_btn.clicked.connect(self.filterScanSignal)
 
     def __condition_changed_command(self, _):
-        if self.condition_combo.currentData(Qt.ItemDataRole.UserRole) == Condition.BETWEEN:
+        if (
+            self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
+            == Condition.BETWEEN
+        ):
             self.search_input2.show()
         else:
             self.search_input2.hide()
@@ -85,26 +92,39 @@ class ScanControls(QHBoxLayout):
 
     def prepare_scan(self) -> tuple[bool, Condition, tuple[bytes, bytes], Type, str]:
         condition = self.condition_combo.currentData(Qt.ItemDataRole.UserRole)
-        values = (b'', b'')
+        values = (b"", b"")
         if not self.search_input.text():
-            return False, condition, values, self.typeCombo.currentData(), '⚠️ Fill scan value before starting scan'
+            return (
+                False,
+                condition,
+                values,
+                self.typeCombo.currentData(),
+                "⚠️ Fill scan value before starting scan",
+            )
         if condition == Condition.BETWEEN and not self.search_input2.text():
-            return False, condition, values, self.typeCombo.currentData(), '⚠️ Fill both scan values starting scan'
+            return (
+                False,
+                condition,
+                values,
+                self.typeCombo.currentData(),
+                "⚠️ Fill both scan values starting scan",
+            )
 
-        value = convert_to_bytes(
-            self.search_input.text(), self.typeCombo.currentData()
-        )
+        value = convert_to_bytes(self.search_input.text(), self.typeCombo.currentData())
         if condition == Condition.BETWEEN:
-            values = (value, convert_to_bytes(
-                self.search_input2.text(), self.typeCombo.currentData())
+            values = (
+                value,
+                convert_to_bytes(
+                    self.search_input2.text(), self.typeCombo.currentData()
+                ),
             )
         else:
-            values = (value, b'')
+            values = (value, b"")
 
         self.disable_scan_navigation()
         self.new_scan_btn.clicked.disconnect()
-        self.new_scan_btn.setText('Cancel Scan')
-        return True, condition, values, self.typeCombo.currentData(), ''
+        self.new_scan_btn.setText("Cancel Scan")
+        return True, condition, values, self.typeCombo.currentData(), ""
 
     def current_condition_data(self, role: Qt.ItemDataRole) -> Condition:
         return self.condition_combo.currentData(role)
@@ -126,15 +146,15 @@ class ScanControls(QHBoxLayout):
     def toggle_scan_button(self) -> bool | None:
         if not self.new_scan_btn.isEnabled():
             return None
-        if self.new_scan_btn.text() == 'Cancel Scan':
-            self.new_scan_btn.setText('New Scan')
-        elif self.new_scan_btn.text() == 'New Scan':
-            self.new_scan_btn.setText('Cancel Scan')
-        return self.new_scan_btn.text() == 'New Scan'
+        if self.new_scan_btn.text() == "Cancel Scan":
+            self.new_scan_btn.setText("New Scan")
+        elif self.new_scan_btn.text() == "New Scan":
+            self.new_scan_btn.setText("Cancel Scan")
+        return self.new_scan_btn.text() == "New Scan"
 
     def initialise_scan_navigation(self) -> bool:
         result = False
-        if self.new_scan_btn.text() == 'Cancel Scan':
+        if self.new_scan_btn.text() == "Cancel Scan":
             result = self.toggle_scan_button()
         self.new_scan_btn.setDisabled(False)
         self.typeCombo.setDisabled(False)
@@ -156,15 +176,23 @@ class ScanControls(QHBoxLayout):
         data_type = self.current_type
         condition = self.current_condition
         if self.condition_combo.currentData() == Condition.BETWEEN:
-            values = (convert_to_bytes(self.search_input.text(), data_type), convert_to_bytes(self.search_input2.text(), data_type))
+            values = (
+                convert_to_bytes(self.search_input.text(), data_type),
+                convert_to_bytes(self.search_input2.text(), data_type),
+            )
         else:
-            values = (convert_to_bytes(self.search_input.text(), data_type), b'')
-        return ScanParameters(condition=condition, values=values, value_type=data_type, scan_type=ScanType.VALUE_SCAN)
+            values = (convert_to_bytes(self.search_input.text(), data_type), b"")
+        return ScanParameters(
+            condition=condition,
+            values=values,
+            value_type=data_type,
+            scan_type=ScanType.VALUE_SCAN,
+        )
 
     def __validate_input(self):
         text = self.search_input.text()
         t = self.typeCombo.currentData()
         if len(text) > 0 and not t.check(text):
-            self.search_input.setStyleSheet('background-color: #f6989d;')
+            self.search_input.setStyleSheet("background-color: #f6989d;")
         else:
-            self.search_input.setStyleSheet('background-color: none;')
+            self.search_input.setStyleSheet("background-color: none;")

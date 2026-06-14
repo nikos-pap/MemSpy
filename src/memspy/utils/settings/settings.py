@@ -9,15 +9,15 @@ from typing import Any
 class Settings(Mapping, ABC):
 
     @classmethod
-    def from_dict(cls: 'Settings', data: dict[str, Any]) -> 'Settings':
+    def from_dict(cls: "Settings", data: dict[str, Any]) -> "Settings":
         """Construct settings from a dict, filtering unknown keys."""
-        allowed = {f.name for f in getattr(cls, '__dataclass_fields__').values()}
+        allowed = {f.name for f in getattr(cls, "__dataclass_fields__").values()}
         filtered = {k: v for k, v in data.items() if k in allowed}
         # noinspection PyArgumentList
         return cls(**filtered)
 
     @classmethod
-    def from_json(cls: 'Settings', s: str) -> 'Settings':
+    def from_json(cls: "Settings", s: str) -> "Settings":
         data = json.loads(s)
         return Settings.from_dict(data)
 
@@ -25,19 +25,19 @@ class Settings(Mapping, ABC):
         return json.dumps(asdict(self), separators=(",", ":"))
 
     def __iter__(self):
-        return iter(getattr(self, '__dataclass_fields__'))
+        return iter(getattr(self, "__dataclass_fields__"))
 
     def __len__(self):
-        return len(getattr(self, '__dataclass_fields__'))
+        return len(getattr(self, "__dataclass_fields__"))
 
     def __getitem__(self, key):
-        if key not in getattr(self, '__dataclass_fields__'):
+        if key not in getattr(self, "__dataclass_fields__"):
             raise KeyError(key)
         return getattr(self, key)
 
     @classmethod
-    def keys(cls: 'Settings') -> list[str]:
-        return getattr(cls, '__dataclass_fields__').keys()
+    def keys(cls: "Settings") -> list[str]:
+        return getattr(cls, "__dataclass_fields__").keys()
 
     def items(self):
         return asdict(self).items()
@@ -46,7 +46,9 @@ class Settings(Mapping, ABC):
 @dataclass(slots=True)
 class AppearanceSettings(Settings):
     font: str = "Segoe UI"
-    font_size: int = 12
+    controls_font_size: int = 12
+    titles_font_size: int = 9
+    table_font_size: int = 10
     theme: str = "Windows11"
     addresses_per_page: int = 100
 
