@@ -1,8 +1,50 @@
 import json
 from abc import ABC
 from collections.abc import Mapping
-from dataclasses import dataclass, asdict
-from typing import Any
+from dataclasses import dataclass, asdict, field, replace
+from enum import Enum
+from typing import Any, Generic, TypeVar
+
+TSettings = TypeVar("TSettings", bound="Settings")
+
+
+class SettingsWidget(Enum):
+    COMBO_INDEX = "combo_index"
+    COMBO_TEXT = "combo_text"
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsFieldUi:
+    label: str | None = None
+    minimum: int | None = None
+    maximum: int | None = None
+    choices: tuple[str, ...] | None = None
+    widget: SettingsWidget | None = None
+    enabled: bool | None = None
+    tooltip: str | None = None
+    group: str | None = None
+
+    def merge(self, override: "SettingsFieldUi | None") -> "SettingsFieldUi":
+        if override is None:
+            return self
+
+        return SettingsFieldUi(
+            label=override.label if override.label is not None else self.label,
+            minimum=override.minimum if override.minimum is not None else self.minimum,
+            maximum=override.maximum if override.maximum is not None else self.maximum,
+            choices=override.choices if override.choices is not None else self.choices,
+            widget=override.widget if override.widget is not None else self.widget,
+            enabled=override.enabled if override.enabled is not None else self.enabled,
+            tooltip=override.tooltip if override.tooltip is not None else self.tooltip,
+            group=override.group if override.group is not None else self.group,
+        )
+
+    def with_widget(self, widget: SettingsWidget) -> "SettingsFieldUi":
+        return replace(self, widget=widget)
+
+
+def ui_field(default: Any, **kwargs):
+    return field(default=default, metadata={SettingsFieldUi: SettingsFieldUi(**kwargs)})
 
 
 @dataclass(slots=True)
@@ -19,7 +61,7 @@ class Settings(Mapping, ABC):
     @classmethod
     def from_json(cls: "Settings", s: str) -> "Settings":
         data = json.loads(s)
-        return Settings.from_dict(data)
+        return cls.from_dict(data)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), separators=(",", ":"))
@@ -46,40 +88,59 @@ class Settings(Mapping, ABC):
 @dataclass(slots=True)
 class AppearanceSettings(Settings):
     font: str = "Segoe UI"
-    controls_font_size: int = 12
-    titles_font_size: int = 9
-    table_font_size: int = 10
+    controls_font_size: int = ui_field(12, minimum=1, maximum=72)
+    titles_font_size: int = ui_field(9, minimum=1, maximum=72)
+    table_font_size: int = ui_field(10, minimum=1, maximum=72)
     theme: str = "Windows11"
-    addresses_per_page: int = 100
+    addresses_per_page: int = ui_field(100, minimum=1, maximum=999999)
 
 
 @dataclass(slots=True)
 class ConfigurationSettings(Settings):
     device: int = 0
-    max_threads: int = 8
+    max_threads: int = ui_field(8, minimum=1, maximum=128)
 
 
 @dataclass(slots=True)
 class ScannerSettings(Settings):
-    writable: bool = True
-    executable: bool = False
-    copy_on_write: bool = True
-    private: bool = True
-    mapped: bool = False
+    writable: bool = ui_field(True, group="Search Memory Regions")
+    executable: bool = ui_field(False, group="Search Memory Regions")
+    copy_on_write: bool = ui_field(True, group="Search Memory Regions")
+    private: bool = ui_field(True, group="Search Memory Regions")
+    mapped: bool = ui_field(False, group="Search Memory Regions")
 
     address_range: str = "00000000 - 7FFFFFFF"
-    alignment: bool = True
-    alignment_bytes: int = 4
+    alignment: bool = ui_field(
+        True,
+        label="Alignment / FastScan",
+        enabled=False,
+        tooltip="Locked setting",
+    )
+    alignment_bytes: int = ui_field(4, minimum=1, maximum=999999)
 
 
 @dataclass(slots=True)
 class PointerScannerSettings(Settings):
-    max_depth: int = 3
-    negative_offsets: bool = False
-    max_offset: int = 4096
-    algorithm: str = "DFS"
-    alignment: bool = True
-    alignment_bytes: int = 4
+    max_depth: int = ui_field(3, minimum=1, maximum=999999)
+    negative_offsets: bool = ui_field(
+        False,
+        enabled=False,
+        tooltip="Locked setting",
+    )
+    max_offset: int = ui_field(4096, minimum=0, maximum=999999)
+    algorithm: str = ui_field(
+        "DFS",
+        choices=("DFS", "BFS"),
+        enabled=False,
+        tooltip="Locked setting",
+    )
+    alignment: bool = ui_field(
+        True,
+        label="Alignment / FastScan",
+        enabled=False,
+        tooltip="Locked setting",
+    )
+    alignment_bytes: int = ui_field(4, minimum=1, maximum=999999)
 
 
 @dataclass(slots=True)
@@ -87,3 +148,53 @@ class ViewSettings(Settings):
     show_address_search: bool = True
     show_pointer_scan: bool = True
     show_workspace: bool = True
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsGroup(Generic[TSettings]):
+    key: str
+    settings_type: type[TSettings]
+
+    @property
+    def data_attr(self) -> str:
+        return f"{self.key}_data"
+
+    @property
+    def default_attr(self) -> str:
+        return f"default_{self.key}_settings"
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsStateItem(Generic[TSettings]):
+    group: SettingsGroup[TSettings]
+    data: TSettings
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsState:
+    items: tuple[SettingsStateItem, ...]
+
+    def __iter__(self):
+        return iter(self.items)
+
+    def get(self, group: SettingsGroup[TSettings]) -> TSettings:
+        for item in self.items:
+            if item.group == group:
+                return item.data
+
+        raise KeyError(group.key)
+
+
+APPEARANCE_SETTINGS = SettingsGroup("appearance", AppearanceSettings)
+CONFIGURATION_SETTINGS = SettingsGroup("configuration", ConfigurationSettings)
+SCANNER_SETTINGS = SettingsGroup("scanner", ScannerSettings)
+POINTER_SCANNER_SETTINGS = SettingsGroup("pointer_scanner", PointerScannerSettings)
+VIEW_SETTINGS = SettingsGroup("view", ViewSettings)
+
+SETTINGS_GROUPS: tuple[SettingsGroup, ...] = (
+    APPEARANCE_SETTINGS,
+    CONFIGURATION_SETTINGS,
+    SCANNER_SETTINGS,
+    POINTER_SCANNER_SETTINGS,
+    VIEW_SETTINGS,
+)

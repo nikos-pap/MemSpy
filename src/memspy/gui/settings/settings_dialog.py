@@ -1,5 +1,6 @@
 import sys
 from copy import deepcopy
+from dataclasses import dataclass
 
 from PyQt6.QtCore import QSize, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -17,7 +18,17 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from memspy.utils.settings import CONFIG
+from memspy.utils.settings import (
+    APPEARANCE_SETTINGS,
+    CONFIG,
+    CONFIGURATION_SETTINGS,
+    POINTER_SCANNER_SETTINGS,
+    SCANNER_SETTINGS,
+    VIEW_SETTINGS,
+    SettingsGroup,
+    SettingsState,
+    SettingsStateItem,
+)
 
 from memspy.gui.settings.settings_pages import (
     AppearancePage,
@@ -25,8 +36,14 @@ from memspy.gui.settings.settings_pages import (
     ScannerPage,
     PointerScannerPage,
     ViewPage,
-    SettingsState,
+    SettingsPage,
 )
+
+
+@dataclass(slots=True)
+class SettingsPageEntry:
+    group: SettingsGroup
+    page: SettingsPage
 
 
 class SettingsDialog(QDialog):
@@ -43,6 +60,17 @@ class SettingsDialog(QDialog):
         self.page_list = QListWidget()
         self.page_stack = QStackedWidget()
 
+        self.page_entries = self._create_page_entries()
+        self.pages = [entry.page for entry in self.page_entries]
+
+        self.applied_state = self.current_manager_state()
+
+        self.__build_ui()
+        self.load_state(self.applied_state)
+        self.connect_page_changes()
+        self.update_apply_state()
+
+    def _create_page_entries(self) -> list[SettingsPageEntry]:
         self.appearance_page = AppearancePage(QStyleFactory.keys())
         self.configuration_page = ConfigurationPage(
             [device.name for device in self.manager.devices]
@@ -51,20 +79,13 @@ class SettingsDialog(QDialog):
         self.pointer_scanner_page = PointerScannerPage()
         self.view_page = ViewPage()
 
-        self.pages = [
-            self.appearance_page,
-            self.configuration_page,
-            self.scanner_page,
-            self.pointer_scanner_page,
-            self.view_page,
+        return [
+            SettingsPageEntry(APPEARANCE_SETTINGS, self.appearance_page),
+            SettingsPageEntry(CONFIGURATION_SETTINGS, self.configuration_page),
+            SettingsPageEntry(SCANNER_SETTINGS, self.scanner_page),
+            SettingsPageEntry(POINTER_SCANNER_SETTINGS, self.pointer_scanner_page),
+            SettingsPageEntry(VIEW_SETTINGS, self.view_page),
         ]
-
-        self.applied_state = self.current_manager_state()
-
-        self.__build_ui()
-        self.load_state(self.applied_state)
-        self.connect_page_changes()
-        self.update_apply_state()
 
     def __build_ui(self) -> None:
         main_layout = QVBoxLayout(self)
@@ -113,38 +134,22 @@ class SettingsDialog(QDialog):
             page.changedSignal.connect(self.update_apply_state)
 
     def current_manager_state(self) -> SettingsState:
-        return SettingsState(
-            appearance=deepcopy(self.manager.appearance_data),
-            configuration=deepcopy(self.manager.configuration_data),
-            scanner=deepcopy(self.manager.scanner_data),
-            pointer_scanner=deepcopy(self.manager.pointer_scanner_data),
-            view=deepcopy(self.manager.view_data),
-        )
+        return self.manager.make_applied_snapshot()
 
     def default_state(self) -> SettingsState:
-        return SettingsState(
-            appearance=deepcopy(self.manager.default_appearance_settings),
-            configuration=deepcopy(self.manager.default_configuration_settings),
-            scanner=deepcopy(self.manager.default_scanner_settings),
-            pointer_scanner=deepcopy(self.manager.default_pointer_scanner_settings),
-            view=deepcopy(self.manager.default_view_settings),
-        )
+        return self.manager.make_default_snapshot()
 
     def widget_state(self) -> SettingsState:
         return SettingsState(
-            appearance=self.appearance_page.get_data(),
-            configuration=self.configuration_page.get_data(),
-            scanner=self.scanner_page.get_data(),
-            pointer_scanner=self.pointer_scanner_page.get_data(),
-            view=self.view_page.get_data(),
+            tuple(
+                SettingsStateItem(entry.group, entry.page.get_data())
+                for entry in self.page_entries
+            )
         )
 
     def load_state(self, state: SettingsState) -> None:
-        self.appearance_page.set_data(state.appearance)
-        self.configuration_page.set_data(state.configuration)
-        self.scanner_page.set_data(state.scanner)
-        self.pointer_scanner_page.set_data(state.pointer_scanner)
-        self.view_page.set_data(state.view)
+        for entry in self.page_entries:
+            entry.page.set_data(state.get(entry.group))
 
     def has_changes(self) -> bool:
         return self.widget_state() != self.applied_state
@@ -153,11 +158,7 @@ class SettingsDialog(QDialog):
         self.apply_button.setEnabled(self.has_changes())
 
     def commit_state(self, state: SettingsState) -> None:
-        self.manager.appearance_data = deepcopy(state.appearance)
-        self.manager.configuration_data = deepcopy(state.configuration)
-        self.manager.scanner_data = deepcopy(state.scanner)
-        self.manager.pointer_scanner_data = deepcopy(state.pointer_scanner)
-        self.manager.view_data = deepcopy(state.view)
+        self.manager.apply_snapshot(state)
 
     def apply_changes(self) -> None:
         new_state = self.widget_state()
@@ -253,10 +254,12 @@ class DemoWindow(QMainWindow):
     def on_settings_applied(
         self, old_state: SettingsState, new_state: SettingsState
     ) -> None:
-        if old_state.appearance.theme != new_state.appearance.theme:
-            QApplication.setStyle(new_state.appearance.theme)
+        old_appearance = old_state.get(APPEARANCE_SETTINGS)
+        new_appearance = new_state.get(APPEARANCE_SETTINGS)
+        if old_appearance.theme != new_appearance.theme:
+            QApplication.setStyle(new_appearance.theme)
 
-        if old_state.view != new_state.view:
+        if old_state.get(VIEW_SETTINGS) != new_state.get(VIEW_SETTINGS):
             self.apply_view_settings()
 
     def apply_view_settings(self) -> None:
@@ -267,23 +270,13 @@ class DemoWindow(QMainWindow):
         self.workspace_panel.setVisible(view.show_workspace)
 
     @staticmethod
-    def print_current_settings(self) -> None:
+    def print_current_settings(_checked=False) -> None:
         manager = CONFIG.settings_manager
 
-        print("\n--- APPEARANCE ---")
-        print(manager.appearance_data)
-
-        print("\n--- CONFIGURATION ---")
-        print(manager.configuration_data)
-
-        print("\n--- SCANNER ---")
-        print(manager.scanner_data)
-
-        print("\n--- POINTER SCANNER ---")
-        print(manager.pointer_scanner_data)
-
-        print("\n--- VIEW ---")
-        print(manager.view_data)
+        for group in manager.groups:
+            title = group.key.replace("_", " ").upper()
+            print(f"\n--- {title} ---")
+            print(manager.data_for(group))
 
 
 if __name__ == "__main__":

@@ -5,12 +5,11 @@ from PyQt6.QtCore import QSettings
 from memspy.utils.devices import list_devices
 
 from memspy.utils.settings.settings import (
+    SETTINGS_GROUPS,
     Settings,
-    AppearanceSettings,
-    ConfigurationSettings,
-    ScannerSettings,
-    PointerScannerSettings,
-    ViewSettings,
+    SettingsGroup,
+    SettingsState,
+    SettingsStateItem,
 )
 from memspy.utils.types.devices import Device
 
@@ -18,94 +17,71 @@ T = TypeVar("T", bound=Settings)
 
 
 class SettingsManager:
-    def __init__(self):
-        self.settings = QSettings("Uminode", "MemSpy")
+    def __init__(
+        self,
+        settings: QSettings | None = None,
+        devices: list[Device] | None = None,
+    ):
+        self.settings = settings or QSettings("Uminode", "MemSpy")
 
-        self.devices: list[Device] = list_devices()
+        self.devices: list[Device] = devices if devices is not None else list_devices()
+        self.groups = SETTINGS_GROUPS
 
-        self.default_appearance_settings: AppearanceSettings = AppearanceSettings()
-        self.default_configuration_settings: ConfigurationSettings = (
-            ConfigurationSettings()
-        )
-        self.default_scanner_settings: ScannerSettings = ScannerSettings()
-        self.default_pointer_scanner_settings: PointerScannerSettings = (
-            PointerScannerSettings()
-        )
-        self.default_view_settings: ViewSettings = ViewSettings()
+        for group in self.groups:
+            setattr(self, group.default_attr, group.settings_type())
 
         self.__load_all()
 
-    def _load_group(self, group: str, defaults: T, settings_type: type[T]) -> T:
+    def default_for(self, group: SettingsGroup[T]) -> T:
+        return getattr(self, group.default_attr)
+
+    def data_for(self, group: SettingsGroup[T]) -> T:
+        return getattr(self, group.data_attr)
+
+    def _load_group(self, group: SettingsGroup[T]) -> T:
+        defaults = self.default_for(group)
         values = {
             key: self.settings.value(
-                f"{group}/{key}",
+                f"{group.key}/{key}",
                 default,
                 type(default),
             )
             for key, default in defaults.items()
         }
 
-        return settings_type.from_dict(values)
+        return group.settings_type.from_dict(values)
 
-    def _save_group(self, group: str, data):
+    def _save_group(self, group: SettingsGroup, data: Settings):
         for key, value in data.items():
-            self.settings.setValue(f"{group}/{key}", value)
+            self.settings.setValue(f"{group.key}/{key}", value)
 
     def __load_all(self):
-        self.appearance_data: AppearanceSettings = self._load_group(
-            "appearance",
-            self.default_appearance_settings,
-            AppearanceSettings,
-        )
-
-        self.configuration_data: ConfigurationSettings = self._load_group(
-            "configuration",
-            self.default_configuration_settings,
-            ConfigurationSettings,
-        )
-
-        self.scanner_data: ScannerSettings = self._load_group(
-            "scanner",
-            self.default_scanner_settings,
-            ScannerSettings,
-        )
-
-        self.pointer_scanner_data: PointerScannerSettings = self._load_group(
-            "pointer_scanner",
-            self.default_pointer_scanner_settings,
-            PointerScannerSettings,
-        )
-
-        self.view_data: ViewSettings = self._load_group(
-            "view",
-            self.default_view_settings,
-            ViewSettings,
-        )
+        for group in self.groups:
+            setattr(self, group.data_attr, self._load_group(group))
 
     def save_all(self):
-        self._save_group("appearance", self.appearance_data)
-        self._save_group("configuration", self.configuration_data)
-        self._save_group("scanner", self.scanner_data)
-        self._save_group("pointer_scanner", self.pointer_scanner_data)
-        self._save_group("view", self.view_data)
+        for group in self.groups:
+            self._save_group(group, self.data_for(group))
 
         self.settings.sync()
         print("Saving settings")
 
-    def make_applied_snapshot(self):
-        return {
-            "appearance": deepcopy(self.appearance_data),
-            "configuration": deepcopy(self.configuration_data),
-            "scanner": deepcopy(self.scanner_data),
-            "pointer_scanner": deepcopy(self.pointer_scanner_data),
-            "view": deepcopy(self.view_data),
-        }
+    def make_applied_snapshot(self) -> SettingsState:
+        return SettingsState(
+            tuple(
+                SettingsStateItem(group, deepcopy(self.data_for(group)))
+                for group in self.groups
+            )
+        )
 
-    def make_default_snapshot(self):
-        return {
-            "appearance": deepcopy(self.default_appearance_settings),
-            "configuration": deepcopy(self.default_configuration_settings),
-            "scanner": deepcopy(self.default_scanner_settings),
-            "pointer_scanner": deepcopy(self.default_pointer_scanner_settings),
-            "view": deepcopy(self.default_view_settings),
-        }
+    def make_default_snapshot(self) -> SettingsState:
+        return SettingsState(
+            tuple(
+                SettingsStateItem(group, deepcopy(self.default_for(group)))
+                for group in self.groups
+            )
+        )
+
+    def apply_snapshot(self, state: SettingsState) -> None:
+        for group in self.groups:
+            setattr(self, group.data_attr, deepcopy(state.get(group)))
