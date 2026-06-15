@@ -1,6 +1,7 @@
 import sys
 from copy import deepcopy
 from dataclasses import dataclass
+from logging import Logger, getLogger
 
 from PyQt6.QtCore import QSize, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -13,7 +14,6 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QPushButton,
     QStackedWidget,
-    QStyleFactory,
     QVBoxLayout,
     QWidget,
 )
@@ -30,14 +30,7 @@ from memspy.utils.settings import (
     SettingsStateItem,
 )
 
-from memspy.gui.settings.settings_pages import (
-    AppearancePage,
-    ConfigurationPage,
-    ScannerPage,
-    PointerScannerPage,
-    ViewPage,
-    SettingsPage,
-)
+from memspy.gui.settings.settings_page import SettingsFormPage, SettingsPage
 
 
 @dataclass(slots=True)
@@ -46,8 +39,19 @@ class SettingsPageEntry:
     page: SettingsPage
 
 
+GENERATED_SETTINGS_PAGES = (
+    (APPEARANCE_SETTINGS, "Appearance"),
+    (CONFIGURATION_SETTINGS, "Configuration"),
+    (SCANNER_SETTINGS, "Scanner"),
+    (POINTER_SCANNER_SETTINGS, "Pointer Scanner"),
+    (VIEW_SETTINGS, "View"),
+)
+
+
 class SettingsDialog(QDialog):
     settings_applied = pyqtSignal(object, object)
+
+    __logger: Logger = getLogger(__qualname__)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -71,20 +75,9 @@ class SettingsDialog(QDialog):
         self.update_apply_state()
 
     def _create_page_entries(self) -> list[SettingsPageEntry]:
-        self.appearance_page = AppearancePage(QStyleFactory.keys())
-        self.configuration_page = ConfigurationPage(
-            [device.name for device in self.manager.devices]
-        )
-        self.scanner_page = ScannerPage()
-        self.pointer_scanner_page = PointerScannerPage()
-        self.view_page = ViewPage()
-
         return [
-            SettingsPageEntry(APPEARANCE_SETTINGS, self.appearance_page),
-            SettingsPageEntry(CONFIGURATION_SETTINGS, self.configuration_page),
-            SettingsPageEntry(SCANNER_SETTINGS, self.scanner_page),
-            SettingsPageEntry(POINTER_SCANNER_SETTINGS, self.pointer_scanner_page),
-            SettingsPageEntry(VIEW_SETTINGS, self.view_page),
+            SettingsPageEntry(group, SettingsFormPage(self, title, group))
+            for group, title in GENERATED_SETTINGS_PAGES
         ]
 
     def __build_ui(self) -> None:

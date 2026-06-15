@@ -194,8 +194,9 @@ class MemoryScannerProcess(Process):
 
         while len(data) > 0:
             yield SCANNER.filter_values(data, value, condition, data_type), (
-                current // total
-            ) * 100
+                current * 100
+            ) // total
+
             data = np.frombuffer(
                 self.__file_reader.read_elements(chunk_size), dtype=dtype
             )

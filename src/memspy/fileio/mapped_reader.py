@@ -23,19 +23,24 @@ class MappedFileReader:
         self.reset()
         self.__filepath = filepath
         self.__dtype = dtype
+
         if os.path.getsize(filepath) == 0:
-            self.__address_list = np.empty((0,), dtype=dtype)
+            address_list = np.empty((0,), dtype=dtype)
         else:
-            self.__address_list = np.memmap(filepath, dtype=dtype, mode="r")
-        self.__total_page_number = len(self.__address_list) // self.__page_size
+            address_list = np.memmap(filepath, dtype=dtype, mode="r")
+
+        self.__address_list = address_list
+        self.__total_page_number = max((len(address_list) - 1) // self.__page_size, 0)
         self.__current_page_number = 0
-        self.__logger.debug(f'File {filepath} loaded')
+        self.__logger.debug(f"File {filepath} loaded")
 
     def read_chunk(self, start: int, chunk_size: int = 100) -> NDArray:
-        return self.__address_list[start:start + chunk_size]
+        return self.__address_list[start : start + chunk_size]
 
     def next_page(self) -> int:
-        self.__current_page_number = min(self.__current_page_number + 1, self.__total_page_number)
+        self.__current_page_number = min(
+            self.__current_page_number + 1, self.__total_page_number
+        )
         return self.__current_page_number
 
     def prev_page(self) -> int:
@@ -44,8 +49,10 @@ class MappedFileReader:
 
     def read_page(self) -> NDArray:
         if self.__address_list is None or len(self.__address_list) == 0:
-            return np.empty((0, ), dtype=self.__dtype)
-        page_start = max(min(self.__page_size * self.__current_page_number, self.size), 0)
+            return np.empty((0,), dtype=self.__dtype)
+        page_start = max(
+            min(self.__page_size * self.__current_page_number, self.size), 0
+        )
         page_end = min(self.size, page_start + self.__page_size)
         return self.__address_list[page_start:page_end]
 
@@ -53,17 +60,21 @@ class MappedFileReader:
         del self.__address_list
         self.set_file(self.__filepath, self.__dtype)
 
-    def filter_addresses(self, out_file: BinaryIO, filter_string: str = '', chunk_size: int = 100_000) -> int:
+    def filter_addresses(
+        self, out_file: BinaryIO, filter_string: str = "", chunk_size: int = 100_000
+    ) -> int:
         if self.__address_list is None:
-            self.__logger.debug(f'Address list is empty')
+            self.__logger.debug(f"Address list is empty")
             return 0
 
         file_size = len(self.__address_list)
-        if filter_string == '':
-            self.__logger.debug(f'filter_string is empty')
+        if filter_string == "":
+            self.__logger.debug(f"filter_string is empty")
             return file_size
 
-        vectorized_checker = np.vectorize(lambda number, search_str: search_str in hex(number)[2:])
+        vectorized_checker = np.vectorize(
+            lambda number, search_str: search_str in hex(number)[2:]
+        )
 
         if chunk_size == -1:
             chunk_size = file_size
@@ -74,11 +85,11 @@ class MappedFileReader:
             for i in range(0, file_size, chunk_size):
                 data = f.read(chunk_size)
                 arr = np.frombuffer(data, dtype=self.dtype)
-                mask = vectorized_checker(arr[:]['num'], search_str=vectorized_checker)
+                mask = vectorized_checker(arr[:]["num"], search_str=vectorized_checker)
                 result = arr[mask].tobytes()
                 data_written += len(result)
                 out_file.write(result)
-        self.__logger.debug(f'Filtered {data_written} bytes')
+        self.__logger.debug(f"Filtered {data_written} bytes")
 
         return data_written
 

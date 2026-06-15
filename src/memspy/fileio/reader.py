@@ -22,7 +22,7 @@ class FileStreamReader:
             raise ValueError(f"File size is not a multiple of {element_size}")
         self.__stream = open(filepath, "rb")
         self.__data_size = element_size
-        self.__logger.debug(f'File {filepath} loaded')
+        self.__logger.debug(f"File {filepath} loaded")
 
     def read(self, size: int) -> bytes:
         return self.__stream.read(size)
@@ -45,6 +45,7 @@ class FileStreamReader:
         self.reset()
         if self.__stream:
             self.__stream.close()
+            self.__stream = None
 
     def __iter__(self) -> Iterable[bytes]:
         result = self.__stream.read(self.__data_size)

@@ -13,34 +13,34 @@ class SettingsWidget(Enum):
     COMBO_TEXT = "combo_text"
 
 
+class SettingsChoiceSource(Enum):
+    THEMES = "themes"
+    DEVICES = "devices"
+
+
 @dataclass(frozen=True, slots=True)
 class SettingsFieldUi:
     label: str | None = None
     minimum: int | None = None
     maximum: int | None = None
     choices: tuple[str, ...] | None = None
+    choices_source: SettingsChoiceSource | None = None
     widget: SettingsWidget | None = None
     enabled: bool | None = None
     tooltip: str | None = None
     group: str | None = None
 
-    def merge(self, override: "SettingsFieldUi | None") -> "SettingsFieldUi":
-        if override is None:
-            return self
-
-        return SettingsFieldUi(
-            label=override.label if override.label is not None else self.label,
-            minimum=override.minimum if override.minimum is not None else self.minimum,
-            maximum=override.maximum if override.maximum is not None else self.maximum,
-            choices=override.choices if override.choices is not None else self.choices,
-            widget=override.widget if override.widget is not None else self.widget,
-            enabled=override.enabled if override.enabled is not None else self.enabled,
-            tooltip=override.tooltip if override.tooltip is not None else self.tooltip,
-            group=override.group if override.group is not None else self.group,
-        )
-
     def with_widget(self, widget: SettingsWidget) -> "SettingsFieldUi":
         return replace(self, widget=widget)
+
+    def with_choices(self, choices: tuple[str, ...]) -> "SettingsFieldUi":
+        return replace(self, choices=choices)
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsChoiceData:
+    choices: tuple[str, ...]
+    default: Any = None
 
 
 def ui_field(default: Any, **kwargs):
@@ -91,13 +91,17 @@ class AppearanceSettings(Settings):
     controls_font_size: int = ui_field(12, minimum=1, maximum=72)
     titles_font_size: int = ui_field(9, minimum=1, maximum=72)
     table_font_size: int = ui_field(10, minimum=1, maximum=72)
-    theme: str = "Windows11"
+    theme: str | None = ui_field(None, choices_source=SettingsChoiceSource.THEMES)
     addresses_per_page: int = ui_field(100, minimum=1, maximum=999999)
 
 
 @dataclass(slots=True)
 class ConfigurationSettings(Settings):
-    device: int = 0
+    device: int = ui_field(
+        -1,
+        choices_source=SettingsChoiceSource.DEVICES,
+        widget=SettingsWidget.COMBO_INDEX,
+    )
     max_threads: int = ui_field(8, minimum=1, maximum=128)
 
 

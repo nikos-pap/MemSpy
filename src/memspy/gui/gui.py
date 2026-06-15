@@ -22,7 +22,6 @@ from memspy.gui.address_scan.paged_table import PagedTable
 from memspy.gui.pointer_scan.pointer_scan_table import PointerScanTableWidget
 from memspy.gui.controls import MenuBar
 from memspy.gui.settings import SettingsDialog
-from memspy.utils.settings import CONFIG
 
 from memspy.utils.types import ScanType
 from memspy.utils.types.scan_types import ScanParameters

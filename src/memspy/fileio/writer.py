@@ -18,13 +18,13 @@ class FileWriter:
 
     Attributes:
         dtype: Optional NumPy dtype-like object.
-        filepath: Optional file path as a string.
+        __filepath: Optional file path as a string.
         __file: Optional binary file object.
     """
 
     def __init__(self, out_dir: str | os.PathLike = tempfile.gettempdir()) -> None:
         self.dtype: DTypeLike | None = None
-        self.filepath: str | None = None
+        self.__filepath: str | None = None
         self.__file: OutputFile | None = None
         self.__out_dir: str | os.PathLike = out_dir
 
@@ -45,7 +45,7 @@ class FileWriter:
     # noinspection PyTypeHints
     def __set_file(self, file: OutputFile, dtype: DTypeLike) -> None:
         self.__file = file
-        self.filepath = file.name
+        self.__filepath = file.name
         self.dtype = dtype
 
     def write(
@@ -75,11 +75,16 @@ class FileWriter:
             self.__file.write(result)
         self.__file.flush()
 
+    @property
+    def filepath(self) -> str | None:
+        return self.__filepath
+
     def close(self) -> None:
         """Closes the open file handle if any."""
         if self.__file and not self.__file.closed:
             self.__file.close()
-            self.__file = None
+        self.__file = None
+        self.__filepath = None
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         if self.__file and not self.__file.closed:
